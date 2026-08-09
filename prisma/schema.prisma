@@ -1,0 +1,353 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum GoalStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+}
+
+enum GoalPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum HabitCategory {
+  HEALTH
+  FITNESS
+  LEARNING
+  MINDFULNESS
+  PRODUCTIVITY
+  SOCIAL
+  FINANCE
+  OTHER
+}
+
+enum GoalCategory {
+  PERSONAL
+  CAREER
+  FITNESS
+  EDUCATION
+  FINANCE
+  HEALTH
+  RELATIONSHIPS
+  OTHER
+}
+
+enum NotificationType {
+  HABIT_REMINDER
+  GOAL_REMINDER
+  WEEKLY_REPORT
+  ACHIEVEMENT
+  MOTIVATION
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Users
+// ─────────────────────────────────────────────────────────────────────────────
+
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  name            String
+  passwordHash    String?
+  googleId        String?   @unique
+  appleId         String?   @unique
+  avatarUrl       String?
+  fcmToken        String?
+  currentStreak   Int       @default(0)
+  longestStreak   Int       @default(0)
+  isEmailVerified Boolean   @default(false)
+  savingsBalance  Float     @default(0.0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  habits             Habit[]
+  goals              Goal[]
+  habitLogs          HabitLog[]
+  aiReports          AiReport[]
+  notifications      Notification[]
+  refreshTokens      RefreshToken[]
+  missedHabitReasons MissedHabitReason[]
+  monthlyBudgets     MonthlyBudget[]
+  expenses           Expense[]
+  monthlySettlements MonthlySettlement[]
+
+  @@index([email])
+  @@index([googleId])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([token])
+  @@map("refresh_tokens")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Habits
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Habit {
+  id           String        @id @default(cuid())
+  userId       String
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  category     HabitCategory @default(OTHER)
+  emoji        String?
+  color        String?
+  repeatDays   Boolean[]     @default([true, true, true, true, true, true, true])
+  reminderTime String?       // "HH:MM" format
+  notes        String?
+  isActive     Boolean       @default(true)
+  currentStreak Int          @default(0)
+  longestStreak Int          @default(0)
+  totalCompleted Int         @default(0)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  logs               HabitLog[]
+  missedHabitReasons MissedHabitReason[]
+
+  @@index([userId])
+  @@index([userId, isActive])
+  @@map("habits")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Habit Logs
+// ─────────────────────────────────────────────────────────────────────────────
+
+model HabitLog {
+  id          String    @id @default(cuid())
+  habitId     String
+  habit       Habit     @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date        DateTime  @db.Date
+  completedAt DateTime?
+  isSkipped   Boolean   @default(false)
+  skipReason  String?
+  notes       String?
+  createdAt   DateTime  @default(now())
+
+  @@unique([habitId, date])
+  @@index([habitId])
+  @@index([userId, date])
+  @@index([date])
+  @@map("habit_logs")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Goals
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Goal {
+  id          String       @id @default(cuid())
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  category    GoalCategory @default(PERSONAL)
+  description String?
+  targetDate  DateTime
+  priority    GoalPriority @default(MEDIUM)
+  status      GoalStatus   @default(IN_PROGRESS)
+  progress    Float        @default(0)
+  notes       String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  progressHistory GoalProgress[]
+
+  @@index([userId])
+  @@index([userId, status])
+  @@index([targetDate])
+  @@map("goals")
+}
+
+model GoalProgress {
+  id        String   @id @default(cuid())
+  goalId    String
+  goal      Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  progress  Float
+  notes     String?
+  recordedAt DateTime @default(now())
+
+  @@index([goalId])
+  @@map("goal_progress")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AI Reports
+// ─────────────────────────────────────────────────────────────────────────────
+
+model AiReport {
+  id                  String   @id @default(cuid())
+  userId              String
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weekStart           DateTime
+  weekEnd             DateTime
+  productivityScore   Int      @default(0)
+  weeklyReport        String
+  strengths           String[]
+  weaknesses          String[]
+  recommendations     String[]
+  rawResponse         Json?
+  createdAt           DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, weekStart])
+  @@map("ai_reports")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Notifications
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  body      String
+  data      Json?
+  isRead    Boolean          @default(false)
+  sentAt    DateTime         @default(now())
+  readAt    DateTime?
+
+  @@index([userId])
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Missed Habit Reasons (Accountability / AI Analytics)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model MissedHabitReason {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  habitId    String
+  habit      Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  missedDate DateTime @db.Date
+  reason     String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, habitId, missedDate])
+  @@index([userId])
+  @@index([userId, missedDate])
+  @@index([habitId])
+  @@map("missed_habit_reasons")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Expense Tracker
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum ExpenseCategory {
+  FOOD
+  TRANSPORT
+  SHOPPING
+  BILLS
+  HEALTH
+  EDUCATION
+  ENTERTAINMENT
+  TRAVEL
+  SALARY
+  OTHER
+}
+
+enum PaymentMethod {
+  CASH
+  UPI
+  CREDIT_CARD
+  DEBIT_CARD
+  BANK_TRANSFER
+}
+
+model MonthlyBudget {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  month           Int
+  year            Int
+  monthlyIncome   Float
+  savingsTarget   Float
+  spendableBudget Float
+  dailyGoal       Float
+  daysInMonth     Int
+  monthlyProfit   Float    @default(0.0)
+  monthlyLoss     Float    @default(0.0)
+  settled         Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, month, year])
+  @@index([userId])
+  @@map("monthly_budgets")
+}
+
+model Expense {
+  id            String          @id @default(cuid())
+  userId        String
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title         String
+  amount        Float
+  category      ExpenseCategory @default(OTHER)
+  paymentMethod PaymentMethod   @default(CASH)
+  date          DateTime        @db.Date
+  time          String?
+  notes         String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([userId])
+  @@index([userId, date])
+  @@index([userId, category])
+  @@map("expenses")
+}
+
+model MonthlySettlement {
+  id                      String   @id @default(cuid())
+  userId                  String
+  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  month                   Int
+  year                    Int
+  totalBudget             Float
+  totalExpenses           Float
+  totalProfit             Float
+  totalLoss               Float
+  netResult               Float
+  savingsBeforeSettlement Float
+  savingsAfterSettlement  Float
+  settlementDate          DateTime @default(now())
+
+  @@unique([userId, month, year])
+  @@index([userId])
+  @@map("monthly_settlements")
+}
