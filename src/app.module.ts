@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { HabitsModule } from './habits/habits.module';
@@ -41,6 +42,11 @@ import { ExpensesModule } from './expenses/expenses.module';
     NotificationsModule,
     MissedReasonsModule,
     ExpensesModule,
+  ],
+  providers: [
+    // Global rate limiting — the ThrottlerModule config did nothing before
+    // because no guard was ever registered to enforce it.
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
 export class AppModule {}

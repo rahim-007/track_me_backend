@@ -7,6 +7,12 @@ export interface FinanceCalculatorInput {
   daysInPeriod: number;
   elapsedDays: number;
   remainingDays: number;
+  /**
+   * When set, uses this as the daily goal instead of dividing the spendable
+   * budget by the days in the period. Used to honor a stored budget's
+   * remaining-days daily goal (e.g. a budget started on Aug 16).
+   */
+  dailyGoalOverride?: number;
 }
 
 export class FinanceCalculator {
@@ -20,6 +26,7 @@ export class FinanceCalculator {
       daysInPeriod,
       elapsedDays,
       remainingDays,
+      dailyGoalOverride,
     } = input;
 
     // 1. Income = Base Income (from budget config) + any salary transactions logged
@@ -35,7 +42,10 @@ export class FinanceCalculator {
     const remainingBudget = spendableBudget - expensesSum;
 
     // 5. Today's Budget (Daily Budget) = Spendable Budget / Days in Period
-    const dailyGoal = daysInPeriod > 0 ? spendableBudget / daysInPeriod : 0;
+    //    (unless the budget was configured with a remaining-days goal).
+    const dailyGoal = dailyGoalOverride != null
+      ? dailyGoalOverride
+      : (daysInPeriod > 0 ? spendableBudget / daysInPeriod : 0);
 
     // 6. Today's Spending
     const todaySpending = todayExpensesSum;

@@ -83,6 +83,7 @@ model User {
   aiReports          AiReport[]
   notifications      Notification[]
   refreshTokens      RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
   missedHabitReasons MissedHabitReason[]
   monthlyBudgets     MonthlyBudget[]
   expenses           Expense[]
@@ -91,6 +92,19 @@ model User {
   @@index([email])
   @@index([googleId])
   @@map("users")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("password_reset_tokens")
 }
 
 model RefreshToken {

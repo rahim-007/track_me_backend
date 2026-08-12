@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBudgetDto } from './dto/create-budget.dto';
 import { CreateExpenseDto } from './dto/create-expense.dto';
@@ -15,12 +15,27 @@ export class ExpensesService {
     return new Date(year, month, 0).getDate();
   }
 
+  /**
+   * The day of the month the budget effectively starts counting from.
+   * Derived from when the budget row was first created, so a budget set up on
+   * Aug 16 counts days from Aug 16 (not from the 1st). Returns 1 when the
+   * budget was created in a different month than the one it describes.
+   */
+  private getStartDay(createdAt: Date, month: number, year: number): number {
+    const c = new Date(createdAt);
+    if (c.getMonth() + 1 === month && c.getFullYear() === year) {
+      return c.getDate();
+    }
+    return 1;
+  }
+
   async calculateMonthlyProfitLoss(
     userId: string,
     month: number,
     year: number,
     dailyGoal: number,
     referenceDate: Date = new Date(),
+    startDay: number = 1,
   ) {
     const startDate = new Date(Date.UTC(year, month - 1, 1));
     const endDate = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
@@ -46,7 +61,7 @@ export class ExpensesService {
     const isCurrentMonth = referenceDate.getUTCMonth() + 1 === month && referenceDate.getUTCFullYear() === year;
     const maxDay = isCurrentMonth ? referenceDate.getUTCDate() - 1 : daysInMonth;
 
-    for (let day = 1; day <= maxDay; day++) {
+    for (let day = startDay; day <= maxDay; day++) {
       const currentDayDate = new Date(Date.UTC(year, month - 1, day));
       const dateKey = currentDayDate.toISOString().split('T')[0];
       const spentToday = dailySpendingMap[dateKey] ?? 0;
@@ -68,13 +83,54 @@ export class ExpensesService {
     });
     if (!budget) return;
 
+    const startDay = this.getStartDay(budget.createdAt, budget.month, budget.year);
     const { monthlyProfit, monthlyLoss } = await this.calculateMonthlyProfitLoss(
       userId,
       month,
       year,
       budget.dailyGoal,
-      referenceDate
+      referenceDate,
+      startDay
     );
+
+    // If this month was already settled, keep savings & the settlement record in
+    // sync when its expenses are edited later (no more stale savings balance).
+    if (budget.settled) {
+      const oldNet = budget.monthlyProfit - budget.monthlyLoss;
+      const newNet = monthlyProfit - monthlyLoss;
+      const delta = newNet - oldNet;
+
+      await this.prisma.$transaction(async (tx) => {
+        await tx.monthlyBudget.update({
+          where: { id: budget.id },
+          data: { monthlyProfit, monthlyLoss },
+        });
+
+        if (delta !== 0) {
+          await tx.user.update({
+            where: { id: userId },
+            data: { savingsBalance: { increment: delta } },
+          });
+        }
+
+        const settlement = await tx.monthlySettlement.findUnique({
+          where: { userId_month_year: { userId, month: budget.month, year: budget.year } },
+        });
+        if (settlement) {
+          const savingsBefore = settlement.savingsAfterSettlement - settlement.netResult;
+          await tx.monthlySettlement.update({
+            where: { id: settlement.id },
+            data: {
+              totalProfit: monthlyProfit,
+              totalLoss: monthlyLoss,
+              netResult: newNet,
+              savingsAfterSettlement: savingsBefore + newNet,
+            },
+          });
+        }
+      });
+      return;
+    }
 
     await this.prisma.monthlyBudget.update({
       where: { id: budget.id },
@@ -105,32 +161,42 @@ export class ExpensesService {
     });
 
     for (const budget of unsettledPastBudgets) {
+      const startDay = this.getStartDay(budget.createdAt, budget.month, budget.year);
       const { monthlyProfit, monthlyLoss } = await this.calculateMonthlyProfitLoss(
         userId,
         budget.month,
         budget.year,
-        budget.dailyGoal
+        budget.dailyGoal,
+        new Date(),
+        startDay
       );
 
       const netResult = monthlyProfit - monthlyLoss;
 
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId }
-      });
-
-      if (!user) continue;
-
-      const savingsBeforeSettlement = user.savingsBalance;
-      const savingsAfterSettlement = savingsBeforeSettlement + netResult;
-
       await this.prisma.$transaction(async (tx) => {
+        // Atomically claim the settlement — if another request already settled
+        // this month (concurrent calls), we skip without double-applying.
+        const claimed = await tx.monthlyBudget.updateMany({
+          where: { id: budget.id, settled: false },
+          data: { settled: true },
+        });
+        if (claimed.count === 0) return;
+
+        const user = await tx.user.findUnique({
+          where: { id: userId },
+        });
+        if (!user) return;
+
+        const savingsBeforeSettlement = user.savingsBalance;
+        const savingsAfterSettlement = savingsBeforeSettlement + netResult;
+
         await tx.user.update({
           where: { id: userId },
-          data: { savingsBalance: savingsAfterSettlement }
+          data: { savingsBalance: { increment: netResult } },
         });
 
         const endOfMonth = new Date(Date.UTC(budget.year, budget.month, 0, 23, 59, 59, 999));
-        
+
         const expensesSumAggregate = await tx.expense.aggregate({
           where: {
             userId,
@@ -149,15 +215,27 @@ export class ExpensesService {
           data: {
             monthlyProfit,
             monthlyLoss,
-            settled: true
           }
         });
 
-        await tx.monthlySettlement.create({
-          data: {
+        await tx.monthlySettlement.upsert({
+          where: {
+            userId_month_year: { userId, month: budget.month, year: budget.year },
+          },
+          create: {
             userId,
             month: budget.month,
             year: budget.year,
+            totalBudget: budget.spendableBudget,
+            totalExpenses,
+            totalProfit: monthlyProfit,
+            totalLoss: monthlyLoss,
+            netResult,
+            savingsBeforeSettlement,
+            savingsAfterSettlement,
+            settlementDate: new Date()
+          },
+          update: {
             totalBudget: budget.spendableBudget,
             totalExpenses,
             totalProfit: monthlyProfit,
@@ -178,7 +256,21 @@ export class ExpensesService {
     const year = dto.year ?? now.getFullYear();
     const daysInMonth = this.getDaysInMonth(month, year);
     const spendableBudget = dto.monthlyIncome - dto.savingsTarget;
-    const dailyGoal = daysInMonth > 0 ? spendableBudget / daysInMonth : 0;
+
+    // A budget "starts" on the day it is first configured (e.g. set up on
+    // Aug 16 -> the daily goal is spread over Aug 16..31, not the whole month).
+    const isCurrentMonth = now.getMonth() + 1 === month && now.getFullYear() === year;
+    const existing = await this.prisma.monthlyBudget.findUnique({
+      where: { userId_month_year: { userId, month, year } },
+      select: { id: true, createdAt: true },
+    });
+    const startDay = existing
+      ? this.getStartDay(existing.createdAt, month, year)
+      : isCurrentMonth
+        ? now.getDate()
+        : 1;
+    const goalDays = Math.max(1, daysInMonth - startDay + 1);
+    const dailyGoal = goalDays > 0 ? spendableBudget / goalDays : 0;
 
     const budget = await this.prisma.monthlyBudget.upsert({
       where: {
@@ -313,6 +405,10 @@ export class ExpensesService {
       where: { id, userId }
     });
 
+    if (!originalExpense) {
+      throw new NotFoundException('Expense not found');
+    }
+
     const result = await this.prisma.expense.updateMany({
       where: { id, userId },
       data,
@@ -341,6 +437,10 @@ export class ExpensesService {
     const originalExpense = await this.prisma.expense.findFirst({
       where: { id, userId }
     });
+
+    if (!originalExpense) {
+      throw new NotFoundException('Expense not found');
+    }
 
     const result = await this.prisma.expense.deleteMany({
       where: { id, userId },
@@ -541,8 +641,13 @@ export class ExpensesService {
     const expensesSum = expensesSumAggregate._sum.amount ?? 0;
     const expensesCount = expensesSumAggregate._count ?? 0;
 
-    // Run dynamic calculations using centralized calculator
-    const baseIncome = budget?.monthlyIncome ?? 0;
+    // Run dynamic calculations using centralized calculator. Note: a "virtual"
+    // budget is synthesized from the salary transactions themselves, so its
+    // monthlyIncome already equals the salary sum — adding salarySum again
+    // would double count income.
+    const isVirtualBudget =
+      budget != null && budget.id != null && String(budget.id).startsWith('virtual_');
+    const baseIncome = budget && !isVirtualBudget ? budget.monthlyIncome : 0;
     const baseSavingsTarget = budget?.savingsTarget ?? 0;
 
     const calc = FinanceCalculator.calculate({
@@ -554,6 +659,8 @@ export class ExpensesService {
       daysInPeriod,
       elapsedDays,
       remainingDays,
+      // Honor the stored remaining-days daily goal (mid-month budget start).
+      dailyGoalOverride: budget && !isVirtualBudget ? budget.dailyGoal : undefined,
     });
 
     // Recent transactions in the period (last 10, including SALARY)

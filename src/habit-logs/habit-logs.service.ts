@@ -1,19 +1,37 @@
-import { Injectable, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class HabitLogsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * Assert the habit belongs to the authenticated user so users can never
+   * create/modify logs (or counters) against someone else's habit.
+   */
+  private async assertOwnedHabit(userId: string, habitId: string) {
+    const habit = await this.prisma.habit.findFirst({
+      where: { id: habitId, userId },
+      select: { id: true },
+    });
+    if (!habit) {
+      throw new NotFoundException('Habit not found');
+    }
+  }
+
   async completeHabit(userId: string, habitId: string, date: string) {
+    await this.assertOwnedHabit(userId, habitId);
     const parsedDate = new Date(date);
 
-    const existing = await this.prisma.habitLog.findUnique({
-      where: { habitId_date: { habitId, date: parsedDate } },
+    const existing = await this.prisma.habitLog.findFirst({
+      where: { habitId, date: parsedDate, userId },
     });
 
+    // Idempotent: marking an already-completed habit again is a no-op (returns
+    // the existing log) rather than a 409 — the app double-taps freely and the
+    // totalCompleted counter is never double-incremented because we skip it.
     if (existing && !existing.isSkipped) {
-      throw new ConflictException('Habit already completed for this date');
+      return existing;
     }
 
     const log = await this.prisma.habitLog.upsert({
@@ -32,16 +50,20 @@ export class HabitLogsService {
       },
     });
 
-    // Update habit completion count
-    await this.prisma.habit.update({
-      where: { id: habitId },
-      data: { totalCompleted: { increment: 1 } },
-    });
+    // totalCompleted counts distinct completed logs. Only increment when this
+    // is a brand-new completion (not when converting a skip back to complete).
+    if (!existing) {
+      await this.prisma.habit.update({
+        where: { id: habitId },
+        data: { totalCompleted: { increment: 1 } },
+      });
+    }
 
     return log;
   }
 
   async skipHabit(userId: string, habitId: string, date: string, reason: string) {
+    await this.assertOwnedHabit(userId, habitId);
     const parsedDate = new Date(date);
 
     return this.prisma.habitLog.upsert({
@@ -62,10 +84,27 @@ export class HabitLogsService {
   }
 
   async uncomplete(userId: string, habitId: string, date: string) {
+    await this.assertOwnedHabit(userId, habitId);
     const parsedDate = new Date(date);
-    return this.prisma.habitLog.deleteMany({
+
+    const log = await this.prisma.habitLog.findFirst({
+      where: { habitId, date: parsedDate, userId },
+    });
+
+    const result = await this.prisma.habitLog.deleteMany({
       where: { habitId, userId, date: parsedDate },
     });
+
+    // Keep the completion counter in sync — remove the count only when an
+    // actual completed (non-skipped) log was deleted.
+    if (log && !log.isSkipped && result.count > 0) {
+      await this.prisma.habit.update({
+        where: { id: habitId },
+        data: { totalCompleted: { decrement: 1 } },
+      });
+    }
+
+    return result;
   }
 
   async getWeeklyStats(userId: string) {

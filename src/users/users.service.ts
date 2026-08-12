@@ -6,14 +6,9 @@ export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
   async calculateUserStreak(userId: string) {
-    const [habits, logs] = await Promise.all([
-      this.prisma.habit.findMany({
-        where: { userId },
-      }),
-      this.prisma.habitLog.findMany({
-        where: { userId },
-      }),
-    ]);
+    const habits = await this.prisma.habit.findMany({
+      where: { userId },
+    });
 
     if (habits.length === 0) {
       await this.prisma.user.update({
@@ -22,6 +17,32 @@ export class UsersService {
       });
       return { currentStreak: 0, longestStreak: 0 };
     }
+
+    // Earliest habit creation date
+    let earliestHabitDate: Date | null = null;
+    for (const h of habits) {
+      if (!earliestHabitDate || h.createdAt < earliestHabitDate) {
+        earliestHabitDate = h.createdAt;
+      }
+    }
+    if (!earliestHabitDate) {
+      earliestHabitDate = new Date();
+    }
+
+    // Cap the scan window to one year so streak computation stays fast for
+    // long-time users instead of walking every day since the first habit.
+    const windowStart = new Date();
+    windowStart.setDate(windowStart.getDate() - 366);
+    const scanStart = earliestHabitDate < windowStart ? windowStart : earliestHabitDate;
+
+    const logs = await this.prisma.habitLog.findMany({
+      where: {
+        userId,
+        date: {
+          gte: new Date(Date.UTC(scanStart.getFullYear(), scanStart.getMonth(), scanStart.getDate())),
+        },
+      },
+    });
 
     const getLocalDateString = (d: Date): string => {
       const year = d.getFullYear();
@@ -40,17 +61,7 @@ export class UsersService {
       logsByDate.get(dateStr)!.push(log);
     }
 
-    // Earliest habit creation date
-    let earliestHabitDate: Date | null = null;
-    for (const h of habits) {
-      if (!earliestHabitDate || h.createdAt < earliestHabitDate) {
-        earliestHabitDate = h.createdAt;
-      }
-    }
-    if (!earliestHabitDate) {
-      earliestHabitDate = new Date();
-    }
-    const earliestDateStr = getLocalDateString(earliestHabitDate);
+    const earliestDateStr = getLocalDateString(scanStart);
 
     const today = new Date();
     const todayStr = getLocalDateString(today);

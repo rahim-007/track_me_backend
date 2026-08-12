@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateHabitDto } from './dto/create-habit.dto';
 import { UpdateHabitDto } from './dto/update-habit.dto';
@@ -35,7 +35,7 @@ export class HabitsService {
   }
 
   async findOne(userId: string, id: string) {
-    return this.prisma.habit.findFirst({
+    const habit = await this.prisma.habit.findFirst({
       where: { id, userId, isActive: true },
       include: {
         logs: {
@@ -44,6 +44,11 @@ export class HabitsService {
         },
       },
     });
+    if (!habit) {
+      // Never reveal whether the id exists but belongs to someone else.
+      throw new NotFoundException('Habit not found');
+    }
+    return habit;
   }
 
   async create(userId: string, dto: CreateHabitDto) {
@@ -56,18 +61,26 @@ export class HabitsService {
   }
 
   async update(userId: string, id: string, dto: UpdateHabitDto) {
-    return this.prisma.habit.updateMany({
+    const result = await this.prisma.habit.updateMany({
       where: { id, userId },
       data: dto,
     });
+    if (result.count === 0) {
+      throw new NotFoundException('Habit not found');
+    }
+    return result;
   }
 
   async remove(userId: string, id: string) {
     // Soft delete
-    return this.prisma.habit.updateMany({
+    const result = await this.prisma.habit.updateMany({
       where: { id, userId },
       data: { isActive: false },
     });
+    if (result.count === 0) {
+      throw new NotFoundException('Habit not found');
+    }
+    return result;
   }
 
   async getStreak(userId: string, habitId: string) {
