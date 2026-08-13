@@ -16,15 +16,14 @@ export class ExpensesService {
   }
 
   /**
-   * The day of the month the budget effectively starts counting from.
-   * Derived from when the budget row was first created, so a budget set up on
-   * Aug 16 counts days from Aug 16 (not from the 1st). Returns 1 when the
-   * budget was created in a different month than the one it describes.
+   * The day of the month the budget's daily goal / P&L counting starts from.
+   * Always "today" for the current month (the daily goal is spread over the
+   * days remaining from today to month end); the 1st for any other month.
+   * Never based on when the budget row was created.
    */
-  private getStartDay(createdAt: Date, month: number, year: number): number {
-    const c = new Date(createdAt);
-    if (c.getMonth() + 1 === month && c.getFullYear() === year) {
-      return c.getDate();
+  private getEffectiveStartDay(month: number, year: number, now: Date = new Date()): number {
+    if (now.getUTCMonth() + 1 === month && now.getUTCFullYear() === year) {
+      return now.getUTCDate();
     }
     return 1;
   }
@@ -82,7 +81,7 @@ export class ExpensesService {
     });
     if (!budget) return;
 
-    const startDay = this.getStartDay(budget.createdAt, budget.month, budget.year);
+    const startDay = this.getEffectiveStartDay(budget.month, budget.year, referenceDate);
     const { monthlyProfit, monthlyLoss } = await this.calculateMonthlyProfitLoss(
       userId,
       month,
@@ -160,7 +159,8 @@ export class ExpensesService {
     });
 
     for (const budget of unsettledPastBudgets) {
-      const startDay = this.getStartDay(budget.createdAt, budget.month, budget.year);
+      // Past months have fully elapsed, so the balance always counts the full month.
+      const startDay = 1;
       const { monthlyProfit, monthlyLoss } = await this.calculateMonthlyProfitLoss(
         userId,
         budget.month,
@@ -256,18 +256,14 @@ export class ExpensesService {
     const daysInMonth = this.getDaysInMonth(month, year);
     const spendableBudget = dto.monthlyIncome - dto.savingsTarget;
 
-    // A budget "starts" on the day it is first configured (e.g. set up on
-    // Aug 16 -> the daily goal is spread over Aug 16..31, not the whole month).
+    // A budget always starts from today (e.g. set up on Aug 16 -> the daily
+    // goal is spread over Aug 16..31, not the whole month, regardless of when
+    // the budget was first created or last edited).
     const isCurrentMonth = now.getMonth() + 1 === month && now.getFullYear() === year;
-    const existing = await this.prisma.monthlyBudget.findUnique({
-      where: { userId_month_year: { userId, month, year } },
-      select: { id: true, createdAt: true },
-    });
-    const startDay = existing
-      ? this.getStartDay(existing.createdAt, month, year)
-      : isCurrentMonth
-        ? now.getDate()
-        : 1;
+    // The daily goal is always spread over the days remaining from today to
+    // month end (never from when the budget was first created), so setting up
+    // or editing a budget mid-month uses the remaining days, not the full month.
+    const startDay = isCurrentMonth ? now.getDate() : 1;
     const goalDays = Math.max(1, daysInMonth - startDay + 1);
     const dailyGoal = goalDays > 0 ? spendableBudget / goalDays : 0;
 
