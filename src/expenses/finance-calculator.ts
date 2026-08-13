@@ -63,7 +63,11 @@ export class FinanceCalculator {
     const rawProgress = savingsTarget > 0 ? (currentSavings / savingsTarget) : 0;
     const savingsProgress = rawProgress < 0 ? 0 : rawProgress > 1 ? 1 : rawProgress;
 
-    // 11. Daily Average = Total Spent / Elapsed Days
+    // 11. Savings Rate = (Income - Total Expenses) / Income (capped between 0.0 and 1.0)
+    const rawSavingsRate = monthlyIncome > 0 ? (monthlyIncome - expensesSum) / monthlyIncome : 0;
+    const savingsRate = rawSavingsRate < 0 ? 0 : rawSavingsRate > 1 ? 1 : rawSavingsRate;
+
+    // 12. Daily Average = Total Spent / Elapsed Days
     const activeElapsedDays = elapsedDays > 0 ? elapsedDays : 1;
     const averageDailyExpense = expensesSum / activeElapsedDays;
 
@@ -78,6 +82,7 @@ export class FinanceCalculator {
       loss,
       currentSavings,
       savingsProgress,
+      savingsRate,
       averageDailyExpense,
     };
   }

@@ -54,27 +54,26 @@ export class ExpensesService {
       dailySpendingMap[dateStr] = (dailySpendingMap[dateStr] || 0) + exp.amount;
     }
 
-    let monthlyProfit = 0;
-    let monthlyLoss = 0;
-
+    // Running P&L balance: each day's surplus (daily limit - spending) carries
+    // forward to the next day and nets against later overspending — exactly like
+    // a normal profit & loss account. Today is included so today's leftover is
+    // immediately added to tomorrow's available budget.
     const daysInMonth = this.getDaysInMonth(month, year);
     const isCurrentMonth = referenceDate.getUTCMonth() + 1 === month && referenceDate.getUTCFullYear() === year;
-    const maxDay = isCurrentMonth ? referenceDate.getUTCDate() - 1 : daysInMonth;
+    const maxDay = isCurrentMonth ? referenceDate.getUTCDate() : daysInMonth;
 
+    let balance = 0;
     for (let day = startDay; day <= maxDay; day++) {
       const currentDayDate = new Date(Date.UTC(year, month - 1, day));
       const dateKey = currentDayDate.toISOString().split('T')[0];
       const spentToday = dailySpendingMap[dateKey] ?? 0;
-
-      const difference = dailyGoal - spentToday;
-      if (difference > 0) {
-        monthlyProfit += difference;
-      } else if (difference < 0) {
-        monthlyLoss += Math.abs(difference);
-      }
+      balance += dailyGoal - spentToday;
     }
 
-    return { monthlyProfit, monthlyLoss };
+    return {
+      monthlyProfit: balance > 0 ? balance : 0,
+      monthlyLoss: balance < 0 ? -balance : 0,
+    };
   }
 
   async recalculateCurrentBudgetProfitLoss(userId: string, month: number, year: number, referenceDate: Date = new Date()) {
@@ -697,6 +696,7 @@ export class ExpensesService {
         remainingBudget: calc.remainingBudget,
         currentSavings: calc.currentSavings,
         savingsProgress: calc.savingsProgress,
+        savingsRate: calc.savingsRate,
         averageDailyExpense: calc.averageDailyExpense,
         monthlyProfit: budget ? (budget as any).monthlyProfit : 0.0,
         monthlyLoss: budget ? (budget as any).monthlyLoss : 0.0,
