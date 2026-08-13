@@ -12,4 +12,8 @@ class AppSettingsModel {
   bool habitRemindersEnabled = true;
   bool goalRemindersEnabled = true;
   bool weeklyReportEnabled = true;
+
+  /// Stores 'yyyy-MM-dd' of the last day the missed-habits reflection
+  /// popup was successfully submitted. Prevents re-showing the same day.
+  String? lastReflectionDate;
 }

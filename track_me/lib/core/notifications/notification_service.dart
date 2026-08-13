@@ -10,6 +10,7 @@ class NotificationService {
   static final _plugin = FlutterLocalNotificationsPlugin();
 
   static Future<void> initialize() async {
+    if (kIsWeb) return;
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosInit = DarwinInitializationSettings(
       requestAlertPermission: true,
@@ -31,6 +32,7 @@ class NotificationService {
     required int hour,
     required int minute,
   }) async {
+    if (kIsWeb) return;
     try {
       await _plugin.zonedSchedule(
         AppConstants.habitNotificationBaseId + habitNotificationId,
@@ -58,6 +60,7 @@ class NotificationService {
   }
 
   static Future<void> cancelHabitReminder(int habitNotificationId) async {
+    if (kIsWeb) return;
     await _plugin.cancel(
       AppConstants.habitNotificationBaseId + habitNotificationId,
     );
@@ -68,6 +71,7 @@ class NotificationService {
     required String body,
     int id = 0,
   }) async {
+    if (kIsWeb) return;
     await _plugin.show(
       id,
       title,
@@ -84,6 +88,7 @@ class NotificationService {
   }
 
   static Future<void> cancelAll() async {
+    if (kIsWeb) return;
     await _plugin.cancelAll();
   }
 

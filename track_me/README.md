@@ -92,7 +92,7 @@ cp .env.example .env.dev.json
 Edit `.env.dev.json`:
 ```json
 {
-  "BASE_URL": "http://10.0.2.2:3000/api",
+  "BASE_URL": "https://track-me-backend-pe6j.onrender.com/api",
   "GEMINI_API_KEY": "your_gemini_api_key",
   "GOOGLE_CLIENT_ID": "your_google_client_id"
 }

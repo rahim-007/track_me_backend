@@ -73,19 +73,38 @@ model User {
   currentStreak   Int       @default(0)
   longestStreak   Int       @default(0)
   isEmailVerified Boolean   @default(false)
+  savingsBalance  Float     @default(0.0)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  habits        Habit[]
-  goals         Goal[]
-  habitLogs     HabitLog[]
-  aiReports     AiReport[]
-  notifications Notification[]
-  refreshTokens RefreshToken[]
+  habits             Habit[]
+  goals              Goal[]
+  habitLogs          HabitLog[]
+  aiReports          AiReport[]
+  notifications      Notification[]
+  refreshTokens      RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+  missedHabitReasons MissedHabitReason[]
+  monthlyBudgets     MonthlyBudget[]
+  expenses           Expense[]
+  monthlySettlements MonthlySettlement[]
 
   @@index([email])
   @@index([googleId])
   @@map("users")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("password_reset_tokens")
 }
 
 model RefreshToken {
@@ -123,7 +142,8 @@ model Habit {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
-  logs HabitLog[]
+  logs               HabitLog[]
+  missedHabitReasons MissedHabitReason[]
 
   @@index([userId])
   @@index([userId, isActive])
@@ -235,4 +255,113 @@ model Notification {
   @@index([userId])
   @@index([userId, isRead])
   @@map("notifications")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Missed Habit Reasons (Accountability / AI Analytics)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model MissedHabitReason {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  habitId    String
+  habit      Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  missedDate DateTime @db.Date
+  reason     String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, habitId, missedDate])
+  @@index([userId])
+  @@index([userId, missedDate])
+  @@index([habitId])
+  @@map("missed_habit_reasons")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Expense Tracker
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum ExpenseCategory {
+  FOOD
+  TRANSPORT
+  SHOPPING
+  BILLS
+  HEALTH
+  EDUCATION
+  ENTERTAINMENT
+  TRAVEL
+  SALARY
+  OTHER
+}
+
+enum PaymentMethod {
+  CASH
+  UPI
+  CREDIT_CARD
+  DEBIT_CARD
+  BANK_TRANSFER
+}
+
+model MonthlyBudget {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  month           Int
+  year            Int
+  monthlyIncome   Float
+  savingsTarget   Float
+  spendableBudget Float
+  dailyGoal       Float
+  daysInMonth     Int
+  monthlyProfit   Float    @default(0.0)
+  monthlyLoss     Float    @default(0.0)
+  settled         Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, month, year])
+  @@index([userId])
+  @@map("monthly_budgets")
+}
+
+model Expense {
+  id            String          @id @default(cuid())
+  userId        String
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title         String
+  amount        Float
+  category      ExpenseCategory @default(OTHER)
+  paymentMethod PaymentMethod   @default(CASH)
+  date          DateTime        @db.Date
+  time          String?
+  notes         String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([userId])
+  @@index([userId, date])
+  @@index([userId, category])
+  @@map("expenses")
+}
+
+model MonthlySettlement {
+  id                      String   @id @default(cuid())
+  userId                  String
+  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  month                   Int
+  year                    Int
+  totalBudget             Float
+  totalExpenses           Float
+  totalProfit             Float
+  totalLoss               Float
+  netResult               Float
+  savingsBeforeSettlement Float
+  savingsAfterSettlement  Float
+  settlementDate          DateTime @default(now())
+
+  @@unique([userId, month, year])
+  @@index([userId])
+  @@map("monthly_settlements")
 }

@@ -118,7 +118,7 @@ class _InsightsBody extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.auto_awesome_rounded,
                         size: 14,
                         color: AppColors.primary,
@@ -342,7 +342,7 @@ class _RecommendationCard extends StatelessWidget {
             child: Center(
               child: Text(
                 '$index',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                   color: AppColors.primary,

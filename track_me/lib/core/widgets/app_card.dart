@@ -67,7 +67,7 @@ class AppCard extends StatelessWidget {
 /// Gradient card for premium look
 class GradientCard extends StatelessWidget {
   final Widget child;
-  final Gradient gradient;
+  final Gradient? gradient;
   final EdgeInsetsGeometry? padding;
   final double borderRadius;
   final VoidCallback? onTap;
@@ -75,7 +75,7 @@ class GradientCard extends StatelessWidget {
   const GradientCard({
     super.key,
     required this.child,
-    this.gradient = AppColors.primaryGradient,
+    this.gradient,
     this.padding,
     this.borderRadius = 20,
     this.onTap,
@@ -86,7 +86,7 @@ class GradientCard extends StatelessWidget {
     return AppCard(
       padding: padding,
       borderRadius: borderRadius,
-      gradient: gradient,
+      gradient: gradient ?? AppColors.primaryGradient,
       onTap: onTap,
       child: child,
     );

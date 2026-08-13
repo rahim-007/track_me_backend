@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -44,8 +45,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
         '/auth/login',
         data: {'email': email, 'password': password},
       );
-      await _saveTokens(response.data);
-      state = AuthSuccess(userId: response.data['user']['id'].toString());
+      final responseData = response.data['data'] ?? response.data;
+      await _saveTokens(responseData);
+      state = AuthSuccess(userId: responseData['user']['id'].toString());
     } catch (e) {
       state = AuthError(message: _parseError(e));
     }
@@ -63,8 +65,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
         '/auth/register',
         data: {'name': name, 'email': email, 'password': password},
       );
-      await _saveTokens(response.data);
-      state = AuthSuccess(userId: response.data['user']['id'].toString());
+      final responseData = response.data['data'] ?? response.data;
+      await _saveTokens(responseData);
+      state = AuthSuccess(userId: responseData['user']['id'].toString());
     } catch (e) {
       state = AuthError(message: _parseError(e));
     }
@@ -82,10 +85,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final client = DioClient();
       final response = await client.dio.post(
         '/auth/google',
-        data: {'id_token': googleAuth.idToken},
+        data: {
+          'googleId': googleUser.id,
+          'email': googleUser.email,
+          'name': googleUser.displayName ?? 'Google User',
+          'avatarUrl': googleUser.photoUrl,
+          'id_token': googleAuth.idToken,
+        },
       );
-      await _saveTokens(response.data);
-      state = AuthSuccess(userId: response.data['user']['id'].toString());
+      final responseData = response.data['data'] ?? response.data;
+      await _saveTokens(responseData);
+      state = AuthSuccess(userId: responseData['user']['id'].toString());
     } catch (e) {
       state = AuthError(message: _parseError(e));
     }
@@ -134,11 +144,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   String _parseError(dynamic error) {
+    debugPrint('AuthNotifier Error: $error');
     try {
       final msg = (error as dynamic).response?.data['message'];
       if (msg is List) return msg.first.toString();
       if (msg is String) return msg;
     } catch (_) {}
+    if (error != null) {
+      final errStr = error.toString();
+      if (errStr.contains('PlatformException')) {
+        return 'Google Sign-in failed: $errStr. Ensure your device\'s debug SHA-1 is registered in Google Cloud Console.';
+      }
+      return errStr;
+    }
     return 'Something went wrong. Please try again.';
   }
 }

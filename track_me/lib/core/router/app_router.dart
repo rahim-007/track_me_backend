@@ -9,10 +9,16 @@ import '../../features/auth/presentation/screens/register_screen.dart';
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
 import '../../features/habits/presentation/screens/habits_screen.dart';
 import '../../features/goals/presentation/screens/goals_screen.dart';
-import '../../features/ai/presentation/screens/ai_insights_screen.dart';
+
 import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../../features/splash/presentation/screens/splash_screen.dart';
+import '../../features/expenses/presentation/screens/expenses_screen.dart';
+import '../../features/expenses/presentation/screens/expense_setup_wizard.dart';
+import '../../features/expenses/presentation/screens/expense_detail_screen.dart';
+import '../../features/expenses/presentation/screens/expense_analytics_screen.dart';
+import '../../features/expenses/presentation/screens/all_transactions_screen.dart';
+import '../../features/expenses/data/models/expense_model.dart';
 import '../shell/main_shell.dart';
 
 part 'app_router.g.dart';
@@ -21,7 +27,7 @@ part 'app_router.g.dart';
 GoRouter appRouter(Ref ref) {
   return GoRouter(
     initialLocation: AppRoutes.splash,
-    debugLogDiagnostics: true,
+    debugLogDiagnostics: false,
     routes: [
       // Splash
       GoRoute(
@@ -100,12 +106,13 @@ GoRouter appRouter(Ref ref) {
               child: const GoalsScreen(),
             ),
           ),
+
           GoRoute(
-            path: AppRoutes.aiInsights,
-            name: 'ai-insights',
+            path: AppRoutes.expenses,
+            name: 'expenses',
             pageBuilder: (context, state) => _noTransitionPage(
               state: state,
-              child: const AiInsightsScreen(),
+              child: const ExpensesScreen(),
             ),
           ),
           GoRoute(
@@ -117,6 +124,53 @@ GoRouter appRouter(Ref ref) {
             ),
           ),
         ],
+      ),
+
+      // Expense Setup (full-screen, outside shell)
+      GoRoute(
+        path: AppRoutes.expenseSetup,
+        name: 'expense-setup',
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const ExpenseSetupWizard(),
+          transitionsBuilder: _slideTransition,
+        ),
+      ),
+
+      // Expense Detail
+      GoRoute(
+        path: AppRoutes.expenseDetail,
+        name: 'expense-detail',
+        pageBuilder: (context, state) {
+          final expense = state.extra as ExpenseModel;
+          return CustomTransitionPage(
+            key: state.pageKey,
+            child: ExpenseDetailScreen(expense: expense),
+            transitionsBuilder: _slideTransition,
+          );
+        },
+      ),
+
+      // Expense Analytics
+      GoRoute(
+        path: AppRoutes.expenseAnalytics,
+        name: 'expense-analytics',
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const ExpenseAnalyticsScreen(),
+          transitionsBuilder: _slideTransition,
+        ),
+      ),
+
+      // All Transactions
+      GoRoute(
+        path: AppRoutes.allTransactions,
+        name: 'all-transactions',
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const AllTransactionsScreen(),
+          transitionsBuilder: _slideTransition,
+        ),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(
@@ -175,6 +229,11 @@ class AppRoutes {
   static const String dashboard = '/dashboard';
   static const String habits = '/habits';
   static const String goals = '/goals';
-  static const String aiInsights = '/ai-insights';
+
+  static const String expenses = '/expenses';
+  static const String expenseSetup = '/expense-setup';
+  static const String expenseDetail = '/expense-detail';
+  static const String expenseAnalytics = '/expense-analytics';
+  static const String allTransactions = '/all-transactions';
   static const String profile = '/profile';
 }

@@ -65,7 +65,7 @@ class _AppTextFieldState extends State<AppTextField> {
       maxLines: widget.obscureText ? 1 : widget.maxLines,
       focusNode: widget.focusNode,
       autofocus: widget.autofocus,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 15,
         fontWeight: FontWeight.w400,
         color: AppColors.textPrimary,

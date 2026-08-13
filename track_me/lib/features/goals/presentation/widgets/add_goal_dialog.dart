@@ -82,6 +82,7 @@ class _AddGoalDialogState extends ConsumerState<AddGoalDialog> {
     final priorities = ['Low', 'Medium', 'High'];
 
     return Dialog(
+      backgroundColor: AppColors.surface,
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       child: SingleChildScrollView(
@@ -222,7 +223,7 @@ class _AddGoalDialogState extends ConsumerState<AddGoalDialog> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.calendar_today_rounded,
+                      Icon(Icons.calendar_today_rounded,
                           color: AppColors.textSecondary, size: 20),
                       const SizedBox(width: 12),
                       Text(

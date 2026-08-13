@@ -5,7 +5,7 @@ class AppEnv {
 
   static const String baseUrl = String.fromEnvironment(
     'BASE_URL',
-    defaultValue: 'http://10.0.2.2:3000/api', // Android emulator localhost
+    defaultValue: 'https://track-me-backend-pe6j.onrender.com/api', // Render (cloud) backend
   );
 
   static const String geminiApiKey = String.fromEnvironment(

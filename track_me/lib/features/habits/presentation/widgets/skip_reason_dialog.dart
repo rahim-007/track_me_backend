@@ -10,8 +10,9 @@ import '../../providers/habits_provider.dart';
 
 class SkipReasonDialog extends ConsumerStatefulWidget {
   final HabitModel habit;
+  final DateTime? date;
 
-  const SkipReasonDialog({super.key, required this.habit});
+  const SkipReasonDialog({super.key, required this.habit, this.date});
 
   @override
   ConsumerState<SkipReasonDialog> createState() => _SkipReasonDialogState();
@@ -44,7 +45,7 @@ class _SkipReasonDialogState extends ConsumerState<SkipReasonDialog> {
 
     await ref.read(habitsProvider.notifier).skipHabit(
           habit: widget.habit,
-          date: DateTime.now(),
+          date: widget.date ?? DateTime.now(),
           reason: reason,
         );
 
@@ -59,6 +60,7 @@ class _SkipReasonDialogState extends ConsumerState<SkipReasonDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
+      backgroundColor: AppColors.surface,
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       child: Padding(

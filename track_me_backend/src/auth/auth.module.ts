@@ -5,8 +5,9 @@ import { ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
-import { GoogleStrategy } from './strategies/google.strategy';
+// import { GoogleStrategy } from './strategies/google.strategy';
 import { UsersModule } from '../users/users.module';
+import { getJwtExpiresIn, getJwtSecret } from '../common/config/jwt.config';
 
 @Module({
   imports: [
@@ -14,16 +15,17 @@ import { UsersModule } from '../users/users.module';
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        secret: config.get<string>('JWT_SECRET', 'secret'),
+        secret: getJwtSecret(config),
         signOptions: {
-          expiresIn: '15m',
+          // Cast: jsonwebtoken types accepts ms-format strings via StringValue.
+          expiresIn: getJwtExpiresIn(config) as any,
         },
       }),
     }),
     UsersModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, GoogleStrategy],
+  providers: [AuthService, JwtStrategy], // GoogleStrategy temporarily disabled
   exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

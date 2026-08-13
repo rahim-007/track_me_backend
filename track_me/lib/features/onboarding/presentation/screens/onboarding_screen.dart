@@ -50,13 +50,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   ];
 
   Future<void> _completeOnboarding() async {
-    final isar = IsarService.instance;
-    await isar.writeTxn(() async {
-      await isar.onboardingPrefModels.put(OnboardingPrefModel()
-        ..id = 1
-        ..isCompleted = true
-        ..completedAt = DateTime.now());
-    });
+    if (IsarService.isAvailable) {
+      final isar = IsarService.instance;
+      await isar.writeTxn(() async {
+        await isar.onboardingPrefModels.put(OnboardingPrefModel()
+          ..id = 1
+          ..isCompleted = true
+          ..completedAt = DateTime.now());
+      });
+    }
     if (mounted) context.go(AppRoutes.login);
   }
 

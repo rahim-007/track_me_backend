@@ -6,6 +6,7 @@ class FirebaseService {
   FirebaseService._();
 
   static Future<void> initialize() async {
+    if (kIsWeb) return;
     try {
       await Firebase.initializeApp();
       await _setupFCM();

@@ -37,7 +37,15 @@ export class AiService {
 
   async generateWeeklyReport(userId: string) {
     const habitStats = await this.getHabitStats(userId);
-    const report = await this.callGeminiApi(habitStats, []);
+
+    // Never 500 when the model call fails — fall back to local insights.
+    let report: any;
+    try {
+      report = await this.callGeminiApi(habitStats, []);
+    } catch (e) {
+      console.error('Gemini weekly-report error, using fallback:', e);
+      report = this.generateFallbackInsights(habitStats);
+    }
 
     // Store in DB
     const weekStart = this.getWeekStart();
@@ -45,7 +53,7 @@ export class AiService {
 
     await this.prisma.aiReport.upsert({
       where: {
-        // Use a custom unique identifier based on userId + weekStart
+        // Deterministic per (userId, weekStart)
         id: `${userId}_${weekStart.toISOString()}`,
       },
       update: {
@@ -99,10 +107,15 @@ Respond in JSON format:
 `;
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${this.apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          // Key in header (never in the URL) so it can't leak into logs/proxies.
+          'x-goog-api-key': this.apiKey,
+        },
+        signal: AbortSignal.timeout(30_000),
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
@@ -113,7 +126,14 @@ Respond in JSON format:
       },
     );
 
-    const data = await response.json() as any;
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      throw new Error(
+        `Gemini API responded ${response.status}: ${body.slice(0, 300)}`,
+      );
+    }
+
+    const data = (await response.json()) as any;
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}';
 
     // Parse JSON from response
@@ -154,17 +174,26 @@ Respond in JSON format:
     const [totalHabits, completedLogs, skippedLogs] = await Promise.all([
       this.prisma.habit.count({ where: { userId, isActive: true } }),
       this.prisma.habitLog.count({
-        where: { userId, isSkipped: false, date: { gte: weekStart, lte: weekEnd } },
+        where: {
+          userId,
+          isSkipped: false,
+          date: { gte: weekStart, lte: weekEnd },
+        },
       }),
       this.prisma.habitLog.count({
-        where: { userId, isSkipped: true, date: { gte: weekStart, lte: weekEnd } },
+        where: {
+          userId,
+          isSkipped: true,
+          date: { gte: weekStart, lte: weekEnd },
+        },
       }),
     ]);
 
     const possibleCompletions = totalHabits * 7;
-    const completionRate = possibleCompletions > 0
-      ? Math.round((completedLogs / possibleCompletions) * 100)
-      : 0;
+    const completionRate =
+      possibleCompletions > 0
+        ? Math.round((completedLogs / possibleCompletions) * 100)
+        : 0;
 
     return {
       totalHabits,

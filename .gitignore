@@ -1,0 +1,41 @@
+# ─── Flutter / Dart ─────────────────────────────────────────────────────────
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.apk
+*.aab
+*.ipa
+*.jks
+*.keystore
+android/.gradle/
+android/local.properties
+android/key.properties
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Generated.xcconfig
+ios/Flutter/ephemeral/
+ios/Flutter/flutter_export_environment.sh
+*.iml
+.idea/
+
+# ─── Node / NestJS backend ──────────────────────────────────────────────────
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+*.log
+npm-debug.log*
+
+# ─── Environment / secrets ──────────────────────────────────────────────────
+# NOTE: .env.dev.json / .env.prod.json / .env.example stay TRACKED on purpose
+# (public URLs + empty keys needed to run the app).
+.env
+.env.local
+.env.*.local
+
+# ─── Misc / OS ──────────────────────────────────────────────────────────────
+.freebuff/
+.DS_Store
+Thumbs.db

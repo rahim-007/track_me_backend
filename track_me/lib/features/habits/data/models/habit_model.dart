@@ -69,10 +69,15 @@ class HabitModel {
   }
 
   factory HabitModel.fromJson(Map<String, dynamic> json) {
+    final rawCategory = json['category'] as String? ?? 'Other';
+    final parsedCategory = rawCategory.isNotEmpty
+        ? rawCategory[0].toUpperCase() + rawCategory.substring(1).toLowerCase()
+        : 'Other';
+
     return HabitModel(
       id: json['id']?.toString() ?? '',
       name: json['name'] as String,
-      category: json['category'] as String? ?? 'Other',
+      category: parsedCategory,
       emoji: json['emoji'] as String?,
       color: json['color'] as String?,
       repeatDays: (json['repeatDays'] as List<dynamic>?)
@@ -97,7 +102,7 @@ class HabitModel {
     return {
       'id': id,
       'name': name,
-      'category': category,
+      'category': _safeCategory,
       'emoji': emoji,
       'color': color,
       'repeatDays': repeatDays,
@@ -107,5 +112,29 @@ class HabitModel {
       'completedDates': completedDates,
       'skippedDates': skippedDates,
     };
+  }
+
+  /// Payload for the backend `POST /habits` endpoint — only fields the API
+  /// accepts (server-managed fields like id/createdAt/logs must be omitted or
+  /// the strict validation pipe rejects the request with 400).
+  Map<String, dynamic> toCreateJson() {
+    return {
+      'name': name,
+      'category': _safeCategory,
+      'emoji': emoji,
+      'color': color,
+      'repeatDays': repeatDays,
+      'reminderTime': reminderTime,
+      'notes': notes,
+    };
+  }
+
+  String get _safeCategory {
+    const validCategories = {
+      'HEALTH', 'FITNESS', 'LEARNING', 'MINDFULNESS',
+      'PRODUCTIVITY', 'SOCIAL', 'FINANCE', 'OTHER'
+    };
+    final catUpper = category.toUpperCase();
+    return validCategories.contains(catUpper) ? catUpper : 'OTHER';
   }
 }

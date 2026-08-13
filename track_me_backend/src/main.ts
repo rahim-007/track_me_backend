@@ -59,9 +59,9 @@ async function bootstrap() {
   });
 
   const port = process.env.PORT ?? 3000;
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
 
-  console.log(`🚀 Track Me API running on: http://localhost:${port}/api`);
+  console.log(`🚀 Track Me API running on: http://0.0.0.0:${port}/api`);
   console.log(`📚 Swagger docs: http://localhost:${port}/api/docs`);
 }
 

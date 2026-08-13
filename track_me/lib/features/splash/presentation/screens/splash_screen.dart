@@ -1,19 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/local/isar_service.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../auth/providers/auth_provider.dart';
 import '../../../onboarding/data/models/onboarding_pref_model.dart';
 
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
+class _SplashScreenState extends ConsumerState<SplashScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _scaleAnim;
@@ -40,13 +42,35 @@ class _SplashScreenState extends State<SplashScreen>
     await Future.delayed(const Duration(milliseconds: 2000));
     if (!mounted) return;
 
-    final isar = IsarService.instance;
-    final pref = await isar.onboardingPrefModels.get(1);
-    final onboardingDone = pref?.isCompleted ?? false;
+    bool onboardingDone = false;
+    if (!IsarService.isAvailable) {
+      // Isar initializes in the background now (non-blocking startup) — wait
+      // briefly so the saved onboarding preference is not misread as missing.
+      try {
+        await IsarService.initialize().timeout(const Duration(seconds: 4));
+      } catch (_) {
+        // Local DB unavailable — fall through with onboardingDone = false.
+      }
+    }
+    if (!mounted) return;
+    if (IsarService.isAvailable) {
+      final isar = IsarService.instance;
+      final pref = await isar.onboardingPrefModels.get(1);
+      onboardingDone = pref?.isCompleted ?? false;
+    }
 
     if (!mounted) return;
     if (!onboardingDone) {
       context.go(AppRoutes.onboarding);
+      return;
+    }
+
+    // Check if authenticated
+    final authenticated = await ref.read(isAuthenticatedProvider.future);
+    if (!mounted) return;
+
+    if (authenticated) {
+      context.go(AppRoutes.dashboard);
     } else {
       context.go(AppRoutes.login);
     }

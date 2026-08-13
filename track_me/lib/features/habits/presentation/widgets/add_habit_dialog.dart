@@ -249,7 +249,7 @@ class _AddHabitDialogState extends ConsumerState<AddHabitDialog> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.alarm_rounded,
+                      Icon(Icons.alarm_rounded,
                           color: AppColors.textSecondary, size: 20),
                       const SizedBox(width: 12),
                       Text(
@@ -267,7 +267,7 @@ class _AddHabitDialogState extends ConsumerState<AddHabitDialog> {
                       if (_reminderTime != null)
                         GestureDetector(
                           onTap: () => setState(() => _reminderTime = null),
-                          child: const Icon(Icons.clear_rounded,
+                          child: Icon(Icons.clear_rounded,
                               size: 16, color: AppColors.textSecondary),
                         ),
                     ],

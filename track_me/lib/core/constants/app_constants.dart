@@ -25,7 +25,9 @@ class AppConstants {
   static const String languageKey = 'language';
 
   // API Timeouts (milliseconds)
-  static const int connectTimeout = 30000;
+  // Connect timeout is kept short so an unreachable backend fails fast instead
+  // of freezing every screen on a 30s spinner.
+  static const int connectTimeout = 10000;
   static const int receiveTimeout = 30000;
   static const int sendTimeout = 30000;
 

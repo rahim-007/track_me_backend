@@ -9,8 +9,37 @@ rootProject.buildDir = "../build"
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
 }
+
+subprojects {
+    afterEvaluate { subproject ->
+        if (subproject.hasProperty('android')) {
+            subproject.android {
+                compileSdkVersion 35
+                buildToolsVersion '35.0.0'
+            }
+        }
+    }
+}
+
 subprojects {
     project.evaluationDependsOn(":app")
+}
+
+subprojects {
+    plugins.withId("com.android.application") {
+        android {
+            if (namespace == null) {
+                namespace = "com.trackme." + project.name.replaceAll("[^a-zA-Z0-9_]", "_")
+            }
+        }
+    }
+    plugins.withId("com.android.library") {
+        android {
+            if (namespace == null) {
+                namespace = "com.trackme." + project.name.replaceAll("[^a-zA-Z0-9_]", "_")
+            }
+        }
+    }
 }
 
 tasks.register("clean", Delete) {

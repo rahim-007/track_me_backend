@@ -29,6 +29,7 @@ export class HabitLogsController {
   ) {
     return this.habitLogsService.skipHabit(req.user.id, dto.habitId, dto.date, dto.reason);
   }
+  
 
   @Delete(':habitId/:date')
   @HttpCode(HttpStatus.OK)
