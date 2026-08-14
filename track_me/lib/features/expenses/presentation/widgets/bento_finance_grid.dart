@@ -12,6 +12,9 @@ class BentoFinanceGrid extends StatelessWidget {
   final double savingsRate;
   final double monthlyProfit;
   final double monthlyLoss;
+  final double extraIncomeTotal;
+  final int extraIncomeCount;
+  final VoidCallback? onExtraIncomeTap;
 
   const BentoFinanceGrid({
     super.key,
@@ -24,232 +27,395 @@ class BentoFinanceGrid extends StatelessWidget {
     required this.savingsRate,
     required this.monthlyProfit,
     required this.monthlyLoss,
+    this.extraIncomeTotal = 0,
+    this.extraIncomeCount = 0,
+    this.onExtraIncomeTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final double profitVal = monthlyProfit;
-    final double lossVal = monthlyLoss;
-
     return Column(
       children: [
-        // Row 1: Income & Spendable Budget
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              flex: 3,
-              child: _BentoCard(
-                height: 125,
-                child: _BentoTileContent(
-                  icon: Icons.account_balance_wallet_outlined,
-                  iconColor: const Color(0xFF8B5CF6), // Purple
-                  value: '₹${NumberFormat('#,##0').format(monthlyIncome)}',
-                  label: 'Monthly Income',
+        // Row 1: Monthly Income, Spendable, Extra Income
+        // IntrinsicHeight keeps every card in the row the same height while
+        // allowing the row to grow when a card's content needs more room.
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: _BentoCard(
+                  child: _BentoTileContent(
+                    icon: Icons.account_balance_wallet_outlined,
+                    iconColor: const Color(0xFF8B5CF6),
+                    value: '₹${NumberFormat('#,##0').format(monthlyIncome)}',
+                    label: 'Monthly Income',
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              flex: 2,
-              child: _BentoCard(
-                height: 125,
-                child: _BentoTileContent(
-                  icon: Icons.trending_up_outlined,
-                  iconColor: const Color(0xFFF97316), // Orange
-                  value: '₹${NumberFormat('#,##0').format(spendableBudget)}',
-                  label: 'Spendable',
+              const SizedBox(width: 12),
+              Expanded(
+                child: _BentoCard(
+                  child: _BentoTileContent(
+                    icon: Icons.trending_up_outlined,
+                    iconColor: const Color(0xFFF97316),
+                    value: '₹${NumberFormat('#,##0').format(spendableBudget)}',
+                    label: 'Spendable',
+                  ),
                 ),
               ),
-            ),
-          ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: _ExtraIncomeCard(
+                  total: extraIncomeTotal,
+                  count: extraIncomeCount,
+                  onTap: onExtraIncomeTap,
+                ),
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
 
-        // Row 2: Savings Progress & Target
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              flex: 3,
-              child: _BentoCard(
-                height: 125,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _BentoIconContainer(
-                            icon: Icons.savings_outlined,
-                            color: const Color(0xFF10B981), // Green
-                          ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Savings Rate',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '${(savingsRate * 100).clamp(0, 100).round()}%',
-                                style: TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.textPrimary,
-                                  letterSpacing: -0.5,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Goal ${(savingsProgress * 100).clamp(0, 100).round()}%',
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    SizedBox(
-                      width: 50,
-                      height: 50,
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          CircularProgressIndicator(
-                            value: savingsRate.clamp(0.0, 1.0),
-                            strokeWidth: 4.5,
-                            backgroundColor: const Color(0xFF10B981).withOpacity(0.1),
-                            valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF10B981)),
-                            strokeCap: StrokeCap.round,
-                          ),
-                          const Center(
-                            child: Icon(
-                              Icons.star_rounded,
+        // Row 2: Savings Rate, Savings Target
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                flex: 1,
+                child: _BentoCard(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const _BentoIconContainer(
+                              icon: Icons.savings_outlined,
                               color: Color(0xFF10B981),
-                              size: 14,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Savings Rate',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${(savingsRate * 100).clamp(0, 100).round()}%',
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimary,
+                                letterSpacing: -0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Goal ${(savingsProgress * 100).clamp(0, 100).round()}%',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      // Large savings progress ring with star icon
+                      SizedBox(
+                        width: 70,
+                        height: 70,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            CircularProgressIndicator(
+                              value: savingsRate.clamp(0.0, 1.0),
+                              strokeWidth: 6,
+                              backgroundColor:
+                                  const Color(0xFF10B981).withOpacity(0.12),
+                              valueColor: const AlwaysStoppedAnimation<Color>(
+                                  Color(0xFF10B981)),
+                              strokeCap: StrokeCap.round,
+                            ),
+                            Center(
+                              child: Container(
+                                width: 30,
+                                height: 30,
+                                decoration: BoxDecoration(
+                                  color:
+                                      const Color(0xFF10B981).withOpacity(0.12),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.star_rounded,
+                                  size: 18,
+                                  color: Color(0xFF10B981),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 1,
+                child: _BentoCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const _BentoIconContainer(
+                        icon: Icons.track_changes_outlined,
+                        color: Color(0xFF6366F1),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Savings Target',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              '₹${NumberFormat('#,##0').format(savingsTarget)}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimary,
+                                letterSpacing: -0.3,
+                              ),
                             ),
                           ),
                         ],
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              flex: 2,
-              child: _BentoCard(
-                height: 125,
-                child: _BentoTileContent(
-                  icon: Icons.track_changes_outlined,
-                  iconColor: const Color(0xFF6366F1), // Indigo
-                  value: '₹${NumberFormat('#,##0').format(savingsTarget)}',
-                  label: 'Savings Target',
-                ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
 
-        // Row 3: Profit, Daily Limit, Loss
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: _BentoCard(
-                height: 125,
-                child: _BentoTileContent(
-                  icon: Icons.check_circle_outline_rounded,
-                  iconColor: const Color(0xFF10B981), // Green
-                  value: '₹${NumberFormat('#,##0').format(profitVal)}',
-                  label: 'Budget Left',
+        // Row 3: Budget Left, Daily Limit, Over
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: _BentoCard(
+                  child: _BentoTileContent(
+                    icon: Icons.check_circle_outline_rounded,
+                    iconColor: const Color(0xFF10B981),
+                    value: '₹${NumberFormat('#,##0').format(monthlyProfit)}',
+                    label: 'Profit',
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _BentoCard(
-                height: 125,
-                child: _BentoTileContent(
-                  icon: Icons.calendar_today_outlined, // Calendar Icon
-                  iconColor: const Color(0xFF3B82F6), // Blue
-                  value: '₹${NumberFormat('#,##0').format(dailyGoal)}',
-                  label: 'Daily Limit',
+              const SizedBox(width: 12),
+              Expanded(
+                child: _BentoCard(
+                  child: _BentoTileContent(
+                    icon: Icons.calendar_today_outlined,
+                    iconColor: const Color(0xFF3B82F6),
+                    value: '₹${NumberFormat('#,##0').format(dailyGoal)}',
+                    label: 'Daily Limit',
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _BentoCard(
-                height: 125,
-                child: _BentoTileContent(
-                  icon: Icons.error_outline_rounded,
-                  iconColor: const Color(0xFFEF4444), // Red
-                  value: '₹${NumberFormat('#,##0').format(lossVal)}',
-                  label: 'Over',
+              const SizedBox(width: 12),
+              Expanded(
+                child: _BentoCard(
+                  child: _BentoTileContent(
+                    icon: Icons.error_outline_rounded,
+                    iconColor: const Color(0xFFEF4444),
+                    value: '₹${NumberFormat('#,##0').format(monthlyLoss)}',
+                    label: 'Loss',
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );
   }
 }
 
-class _BentoCard extends StatelessWidget {
-  final Widget child;
-  final double? height;
+/// Standalone Extra Income tile — thin purple outline + NEW badge.
+/// Purely informational; does not feed any budget/income calculation.
+class _ExtraIncomeCard extends StatelessWidget {
+  final double total;
+  final int count;
   final VoidCallback? onTap;
-  final EdgeInsetsGeometry? padding;
 
-  const _BentoCard({
-    required this.child,
-    this.height,
+  const _ExtraIncomeCard({
+    required this.total,
+    required this.count,
     this.onTap,
-    this.padding,
   });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        height: height,
-        padding: padding ?? const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: AppColors.isDarkMode 
-                ? const Color(0xFF2D2A3A) 
-                : const Color(0xFFE5E7EB), // Slate 200 border matching palette
-            width: 1,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(AppColors.isDarkMode ? 0.15 : 0.03),
-              blurRadius: 16,
-              offset: const Offset(0, 4),
+      child: AnimatedScale(
+        duration: const Duration(milliseconds: 150),
+        scale: 1.0,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 125),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: AppColors.primary.withOpacity(0.45),
+              width: 1.2,
             ),
-          ],
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black
+                    .withOpacity(AppColors.isDarkMode ? 0.15 : 0.03),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Extra Income',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 5, vertical: 1.5),
+                    decoration: BoxDecoration(
+                      color: AppColors.success,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text(
+                      'NEW',
+                      style: TextStyle(
+                        fontSize: 7,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '₹${NumberFormat('#,##0').format(total)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.primary,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '$count ${count == 1 ? 'entry' : 'entries'}',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        size: 14,
+                        color: AppColors.textSecondary,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-        child: child,
       ),
+    );
+  }
+}
+
+class _BentoCard extends StatelessWidget {
+  final Widget child;
+
+  const _BentoCard({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 125),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: AppColors.isDarkMode
+              ? const Color(0xFF2D2A3A)
+              : const Color(0xFFE5E7EB),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(AppColors.isDarkMode ? 0.15 : 0.03),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: child,
     );
   }
 }

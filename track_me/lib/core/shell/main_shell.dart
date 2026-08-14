@@ -121,7 +121,7 @@ class _BottomNavBar extends StatelessWidget {
                 child: _NavItem(
                   icon: Icons.account_balance_wallet_rounded,
                   unselectedIcon: Icons.account_balance_wallet_outlined,
-                  label: 'Expenses',
+                  label: 'Cash Flow',
                   isSelected: selectedIndex == 3,
                   onTap: () => onTap(3),
                 ),

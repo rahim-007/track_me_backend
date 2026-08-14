@@ -172,7 +172,11 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: ExpenseCategory.values.map((cat) {
+              // Salary (income) is intentionally hidden here: income is
+              // recorded through the Extra Income flow instead.
+              children: ExpenseCategory.values
+                  .where((cat) => cat != ExpenseCategory.salary)
+                  .map((cat) {
                 final isSelected = cat == _selectedCategory;
                 return GestureDetector(
                   onTap: () => setState(() => _selectedCategory = cat),

@@ -14,6 +14,7 @@ import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../../features/splash/presentation/screens/splash_screen.dart';
 import '../../features/expenses/presentation/screens/expenses_screen.dart';
+import '../../features/expenses/presentation/screens/extra_income_screen.dart';
 import '../../features/expenses/presentation/screens/expense_setup_wizard.dart';
 import '../../features/expenses/presentation/screens/expense_detail_screen.dart';
 import '../../features/expenses/presentation/screens/expense_analytics_screen.dart';
@@ -172,6 +173,17 @@ GoRouter appRouter(Ref ref) {
           transitionsBuilder: _slideTransition,
         ),
       ),
+
+      // Extra Income (standalone)
+      GoRoute(
+        path: AppRoutes.extraIncome,
+        name: 'extra-income',
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const ExtraIncomeScreen(),
+          transitionsBuilder: _slideTransition,
+        ),
+      ),
     ],
     errorBuilder: (context, state) => Scaffold(
       body: Center(
@@ -235,5 +247,6 @@ class AppRoutes {
   static const String expenseDetail = '/expense-detail';
   static const String expenseAnalytics = '/expense-analytics';
   static const String allTransactions = '/all-transactions';
+  static const String extraIncome = '/extra-income';
   static const String profile = '/profile';
 }

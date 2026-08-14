@@ -467,9 +467,19 @@ class _DailyBarChart extends StatelessWidget {
                   final idx = value.toInt();
                   if (idx >= days.length) return const SizedBox.shrink();
                   final date = days[idx].date;
-                  // Show abbreviated date
+                  // Show abbreviated label: day for daily/weekly/monthly
+                  // series, month name for the monthly-aggregated yearly series.
                   final parts = date.split('-');
-                  final dayStr = parts.length >= 3 ? parts[2] : date;
+                  String dayStr;
+                  if (parts.length >= 3) {
+                    dayStr = parts[2];
+                  } else if (parts.length == 2) {
+                    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                    final month = int.tryParse(parts[1]) ?? 0;
+                    dayStr = (month >= 1 && month <= 12) ? monthNames[month - 1] : date;
+                  } else {
+                    dayStr = date;
+                  }
                   return Text(
                     dayStr,
                     style: TextStyle(fontSize: 9, color: AppColors.textSecondary),

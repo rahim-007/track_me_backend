@@ -120,7 +120,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               const Text('👋', style: TextStyle(fontSize: 22)),
                             ],
                           ),
-                          loading: () => const ShimmerBox(width: 120, height: 24),
+                          loading: () =>
+                              const ShimmerBox(width: 120, height: 24),
                           error: (_, __) => Text(
                             'Friend 👋',
                             style: TextStyle(
@@ -150,7 +151,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.isDarkMode ? Colors.transparent : Colors.black.withOpacity(0.03),
+                          color: AppColors.isDarkMode
+                              ? Colors.transparent
+                              : Colors.black.withOpacity(0.03),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -191,13 +194,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         border: Border.all(color: AppColors.surface, width: 2),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.isDarkMode ? Colors.transparent : Colors.black.withOpacity(0.05),
+                            color: AppColors.isDarkMode
+                                ? Colors.transparent
+                                : Colors.black.withOpacity(0.05),
                             blurRadius: 10,
                           ),
                         ],
                       ),
                       child: ClipOval(
-                        child: (user != null && user.avatarUrl != null && user.avatarUrl!.isNotEmpty)
+                        child: (user != null &&
+                                user.avatarUrl != null &&
+                                user.avatarUrl!.isNotEmpty)
                             ? CachedNetworkImage(
                                 imageUrl: user.avatarUrl!,
                                 fit: BoxFit.cover,
@@ -205,12 +212,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                   child: SizedBox(
                                     width: 15,
                                     height: 15,
-                                    child: CircularProgressIndicator(strokeWidth: 1.5),
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 1.5),
                                   ),
                                 ),
                                 errorWidget: (context, url, error) => Center(
                                   child: Text(
-                                    (user.name.isNotEmpty) ? user.name[0].toUpperCase() : 'U',
+                                    (user.name.isNotEmpty)
+                                        ? user.name[0].toUpperCase()
+                                        : 'U',
                                     style: const TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.bold,
@@ -221,7 +231,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               )
                             : Center(
                                 child: Text(
-                                  (user != null && user.name.isNotEmpty) ? user.name[0].toUpperCase() : 'U',
+                                  (user != null && user.name.isNotEmpty)
+                                      ? user.name[0].toUpperCase()
+                                      : 'U',
                                   style: const TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
@@ -231,7 +243,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               ),
                       ),
                     ),
-                    loading: () => const ShimmerBox(width: 42, height: 42, borderRadius: 21),
+                    loading: () => const ShimmerBox(
+                        width: 42, height: 42, borderRadius: 21),
                     error: (_, __) => Container(
                       width: 42,
                       height: 42,
@@ -266,7 +279,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
                   // Today's Progress Cards
                   habitsAsync.when(
-                    data: (habits) => _ProgressSection(habits: habits, profile: profile.value),
+                    data: (habits) => _ProgressSection(
+                        habits: habits, profile: profile.value),
                     loading: () => const _ProgressSectionSkeleton(),
                     error: (_, __) => const SizedBox.shrink(),
                   ),
@@ -281,11 +295,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           budget: budget,
                           dashboard: dashboard,
                         ),
-                        loading: () => const ShimmerBox(height: 160, borderRadius: 24),
+                        loading: () =>
+                            const ShimmerBox(height: 160, borderRadius: 24),
                         error: (_, __) => _ExpensesSummaryCard(budget: budget),
                       );
                     },
-                    loading: () => const ShimmerBox(height: 160, borderRadius: 24),
+                    loading: () =>
+                        const ShimmerBox(height: 160, borderRadius: 24),
                     error: (_, __) => const SizedBox.shrink(),
                   ),
 
@@ -352,8 +368,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ),
                     error: (_, __) => const SizedBox.shrink(),
                   ),
-
-
                 ]),
               ),
             ),
@@ -376,7 +390,7 @@ class _CustomQuoteCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      height: 136,
+      constraints: const BoxConstraints(minHeight: 136),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFF8B5CF6), Color(0xFF6D28D9)],
@@ -392,81 +406,83 @@ class _CustomQuoteCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Stack(
-        children: [
-          // Mountain Painter
-          Positioned(
-            right: 0,
-            bottom: 0,
-            top: 0,
-            width: 180,
-            child: ClipRRect(
-              borderRadius: const BorderRadius.only(
-                topRight: Radius.circular(24),
-                bottomRight: Radius.circular(24),
-              ),
-              child: CustomPaint(
-                painter: _MountainPainter(),
-              ),
-            ),
-          ),
-          // Quote Content
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text(
-                  '“',
-                  style: TextStyle(
-                    fontSize: 40,
-                    color: Color(0x73FFFFFF),
-                    fontFamily: 'serif',
-                    height: 0.8,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                SizedBox(
-                  width: MediaQuery.of(context).size.width * 0.52,
-                  child: Text(
-                    quote,
-                    style: const TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                      fontStyle: FontStyle.italic,
-                      height: 1.4,
-                    ),
-                    maxLines: 4,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Refresh trigger overlay
-          if (onRefresh != null)
+      child: IntrinsicHeight(
+        child: Stack(
+          children: [
+            // Mountain Painter
             Positioned(
-              top: 12,
-              left: 12,
-              child: GestureDetector(
-                onTap: onRefresh,
-                child: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.refresh_rounded,
-                    color: Colors.white,
-                    size: 14,
-                  ),
+              right: 0,
+              bottom: 0,
+              top: 0,
+              width: 180,
+              child: ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topRight: Radius.circular(24),
+                  bottomRight: Radius.circular(24),
+                ),
+                child: CustomPaint(
+                  painter: _MountainPainter(),
                 ),
               ),
             ),
-        ],
+            // Quote Content
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text(
+                    '“',
+                    style: TextStyle(
+                      fontSize: 40,
+                      color: Color(0x73FFFFFF),
+                      fontFamily: 'serif',
+                      height: 0.8,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  SizedBox(
+                    width: MediaQuery.of(context).size.width * 0.52,
+                    child: Text(
+                      quote,
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                        fontStyle: FontStyle.italic,
+                        height: 1.4,
+                      ),
+                      // No maxLines/ellipsis: the card grows via minHeight so the
+                      // complete quote is always visible.
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Refresh trigger overlay
+            if (onRefresh != null)
+              Positioned(
+                top: 12,
+                left: 12,
+                child: GestureDetector(
+                  onTap: onRefresh,
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.refresh_rounded,
+                      color: Colors.white,
+                      size: 14,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -497,7 +513,7 @@ class _ProgressSection extends StatelessWidget {
       final date = now.subtract(Duration(days: i));
       final dateStr = DateFormat('yyyy-MM-dd').format(date);
       final weekdayIndex = (date.weekday - 1) % 7;
-      
+
       int scheduledCount = 0;
       int completedCount = 0;
       for (final h in habits) {
@@ -514,7 +530,8 @@ class _ProgressSection extends StatelessWidget {
 
     double weeklyProgress = 0.0;
     if (last7DaysCompletions.isNotEmpty) {
-      weeklyProgress = last7DaysCompletions.reduce((a, b) => a + b) / last7DaysCompletions.length;
+      weeklyProgress = last7DaysCompletions.reduce((a, b) => a + b) /
+          last7DaysCompletions.length;
     }
 
     return Row(
@@ -528,7 +545,9 @@ class _ProgressSection extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.isDarkMode ? Colors.transparent : Colors.black.withOpacity(0.03),
+                  color: AppColors.isDarkMode
+                      ? Colors.transparent
+                      : Colors.black.withOpacity(0.03),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -585,7 +604,8 @@ class _ProgressSection extends StatelessWidget {
                           value: percent,
                           minHeight: 5,
                           backgroundColor: AppColors.primaryContainer,
-                          valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(AppColors.primary),
                         ),
                       ),
                     ),
@@ -614,7 +634,9 @@ class _ProgressSection extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.isDarkMode ? Colors.transparent : Colors.black.withOpacity(0.03),
+                  color: AppColors.isDarkMode
+                      ? Colors.transparent
+                      : Colors.black.withOpacity(0.03),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -628,7 +650,9 @@ class _ProgressSection extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        color: AppColors.isDarkMode ? const Color(0xFF452C16) : const Color(0xFFFFF7ED),
+                        color: AppColors.isDarkMode
+                            ? const Color(0xFF452C16)
+                            : const Color(0xFFFFF7ED),
                         shape: BoxShape.circle,
                       ),
                       child: const Text('🔥', style: TextStyle(fontSize: 14)),
@@ -679,7 +703,9 @@ class _ProgressSection extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.isDarkMode ? Colors.transparent : Colors.black.withOpacity(0.03),
+                  color: AppColors.isDarkMode
+                      ? Colors.transparent
+                      : Colors.black.withOpacity(0.03),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -693,7 +719,9 @@ class _ProgressSection extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        color: AppColors.isDarkMode ? const Color(0xFF113D2D) : const Color(0xFFECFDF5),
+                        color: AppColors.isDarkMode
+                            ? const Color(0xFF113D2D)
+                            : const Color(0xFFECFDF5),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
@@ -733,7 +761,8 @@ class _ProgressSection extends StatelessWidget {
                   height: 15,
                   width: double.infinity,
                   child: CustomPaint(
-                    painter: _WeeklyProgressPainter(heights: last7DaysCompletions),
+                    painter:
+                        _WeeklyProgressPainter(heights: last7DaysCompletions),
                   ),
                 ),
               ],
@@ -782,7 +811,9 @@ class _HabitCompactCard extends ConsumerWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: AppColors.isDarkMode ? Colors.transparent : Colors.black.withOpacity(0.02),
+            color: AppColors.isDarkMode
+                ? Colors.transparent
+                : Colors.black.withOpacity(0.02),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -830,7 +861,8 @@ class _HabitCompactCard extends ConsumerWidget {
                         fontSize: 14.5,
                         fontWeight: FontWeight.w700,
                         color: AppColors.textPrimary,
-                        decoration: isSkipped ? TextDecoration.lineThrough : null,
+                        decoration:
+                            isSkipped ? TextDecoration.lineThrough : null,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -849,7 +881,8 @@ class _HabitCompactCard extends ConsumerWidget {
                         if (isSkipped) ...[
                           const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 1.5),
                             decoration: BoxDecoration(
                               color: const Color(0xFFF59E0B).withOpacity(0.15),
                               borderRadius: BorderRadius.circular(6),
@@ -883,7 +916,8 @@ class _HabitCompactCard extends ConsumerWidget {
                   onPressed: () {
                     showDialog(
                       context: context,
-                      builder: (_) => SkipReasonDialog(habit: habit, date: DateTime.now()),
+                      builder: (_) =>
+                          SkipReasonDialog(habit: habit, date: DateTime.now()),
                     );
                   },
                 ),
@@ -893,7 +927,9 @@ class _HabitCompactCard extends ConsumerWidget {
               GestureDetector(
                 onTap: () {
                   if (!isSkipped) {
-                    ref.read(habitsProvider.notifier).toggleCompletion(habit, DateTime.now());
+                    ref
+                        .read(habitsProvider.notifier)
+                        .toggleCompletion(habit, DateTime.now());
                   }
                 },
                 child: Container(
@@ -906,12 +942,16 @@ class _HabitCompactCard extends ConsumerWidget {
                     decoration: BoxDecoration(
                       color: isCompleted
                           ? AppColors.primary
-                          : (isSkipped ? const Color(0xFFF59E0B).withOpacity(0.2) : Colors.transparent),
+                          : (isSkipped
+                              ? const Color(0xFFF59E0B).withOpacity(0.2)
+                              : Colors.transparent),
                       shape: BoxShape.circle,
                       border: Border.all(
                         color: isCompleted
                             ? AppColors.primary
-                            : (isSkipped ? const Color(0xFFF59E0B) : AppColors.border),
+                            : (isSkipped
+                                ? const Color(0xFFF59E0B)
+                                : AppColors.border),
                         width: 2,
                       ),
                     ),
@@ -973,7 +1013,9 @@ class _GoalCompactCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: AppColors.isDarkMode ? Colors.transparent : Colors.black.withOpacity(0.02),
+            color: AppColors.isDarkMode
+                ? Colors.transparent
+                : Colors.black.withOpacity(0.02),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -998,7 +1040,8 @@ class _GoalCompactCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    Icon(Icons.calendar_today_rounded, size: 11, color: AppColors.textSecondary),
+                    Icon(Icons.calendar_today_rounded,
+                        size: 11, color: AppColors.textSecondary),
                     const SizedBox(width: 6),
                     Text(
                       'Due ${DateFormat('MMM d, yyyy').format(goal.targetDate)}',
@@ -1020,7 +1063,8 @@ class _GoalCompactCard extends StatelessWidget {
                           value: progress,
                           minHeight: 5,
                           backgroundColor: AppColors.primaryContainer,
-                          valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(AppColors.primary),
                         ),
                       ),
                     ),
@@ -1055,8 +1099,6 @@ class _GoalCompactCard extends StatelessWidget {
     );
   }
 }
-
-
 
 // ─── Section Header ───────────────────────────────────────────────────────────
 
@@ -1227,19 +1269,25 @@ class _WeeklyProgressPainter extends CustomPainter {
 
     final path = Path();
     final double stepX = size.width / (heights.length - 1);
-    
-    path.moveTo(0, size.height * (1.0 - heights[0].clamp(0.0, 1.0) * 0.85 - 0.05));
+
+    path.moveTo(
+        0, size.height * (1.0 - heights[0].clamp(0.0, 1.0) * 0.85 - 0.05));
 
     for (int i = 1; i < heights.length; i++) {
       final prevX = (i - 1) * stepX;
-      final prevY = size.height * (1.0 - heights[i - 1].clamp(0.0, 1.0) * 0.85 - 0.05);
+      final prevY =
+          size.height * (1.0 - heights[i - 1].clamp(0.0, 1.0) * 0.85 - 0.05);
       final currX = i * stepX;
-      final currY = size.height * (1.0 - heights[i].clamp(0.0, 1.0) * 0.85 - 0.05);
-      
+      final currY =
+          size.height * (1.0 - heights[i].clamp(0.0, 1.0) * 0.85 - 0.05);
+
       path.cubicTo(
-        prevX + stepX * 0.5, prevY,
-        prevX + stepX * 0.5, currY,
-        currX, currY,
+        prevX + stepX * 0.5,
+        prevY,
+        prevX + stepX * 0.5,
+        currY,
+        currX,
+        currY,
       );
     }
 
@@ -1261,7 +1309,8 @@ class _WeeklyProgressPainter extends CustomPainter {
     canvas.drawPath(path, strokePaint);
 
     final lastX = size.width;
-    final lastY = size.height * (1.0 - heights.last.clamp(0.0, 1.0) * 0.85 - 0.05);
+    final lastY =
+        size.height * (1.0 - heights.last.clamp(0.0, 1.0) * 0.85 - 0.05);
     final p4 = Offset(lastX, lastY);
 
     final dotPaint = Paint()
@@ -1290,9 +1339,13 @@ class _GoalIllustrationPainter extends CustomPainter {
     final lowerName = name.toLowerCase();
     final lowerCategory = category.toLowerCase();
 
-    if (lowerName.contains('run') || lowerName.contains('marathon') || lowerCategory.contains('fit')) {
+    if (lowerName.contains('run') ||
+        lowerName.contains('marathon') ||
+        lowerCategory.contains('fit')) {
       _paintRunner(canvas, size);
-    } else if (lowerName.contains('flutter') || lowerCategory.contains('educ') || lowerCategory.contains('learn')) {
+    } else if (lowerName.contains('flutter') ||
+        lowerCategory.contains('educ') ||
+        lowerCategory.contains('learn')) {
       _paintLaptop(canvas, size);
     } else {
       _paintTarget(canvas, size);
@@ -1301,7 +1354,8 @@ class _GoalIllustrationPainter extends CustomPainter {
 
   void _paintRunner(Canvas canvas, Size size) {
     final bgPaint = Paint()..color = const Color(0xFF7C3AED).withOpacity(0.06);
-    canvas.drawCircle(Offset(size.width * 0.5, size.height * 0.5), size.height * 0.45, bgPaint);
+    canvas.drawCircle(Offset(size.width * 0.5, size.height * 0.5),
+        size.height * 0.45, bgPaint);
 
     final primaryPaint = Paint()
       ..color = const Color(0xFF7C3AED).withOpacity(0.85)
@@ -1320,28 +1374,38 @@ class _GoalIllustrationPainter extends CustomPainter {
     canvas.drawCircle(Offset(cx + 6, cy - 14), 3.2, fillPaint);
 
     // Torso
-    canvas.drawLine(Offset(cx + 3, cy - 8), Offset(cx - 3, cy + 3), primaryPaint);
+    canvas.drawLine(
+        Offset(cx + 3, cy - 8), Offset(cx - 3, cy + 3), primaryPaint);
 
     // Front arm
-    canvas.drawLine(Offset(cx + 2, cy - 7), Offset(cx - 5, cy - 2), primaryPaint);
-    canvas.drawLine(Offset(cx - 5, cy - 2), Offset(cx - 2, cy + 5), primaryPaint);
+    canvas.drawLine(
+        Offset(cx + 2, cy - 7), Offset(cx - 5, cy - 2), primaryPaint);
+    canvas.drawLine(
+        Offset(cx - 5, cy - 2), Offset(cx - 2, cy + 5), primaryPaint);
 
     // Back arm
-    canvas.drawLine(Offset(cx + 2, cy - 7), Offset(cx + 8, cy - 4), primaryPaint);
-    canvas.drawLine(Offset(cx + 8, cy - 4), Offset(cx + 9, cy + 2), primaryPaint);
+    canvas.drawLine(
+        Offset(cx + 2, cy - 7), Offset(cx + 8, cy - 4), primaryPaint);
+    canvas.drawLine(
+        Offset(cx + 8, cy - 4), Offset(cx + 9, cy + 2), primaryPaint);
 
     // Front leg
-    canvas.drawLine(Offset(cx - 3, cy + 3), Offset(cx + 5, cy + 8), primaryPaint);
-    canvas.drawLine(Offset(cx + 5, cy + 8), Offset(cx + 1, cy + 16), primaryPaint);
+    canvas.drawLine(
+        Offset(cx - 3, cy + 3), Offset(cx + 5, cy + 8), primaryPaint);
+    canvas.drawLine(
+        Offset(cx + 5, cy + 8), Offset(cx + 1, cy + 16), primaryPaint);
 
     // Back leg
-    canvas.drawLine(Offset(cx - 3, cy + 3), Offset(cx - 7, cy + 9), primaryPaint);
-    canvas.drawLine(Offset(cx - 7, cy + 9), Offset(cx - 4, cy + 18), primaryPaint);
+    canvas.drawLine(
+        Offset(cx - 3, cy + 3), Offset(cx - 7, cy + 9), primaryPaint);
+    canvas.drawLine(
+        Offset(cx - 7, cy + 9), Offset(cx - 4, cy + 18), primaryPaint);
   }
 
   void _paintLaptop(Canvas canvas, Size size) {
     final bgPaint = Paint()..color = const Color(0xFF3B82F6).withOpacity(0.06);
-    canvas.drawCircle(Offset(size.width * 0.5, size.height * 0.5), size.height * 0.45, bgPaint);
+    canvas.drawCircle(Offset(size.width * 0.5, size.height * 0.5),
+        size.height * 0.45, bgPaint);
 
     final linePaint = Paint()
       ..color = const Color(0xFF3B82F6).withOpacity(0.7)
@@ -1378,7 +1442,7 @@ class _GoalIllustrationPainter extends CustomPainter {
     final logoPaint = Paint()
       ..color = const Color(0xFF3B82F6)
       ..style = PaintingStyle.fill;
-    
+
     final path1 = Path()
       ..moveTo(cx - 2, cy - 8)
       ..lineTo(cx + 3, cy - 8)
@@ -1406,7 +1470,8 @@ class _GoalIllustrationPainter extends CustomPainter {
 
   void _paintTarget(Canvas canvas, Size size) {
     final bgPaint = Paint()..color = const Color(0xFF10B981).withOpacity(0.06);
-    canvas.drawCircle(Offset(size.width * 0.5, size.height * 0.5), size.height * 0.45, bgPaint);
+    canvas.drawCircle(Offset(size.width * 0.5, size.height * 0.5),
+        size.height * 0.45, bgPaint);
 
     final strokePaint = Paint()
       ..color = const Color(0xFF10B981).withOpacity(0.75)
@@ -1455,7 +1520,8 @@ class _ExpensesSummaryCard extends StatelessWidget {
                   color: AppColors.primaryContainer,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.account_balance_wallet_rounded, color: AppColors.primary, size: 24),
+                child: Icon(Icons.account_balance_wallet_rounded,
+                    color: AppColors.primary, size: 24),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -1463,7 +1529,7 @@ class _ExpensesSummaryCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Set Up Expenses',
+                      'Set Up Cash Flow',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
@@ -1490,7 +1556,8 @@ class _ExpensesSummaryCard extends StatelessWidget {
 
     final todayTotal = dashboard?.today.total ?? 0.0;
     final dailyGoal = dashboard?.today.dailyGoal ?? budget.dailyGoal ?? 0.0;
-    final progress = dailyGoal > 0 ? (todayTotal / dailyGoal).clamp(0.0, 1.0) : 0.0;
+    final progress =
+        dailyGoal > 0 ? (todayTotal / dailyGoal).clamp(0.0, 1.0) : 0.0;
     final isProfit = todayTotal <= dailyGoal;
     final difference = dailyGoal - todayTotal;
 
@@ -1524,7 +1591,8 @@ class _ExpensesSummaryCard extends StatelessWidget {
                     color: Colors.white.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 18),
+                  child: const Icon(Icons.account_balance_wallet_rounded,
+                      color: Colors.white, size: 18),
                 ),
                 const SizedBox(width: 10),
                 Text(
@@ -1538,7 +1606,8 @@ class _ExpensesSummaryCard extends StatelessWidget {
                 ),
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(12),
@@ -1601,7 +1670,9 @@ class _ExpensesSummaryCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w800,
-                        color: isProfit ? const Color(0xFF4ADE80) : const Color(0xFFFCA5A5),
+                        color: isProfit
+                            ? const Color(0xFF4ADE80)
+                            : const Color(0xFFFCA5A5),
                       ),
                     ),
                   ],
@@ -1624,8 +1695,12 @@ class _ExpensesSummaryCard extends StatelessWidget {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          isProfit ? const Color(0xFF4ADE80) : const Color(0xFFFCA5A5),
-                          isProfit ? const Color(0xFF22C55E) : const Color(0xFFEF4444),
+                          isProfit
+                              ? const Color(0xFF4ADE80)
+                              : const Color(0xFFFCA5A5),
+                          isProfit
+                              ? const Color(0xFF22C55E)
+                              : const Color(0xFFEF4444),
                         ],
                       ),
                       borderRadius: BorderRadius.circular(3),

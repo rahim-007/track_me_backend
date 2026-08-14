@@ -11,6 +11,7 @@ import '../../../../core/widgets/shared_widgets.dart';
 import '../../data/models/dashboard_data.dart';
 import '../../data/models/expense_category.dart';
 import '../../providers/expenses_provider.dart';
+import '../../providers/extra_income_provider.dart';
 import '../../providers/expense_analytics_provider.dart';
 import '../../../profile/providers/profile_provider.dart';
 import '../widgets/bento_finance_grid.dart';
@@ -48,22 +49,6 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
     );
   }
 
-  void _showAddIncome() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => AddExpenseSheet(
-        initialCategory: ExpenseCategory.salary,
-        onSave: (expense) async {
-          await ref.read(expensesListProvider.notifier).addExpense(expense);
-          ref.read(expenseDashboardProvider.notifier).reload();
-          ref.read(expenseAnalyticsProvider.notifier).reload();
-        },
-      ),
-    );
-  }
-
   String getGreeting(String? name) {
     final hour = DateTime.now().hour;
     final String greetingText;
@@ -83,6 +68,8 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
     final dashboardState = ref.watch(expenseDashboardProvider);
     final analyticsState = ref.watch(expenseAnalyticsProvider);
     final selectedFilter = ref.watch(expenseFilterProvider);
+    final extraIncomeTotal = ref.watch(extraIncomeTotalProvider);
+    final extraIncomeCount = ref.watch(extraIncomeCountProvider);
 
     return budgetState.when(
       skipLoadingOnRefresh: true,
@@ -100,6 +87,8 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
             dashboard: null,
             analytics: null,
             selectedFilter: selectedFilter,
+            extraIncomeTotal: extraIncomeTotal,
+            extraIncomeCount: extraIncomeCount,
           ),
           data: (dashboard) => analyticsState.when(
             skipLoadingOnRefresh: true,
@@ -109,12 +98,16 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
               dashboard: dashboard,
               analytics: null,
               selectedFilter: selectedFilter,
+              extraIncomeTotal: extraIncomeTotal,
+              extraIncomeCount: extraIncomeCount,
             ),
             data: (analytics) => _buildDashboard(
               budget: budget,
               dashboard: dashboard,
               analytics: analytics,
               selectedFilter: selectedFilter,
+              extraIncomeTotal: extraIncomeTotal,
+              extraIncomeCount: extraIncomeCount,
             ),
           ),
         );
@@ -170,7 +163,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Configure your monthly income and savings\ntarget to start tracking expenses.',
+                  'Configure your monthly income and savings\ntarget to start tracking your cash flow.',
                   style: TextStyle(
                     fontSize: 14,
                     color: AppColors.textSecondary,
@@ -213,6 +206,8 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
     DashboardData? dashboard,
     AnalyticsData? analytics,
     required ExpenseFilterType selectedFilter,
+    double extraIncomeTotal = 0,
+    int extraIncomeCount = 0,
   }) {
     final todayTotal = dashboard?.today.total ?? 0.0;
     final dailyGoal = dashboard?.today.dailyGoal ?? budget.dailyGoal ?? 0.0;
@@ -355,14 +350,17 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
                       savingsRate: dashboard?.month.savingsRate ?? 0.0,
                       monthlyProfit: dashboard?.month.monthlyProfit ?? 0.0,
                       monthlyLoss: dashboard?.month.monthlyLoss ?? 0.0,
+                      extraIncomeTotal: extraIncomeTotal,
+                      extraIncomeCount: extraIncomeCount,
+                      onExtraIncomeTap: () => context.push(AppRoutes.extraIncome),
                     ),
                     const SizedBox(height: 20),
 
                     // Quick Actions Section
                     _QuickActionsRow(
                       onAddExpense: _showAddExpense,
-                      onAddIncome: _showAddIncome,
                       onBudget: () => context.push(AppRoutes.expenseSetup),
+                      onExtraIncome: () => context.push(AppRoutes.extraIncome),
                       onReports: () => context.push(AppRoutes.expenseAnalytics),
                     ),
                     const SizedBox(height: 24),
@@ -715,14 +713,14 @@ class _TodayHeroCard extends StatelessWidget {
 
 class _QuickActionsRow extends StatelessWidget {
   final VoidCallback onAddExpense;
-  final VoidCallback onAddIncome;
   final VoidCallback onBudget;
+  final VoidCallback onExtraIncome;
   final VoidCallback onReports;
 
   const _QuickActionsRow({
     required this.onAddExpense,
-    required this.onAddIncome,
     required this.onBudget,
+    required this.onExtraIncome,
     required this.onReports,
   });
 
@@ -751,16 +749,16 @@ class _QuickActionsRow extends StatelessWidget {
             onTap: onAddExpense,
           ),
           _ActionButton(
-            icon: Icons.add_circle_outline_rounded,
-            label: 'Add Income',
-            color: const Color(0xFF10B981),
-            onTap: onAddIncome,
-          ),
-          _ActionButton(
             icon: Icons.account_balance_wallet_rounded,
             label: 'Budget',
             color: const Color(0xFF7C3AED),
             onTap: onBudget,
+          ),
+          _ActionButton(
+            icon: Icons.payments_outlined,
+            label: 'Extra Income',
+            color: const Color(0xFF8B5CF6),
+            onTap: onExtraIncome,
           ),
           _ActionButton(
             icon: Icons.bar_chart_rounded,

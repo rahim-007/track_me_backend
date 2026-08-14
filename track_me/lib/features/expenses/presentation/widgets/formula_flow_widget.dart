@@ -11,8 +11,8 @@ class FormulaFlowWidget extends StatelessWidget {
       _FlowStep(emoji: '🏦', label: 'Savings Target', color: Color(0xFF10B981)),
       _FlowStep(emoji: '💳', label: 'Spendable Budget', color: Color(0xFFF97316)),
       _FlowStep(emoji: '📅', label: 'Daily Goal', color: Color(0xFF3B82F6)),
-      _FlowStep(emoji: '📊', label: 'Track Expenses', color: Color(0xFF6366F1)),
-      _FlowStep(emoji: '📈', label: 'Budget Left / Over', color: Color(0xFFEC4899)),
+      _FlowStep(emoji: '📊', label: 'Track Cash Flow', color: Color(0xFF6366F1)),
+      _FlowStep(emoji: '📈', label: 'Profit / Loss', color: Color(0xFFEC4899)),
       _FlowStep(emoji: '🎯', label: 'Monthly Savings', color: Color(0xFF059669)),
     ];
 
