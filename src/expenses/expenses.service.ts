@@ -16,14 +16,14 @@ export class ExpensesService {
   }
 
   /**
-   * The day of the month the budget's daily goal / P&L counting starts from.
-   * Always "today" for the current month (the daily goal is spread over the
-   * days remaining from today to month end); the 1st for any other month.
-   * Never based on when the budget row was created.
+   * The day of the month the budget's running P&L balance starts accumulating
+   * from. Equal to the day this month's budget was (last) configured — so a
+   * fresh budget starts with Budget Left = 0 and the balance grows day by day.
+   * The 1st for any other month (full-month periods, e.g. settlements).
    */
-  private getEffectiveStartDay(month: number, year: number, now: Date = new Date()): number {
-    if (now.getUTCMonth() + 1 === month && now.getUTCFullYear() === year) {
-      return now.getUTCDate();
+  private getPeriodStartDay(createdAt: Date, month: number, year: number): number {
+    if (createdAt.getUTCMonth() + 1 === month && createdAt.getUTCFullYear() === year) {
+      return createdAt.getUTCDate();
     }
     return 1;
   }
@@ -53,20 +53,45 @@ export class ExpensesService {
       dailySpendingMap[dateStr] = (dailySpendingMap[dateStr] || 0) + exp.amount;
     }
 
-    // Running P&L balance: each day's surplus (daily limit - spending) carries
-    // forward to the next day and nets against later overspending — exactly like
-    // a normal profit & loss account. Today is included so today's leftover is
-    // immediately added to tomorrow's available budget.
+    // Running P&L balance. Budget Left starts at 0 on the day the budget starts:
+    // each day's surplus only enters the balance the NEXT day (today's leftover
+    // is not counted yet) and later overspending nets against the accumulated
+    // surplus — exactly like a normal P&L account. Today's LOSS, however, is
+    // applied immediately so an overspend shows in "Over" right away instead of
+    // waiting until tomorrow. Past months are fully elapsed, so the whole month
+    // counts (settlements).
     const daysInMonth = this.getDaysInMonth(month, year);
-    const isCurrentMonth = referenceDate.getUTCMonth() + 1 === month && referenceDate.getUTCFullYear() === year;
-    const maxDay = isCurrentMonth ? referenceDate.getUTCDate() : daysInMonth;
+    const isCurrentMonth =
+      referenceDate.getUTCMonth() + 1 === month && referenceDate.getUTCFullYear() === year;
 
     let balance = 0;
-    for (let day = startDay; day <= maxDay; day++) {
-      const currentDayDate = new Date(Date.UTC(year, month - 1, day));
-      const dateKey = currentDayDate.toISOString().split('T')[0];
-      const spentToday = dailySpendingMap[dateKey] ?? 0;
-      balance += dailyGoal - spentToday;
+    if (isCurrentMonth) {
+      const today = referenceDate.getUTCDate();
+      // Count only days BEFORE today; today's surplus joins the balance tomorrow.
+      const maxDay = Math.min(today - 1, daysInMonth);
+      for (let day = startDay; day <= maxDay; day++) {
+        const currentDayDate = new Date(Date.UTC(year, month - 1, day));
+        const dateKey = currentDayDate.toISOString().split('T')[0];
+        const spentThatDay = dailySpendingMap[dateKey] ?? 0;
+        balance += dailyGoal - spentThatDay;
+      }
+
+      // Today's loss counts immediately (shows in "Over"); today's surplus is
+      // deferred until tomorrow so a fresh budget starts at Budget Left = 0.
+      const todayDate = new Date(Date.UTC(year, month - 1, today));
+      const todayKey = todayDate.toISOString().split('T')[0];
+      const spentToday = dailySpendingMap[todayKey] ?? 0;
+      const todayPnl = dailyGoal - spentToday;
+      if (todayPnl < 0) {
+        balance += todayPnl;
+      }
+    } else {
+      for (let day = startDay; day <= daysInMonth; day++) {
+        const currentDayDate = new Date(Date.UTC(year, month - 1, day));
+        const dateKey = currentDayDate.toISOString().split('T')[0];
+        const spentThatDay = dailySpendingMap[dateKey] ?? 0;
+        balance += dailyGoal - spentThatDay;
+      }
     }
 
     return {
@@ -81,7 +106,10 @@ export class ExpensesService {
     });
     if (!budget) return;
 
-    const startDay = this.getEffectiveStartDay(budget.month, budget.year, referenceDate);
+    // The P&L window starts the day this month's budget was (last) configured,
+    // so a budget set up (or income/savings edited) today starts at Budget
+    // Left = 0 and accumulates from tomorrow — never from the 1st of the month.
+    const startDay = this.getPeriodStartDay(budget.createdAt, budget.month, budget.year);
     const { monthlyProfit, monthlyLoss } = await this.calculateMonthlyProfitLoss(
       userId,
       month,
@@ -287,6 +315,9 @@ export class ExpensesService {
         spendableBudget,
         dailyGoal,
         daysInMonth,
+        // Re-configuring the budget (income/savings) restarts its period:
+        // the running P&L balance starts from 0 again as of today.
+        createdAt: new Date(),
       },
     });
 
