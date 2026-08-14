@@ -15,6 +15,20 @@ export class ExpensesService {
     return new Date(year, month, 0).getDate();
   }
 
+  private isLeapYear(year: number): boolean {
+    return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  }
+
+  private getDaysInYear(year: number): number {
+    return this.isLeapYear(year) ? 366 : 365;
+  }
+
+  private getDayOfYear(date: Date): number {
+    const year = date.getUTCFullYear();
+    const start = Date.UTC(year, 0, 1);
+    return Math.floor((date.getTime() - start) / (24 * 60 * 60 * 1000)) + 1;
+  }
+
   /**
    * The day of the month the budget's running P&L balance starts accumulating
    * from. Equal to the day this month's budget was (last) configured — so a
@@ -540,7 +554,7 @@ export class ExpensesService {
       daysInPeriod = 1;
       elapsedDays = 1;
       remainingDays = 1;
-    } else if (selectedFilter === 'thisWeek') {
+    } else if (selectedFilter === 'thisWeek' || selectedFilter === 'weekly') {
       const dayOfWeek = referenceDate.getUTCDay(); // 0 (Sunday) to 6 (Saturday)
       const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
       const monday = new Date(referenceDate);
@@ -557,7 +571,7 @@ export class ExpensesService {
       if (elapsedDays < 1) elapsedDays = 1;
       if (elapsedDays > 7) elapsedDays = 7;
       remainingDays = 7 - elapsedDays + 1;
-    } else if (selectedFilter === 'thisMonth') {
+    } else if (selectedFilter === 'thisMonth' || selectedFilter === 'monthly') {
       const month = referenceDate.getUTCMonth() + 1;
       const year = referenceDate.getUTCFullYear();
       periodStart = new Date(Date.UTC(year, month - 1, 1));
@@ -579,6 +593,14 @@ export class ExpensesService {
       daysInPeriod = this.getDaysInMonth(prevMonth, prevYear);
       elapsedDays = daysInPeriod;
       remainingDays = 1;
+    } else if (selectedFilter === 'yearly') {
+      const year = referenceDate.getUTCFullYear();
+      periodStart = new Date(Date.UTC(year, 0, 1));
+      periodEnd = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999));
+
+      daysInPeriod = this.getDaysInYear(year);
+      elapsedDays = this.getDayOfYear(referenceDate);
+      remainingDays = daysInPeriod - elapsedDays + 1;
     } else if (selectedFilter === 'custom' && startDateStr && endDateStr) {
       periodStart = new Date(`${startDateStr}T00:00:00.000Z`);
       periodEnd = new Date(`${endDateStr}T23:59:59.999Z`);
@@ -769,6 +791,19 @@ export class ExpensesService {
     const days = Object.keys(dailyBreakdown).length || 1;
     const dailyAverage = totalAmount / days;
 
+    // For the yearly tab, collapse the per-day series into monthly buckets so
+    // the chart stays legible (12 bars instead of ~365). dailyAverage above is
+    // computed from the raw per-day series and is unaffected.
+    let breakdownEntries = Object.entries(dailyBreakdown);
+    if (period === 'yearly') {
+      const monthly: Record<string, number> = {};
+      for (const [date, amount] of breakdownEntries) {
+        const key = date.slice(0, 7); // 'YYYY-MM'
+        monthly[key] = (monthly[key] || 0) + amount;
+      }
+      breakdownEntries = Object.entries(monthly).sort(([a], [b]) => (a < b ? -1 : 1));
+    }
+
     // Sort categories by amount
     const sortedCategories = Object.entries(categoryBreakdown)
       .sort(([, a], [, b]) => b - a);
@@ -796,7 +831,7 @@ export class ExpensesService {
         amount,
         percentage: totalAmount > 0 ? (amount / totalAmount) * 100 : 0,
       })),
-      dailyBreakdown: Object.entries(dailyBreakdown).map(([date, amount]) => ({
+      dailyBreakdown: breakdownEntries.map(([date, amount]) => ({
         date,
         amount,
       })),

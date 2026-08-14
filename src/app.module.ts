@@ -12,6 +12,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { MissedReasonsModule } from './missed-reasons/missed-reasons.module';
 import { ExpensesModule } from './expenses/expenses.module';
+import { ExtraIncomeModule } from './extra-income/extra-income.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { ExpensesModule } from './expenses/expenses.module';
     NotificationsModule,
     MissedReasonsModule,
     ExpensesModule,
+    ExtraIncomeModule,
   ],
   providers: [
     // Global rate limiting — the ThrottlerModule config did nothing before
