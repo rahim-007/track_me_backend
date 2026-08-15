@@ -27,17 +27,6 @@ enum GoalPriority {
   HIGH
 }
 
-enum HabitCategory {
-  HEALTH
-  FITNESS
-  LEARNING
-  MINDFULNESS
-  PRODUCTIVITY
-  SOCIAL
-  FINANCE
-  OTHER
-}
-
 enum GoalCategory {
   PERSONAL
   CAREER
@@ -130,7 +119,7 @@ model Habit {
   userId       String
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   name         String
-  category     HabitCategory @default(OTHER)
+  category     String @default("OTHER")
   emoji        String?
   color        String?
   repeatDays   Boolean[]     @default([true, true, true, true, true, true, true])
