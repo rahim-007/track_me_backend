@@ -38,18 +38,27 @@ export class GoalsService {
   }
 
   async update(userId: string, id: string, dto: UpdateGoalDto) {
+    // Ownership check — a user may only edit their own goal. `findFirst` with
+    // the userId also makes this a 404 (not a data leak) for foreign goals.
+    const existing = await this.prisma.goal.findFirst({
+      where: { id, userId },
+      select: { id: true },
+    });
+    if (!existing) {
+      throw new NotFoundException('Goal not found');
+    }
+
     const data: any = { ...dto };
     if (dto.targetDate) {
       data.targetDate = new Date(dto.targetDate);
     }
-    const result = await this.prisma.goal.updateMany({
-      where: { id, userId },
+
+    // Return the updated goal (server-managed fields like id, userId, progress,
+    // status, createdAt are preserved because they are not part of the DTO).
+    return this.prisma.goal.update({
+      where: { id },
       data,
     });
-    if (result.count === 0) {
-      throw new NotFoundException('Goal not found');
-    }
-    return result;
   }
 
   async updateProgress(userId: string, id: string, progress: number, notes?: string) {

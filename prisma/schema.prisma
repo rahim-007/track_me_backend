@@ -172,15 +172,16 @@ model Goal {
   id          String       @id @default(cuid())
   userId      String
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name        String
-  category    GoalCategory @default(PERSONAL)
-  description String?
-  targetDate  DateTime
-  priority    GoalPriority @default(MEDIUM)
-  status      GoalStatus   @default(IN_PROGRESS)
-  progress    Float        @default(0)
-  notes       String?
-  createdAt   DateTime     @default(now())
+  name         String
+  category     GoalCategory @default(PERSONAL)
+  description  String?
+  targetDate   DateTime
+  priority     GoalPriority @default(MEDIUM)
+  status       GoalStatus   @default(IN_PROGRESS)
+  progress     Float        @default(0)
+  durationDays Int          @default(30)
+  notes        String?
+  createdAt    DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
   progressHistory GoalProgress[]

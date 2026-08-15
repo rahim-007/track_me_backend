@@ -1,4 +1,13 @@
-import { IsString, IsEnum, IsOptional, IsDateString, MaxLength } from 'class-validator';
+import {
+  IsString,
+  IsEnum,
+  IsOptional,
+  IsDateString,
+  IsInt,
+  MaxLength,
+  Min,
+  Max,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { GoalCategory, GoalPriority } from '@prisma/client';
 
@@ -21,6 +30,13 @@ export class CreateGoalDto {
   @IsEnum(GoalPriority)
   @IsOptional()
   priority?: GoalPriority;
+
+  @ApiPropertyOptional({ example: 90, description: 'Goal duration in days (1 - 365)' })
+  @IsInt()
+  @Min(1)
+  @Max(365)
+  @IsOptional()
+  durationDays?: number;
 
   @ApiPropertyOptional()
   @IsString()
