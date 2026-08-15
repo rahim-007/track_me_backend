@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { computeOverallStreaks } from '../streaks/streaks.util';
 
 @Injectable()
 export class UsersService {
@@ -32,129 +33,21 @@ export class UsersService {
     // Cap the scan window to one year so streak computation stays fast for
     // long-time users instead of walking every day since the first habit.
     const windowStart = new Date();
-    windowStart.setDate(windowStart.getDate() - 366);
+    windowStart.setUTCDate(windowStart.getUTCDate() - 366);
     const scanStart = earliestHabitDate < windowStart ? windowStart : earliestHabitDate;
 
     const logs = await this.prisma.habitLog.findMany({
       where: {
         userId,
         date: {
-          gte: new Date(Date.UTC(scanStart.getFullYear(), scanStart.getMonth(), scanStart.getDate())),
+          gte: new Date(
+            Date.UTC(scanStart.getUTCFullYear(), scanStart.getUTCMonth(), scanStart.getUTCDate()),
+          ),
         },
       },
     });
 
-    const getLocalDateString = (d: Date): string => {
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    };
-
-    // Group logs by date string (yyyy-MM-dd)
-    const logsByDate = new Map<string, typeof logs>();
-    for (const log of logs) {
-      const dateStr = log.date.toISOString().split('T')[0];
-      if (!logsByDate.has(dateStr)) {
-        logsByDate.set(dateStr, []);
-      }
-      logsByDate.get(dateStr)!.push(log);
-    }
-
-    const earliestDateStr = getLocalDateString(scanStart);
-
-    const today = new Date();
-    const todayStr = getLocalDateString(today);
-    
-    const dateStrings: string[] = [];
-    const checkDate = new Date();
-    let checkDateStr = getLocalDateString(checkDate);
-
-    while (checkDateStr >= earliestDateStr) {
-      dateStrings.push(checkDateStr);
-      checkDate.setDate(checkDate.getDate() - 1);
-      checkDateStr = getLocalDateString(checkDate);
-    }
-
-    const dayStatus = new Map<string, 'success' | 'failure' | 'neutral'>();
-
-    for (const dateStr of dateStrings) {
-      const parts = dateStr.split('-');
-      const y = parseInt(parts[0], 10);
-      const m = parseInt(parts[1], 10) - 1;
-      const d = parseInt(parts[2], 10);
-      const dateObj = new Date(y, m, d, 12, 0, 0);
-      const dayOfWeek = dateObj.getDay();
-      const repeatDaysIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-
-      const scheduledHabits = habits.filter((h) => {
-        const createdStr = getLocalDateString(h.createdAt);
-        return h.repeatDays[repeatDaysIndex] && createdStr <= dateStr;
-      });
-
-      if (scheduledHabits.length === 0) {
-        dayStatus.set(dateStr, 'neutral');
-        continue;
-      }
-
-      const dayLogs = logsByDate.get(dateStr) ?? [];
-      let allDone = true;
-
-      for (const h of scheduledHabits) {
-        const log = dayLogs.find((l) => l.habitId === h.id);
-        if (!log) {
-          allDone = false;
-          break;
-        }
-      }
-
-      if (allDone) {
-        dayStatus.set(dateStr, 'success');
-      } else {
-        dayStatus.set(dateStr, 'failure');
-      }
-    }
-
-    let currentStreak = 0;
-    for (const dateStr of dateStrings) {
-      const status = dayStatus.get(dateStr);
-      if (status === 'success') {
-        currentStreak++;
-      } else if (status === 'failure') {
-        if (dateStr === todayStr) {
-          continue;
-        } else {
-          break;
-        }
-      } else {
-        continue;
-      }
-    }
-
-    let longestStreak = 0;
-    let tempStreak = 0;
-    const chronologicalDates = [...dateStrings].reverse();
-    for (const dateStr of chronologicalDates) {
-      const status = dayStatus.get(dateStr);
-      if (status === 'success') {
-        tempStreak++;
-        if (tempStreak > longestStreak) {
-          longestStreak = tempStreak;
-        }
-      } else if (status === 'failure') {
-        if (dateStr === todayStr) {
-          // ignore
-        } else {
-          tempStreak = 0;
-        }
-      } else {
-        // ignore
-      }
-    }
-
-    if (currentStreak > longestStreak) {
-      longestStreak = currentStreak;
-    }
+    const { currentStreak, longestStreak } = computeOverallStreaks(habits, logs);
 
     await this.prisma.user.update({
       where: { id: userId },

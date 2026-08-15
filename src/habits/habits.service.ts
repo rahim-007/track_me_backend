@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { computeHabitStreak } from '../streaks/streaks.util';
 import { CreateHabitDto } from './dto/create-habit.dto';
 import { UpdateHabitDto } from './dto/update-habit.dto';
 
@@ -84,29 +85,29 @@ export class HabitsService {
   }
 
   async getStreak(userId: string, habitId: string) {
-    const logs = await this.prisma.habitLog.findMany({
-      where: { habitId, userId, isSkipped: false },
-      orderBy: { date: 'desc' },
+    const habit = await this.prisma.habit.findFirst({
+      where: { id: habitId, userId, isActive: true },
+      include: {
+        // Only valid non-skipped completions can extend a streak.
+        logs: {
+          where: { isSkipped: false },
+          orderBy: { date: 'desc' },
+        },
+      },
     });
-
-    let streak = 0;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    for (let i = 0; i < logs.length; i++) {
-      const logDate = new Date(logs[i].date);
-      logDate.setHours(0, 0, 0, 0);
-      const expectedDate = new Date(today);
-      expectedDate.setDate(today.getDate() - i);
-
-      if (logDate.getTime() === expectedDate.getTime()) {
-        streak++;
-      } else {
-        break;
-      }
+    if (!habit) {
+      // Never reveal whether the id exists but belongs to someone else.
+      throw new NotFoundException('Habit not found');
     }
 
-    return { currentStreak: streak };
+    // Per-habit streak is schedule-aware: unscheduled days are ignored and
+    // never break the streak; a scheduled day that is skipped or missing does.
+    const completedDates = new Set(
+      habit.logs.map((l: any) => l.date.toISOString().split('T')[0]),
+    );
+    const currentStreak = computeHabitStreak(habit, completedDates);
+
+    return { currentStreak };
   }
 
   private formatHabitWithDates(habit: any) {
