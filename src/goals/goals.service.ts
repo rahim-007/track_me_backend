@@ -1,7 +1,16 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateGoalDto } from './dto/create-goal.dto';
 import { UpdateGoalDto } from './dto/update-goal.dto';
+import {
+  currentValueForProgress,
+  isCountOnlyUnit,
+  isWholeUnitValue,
+} from './goal-units';
 
 @Injectable()
 export class GoalsService {
@@ -67,12 +76,27 @@ export class GoalsService {
 
     const goal = await this.prisma.goal.findFirst({
       where: { id, userId },
-      select: { id: true },
+      select: { id: true, target: true, unit: true },
     });
 
     // Never record history for goals the user doesn't own (or that don't exist)
     if (!goal) {
       throw new NotFoundException('Goal not found');
+    }
+
+    // Type-aware validation: a count-based goal (books, tasks, ₹…) must never
+    // land on a fractional unit value, even when the request bypasses the app
+    // (e.g. progress 0.25 on a 10-book target = 2.5 books → reject).
+    const currentValue = currentValueForProgress(safeProgress, goal.target);
+    if (
+      currentValue !== null &&
+      isCountOnlyUnit(goal.unit) &&
+      !isWholeUnitValue(currentValue)
+    ) {
+      throw new BadRequestException(
+        `Progress must be a whole number of ${goal.unit} for this goal ` +
+          `(got ${currentValue} ${goal.unit})`,
+      );
     }
 
     // Keep progress + history atomic

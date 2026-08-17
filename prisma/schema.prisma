@@ -46,6 +46,11 @@ enum NotificationType {
   MOTIVATION
 }
 
+enum DebtStatus {
+  ACTIVE
+  PAID
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Users
 // ─────────────────────────────────────────────────────────────────────────────
@@ -59,6 +64,10 @@ model User {
   appleId         String?   @unique
   avatarUrl       String?
   fcmToken        String?
+  // IANA timezone name (e.g. "Asia/Kolkata") used to schedule habit/goal
+  // reminders at the user's local clock. Null = fall back to the server's
+  // REMINDER_TIMEZONE (or server-local time).
+  timezone        String?
   currentStreak   Int       @default(0)
   longestStreak   Int       @default(0)
   isEmailVerified Boolean   @default(false)
@@ -78,6 +87,7 @@ model User {
   expenses           Expense[]
   monthlySettlements MonthlySettlement[]
   extraIncomes       ExtraIncome[]
+  debts              Debt[]
 
   @@index([email])
   @@index([googleId])
@@ -179,6 +189,15 @@ model Goal {
   priority     GoalPriority @default(MEDIUM)
   status       GoalStatus   @default(IN_PROGRESS)
   progress     Float        @default(0)
+  // Target amount expressed in the goal's unit (e.g. 5 for a 5 kg weight goal).
+  // 0 means "not set" — legacy goals fall back to parsing the target from the
+  // goal name. Stored as Float so measurement goals (kg, km, L, hours) can hold
+  // fractional targets like 0.5; integer-only enforcement happens in DTO/service
+  // validation based on the unit, not in the column type.
+  target       Float        @default(0)
+  // Measurement/count unit for the target & progress values (kg, km, L, hours,
+  // ₹, books, tasks, workouts, ...). Empty string = no unit (legacy goals).
+  unit         String       @default("")
   durationDays Int          @default(30)
   notes        String?
   createdAt    DateTime     @default(now())
@@ -375,4 +394,43 @@ model ExtraIncome {
   @@index([userId])
   @@index([userId, date])
   @@map("extra_incomes")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Debt / Loan Tracker (standalone — never feeds Cash Flow calculations)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Debt {
+  id               String     @id @default(cuid())
+  userId           String
+  user             User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name             String
+  originalAmount   Float
+  lenderName       String?
+  dueDate          DateTime?
+  installmentAmount Float?
+  description      String?
+  status           DebtStatus @default(ACTIVE)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  payments DebtPayment[]
+
+  @@index([userId])
+  @@index([userId, status])
+  @@map("debts")
+}
+
+model DebtPayment {
+  id          String   @id @default(cuid())
+  debtId      String
+  debt        Debt     @relation(fields: [debtId], references: [id], onDelete: Cascade)
+  amount      Float
+  paymentDate DateTime
+  note        String?
+  createdAt   DateTime @default(now())
+
+  @@index([debtId])
+  @@index([debtId, paymentDate])
+  @@map("debt_payments")
 }

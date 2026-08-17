@@ -6,6 +6,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { GoalsService } from './goals.service';
 import { CreateGoalDto } from './dto/create-goal.dto';
 import { UpdateGoalDto } from './dto/update-goal.dto';
+import { UpdateGoalProgressDto } from './dto/update-goal-progress.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('Goals')
@@ -48,7 +49,7 @@ export class GoalsController {
   updateProgress(
     @Request() req: any,
     @Param('id') id: string,
-    @Body() dto: { progress: number; notes?: string },
+    @Body() dto: UpdateGoalProgressDto,
   ) {
     return this.goalsService.updateProgress(req.user.id, id, dto.progress, dto.notes);
   }
