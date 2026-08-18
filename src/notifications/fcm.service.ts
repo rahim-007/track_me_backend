@@ -81,7 +81,16 @@ export class FcmService {
       const message = {
         token: params.token,
         notification: { title: params.title, body: params.body },
-        android: { priority: 'high' as const },
+        // Deliver on the app's high-importance 'habit_reminders' channel
+        // (created by NotificationService on launch) so pushes aren't routed
+        // to Android's low-importance default channel.
+        android: {
+          priority: 'high' as const,
+          notification: {
+            channelId: 'habit_reminders',
+            sound: 'default',
+          },
+        },
         apns: { payload: { aps: { sound: 'default' } } },
         data: params.data ?? {},
       };
