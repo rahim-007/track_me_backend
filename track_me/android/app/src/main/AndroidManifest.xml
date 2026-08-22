@@ -1,4 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Notifications: without POST_NOTIFICATIONS, Android 13+ (API 33+)
+         silently drops every notification (FCM push AND local reminders).
+         SCHEDULE_EXACT_ALARM lets habit reminders fire on time on Android 12+;
+         RECEIVE_BOOT_COMPLETED re-arms them after a device reboot. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+
     <application
         android:label="track_me"
         android:name="${applicationName}"
@@ -31,6 +39,25 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- flutter_local_notifications: the plugin's scheduled-notification
+             receivers. v17 relies on class-targeted PendingIntents, but on
+             Android 15/16 (and Motorola's SmartBackground) broadcasts to
+             manifest-less components are silently dropped. Declaring them
+             here makes the AlarmManager delivery resolvable. -->
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
+            android:exported="false" />
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+            </intent-filter>
+        </receiver>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

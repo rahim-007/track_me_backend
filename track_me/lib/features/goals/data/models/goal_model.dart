@@ -1,3 +1,5 @@
+import 'goal_units.dart';
+
 class GoalModel {
   final String id;
   final String name;
@@ -6,6 +8,9 @@ class GoalModel {
   final String priority;
   final String status;
   final double progress; // 0.0 - 1.0
+  final int durationDays;
+  final double target; // target amount in [unit] (0 = not set → parsed from name)
+  final String unit; // e.g. 'kg', 'km', 'L', 'hours', '₹', 'books', 'tasks'
   final String? notes;
   final DateTime createdAt;
 
@@ -17,9 +22,20 @@ class GoalModel {
     required this.priority,
     required this.status,
     required this.progress,
+    this.durationDays = 30,
+    this.target = 0,
+    this.unit = '',
     this.notes,
     required this.createdAt,
   });
+
+  /// Whether a numeric target has been stored (legacy goals have none and fall
+  /// back to parsing the target out of the goal name).
+  bool get hasTarget => target > 0;
+
+  /// Whether the goal's unit allows fractional values (kg, km, L, hours …).
+  /// Goals without a unit default to allowing decimals (permissive legacy).
+  bool get allowsDecimalProgress => unitAllowsDecimals(unit);
 
   GoalModel copyWith({
     String? id,
@@ -29,6 +45,9 @@ class GoalModel {
     String? priority,
     String? status,
     double? progress,
+    int? durationDays,
+    double? target,
+    String? unit,
     String? notes,
     DateTime? createdAt,
   }) {
@@ -40,6 +59,9 @@ class GoalModel {
       priority: priority ?? this.priority,
       status: status ?? this.status,
       progress: progress ?? this.progress,
+      durationDays: durationDays ?? this.durationDays,
+      target: target ?? this.target,
+      unit: unit ?? this.unit,
       notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
     );
@@ -67,6 +89,9 @@ class GoalModel {
       priority: parsedPriority,
       status: parsedStatus,
       progress: (json['progress'] as num?)?.toDouble() ?? 0.0,
+      durationDays: (json['durationDays'] as num?)?.toInt() ?? 30,
+      target: (json['target'] as num?)?.toDouble() ?? 0.0,
+      unit: json['unit'] as String? ?? '',
       notes: json['notes'] as String?,
       createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt'] as String) : DateTime.now(),
     );
@@ -81,6 +106,9 @@ class GoalModel {
       'priority': _safePriority,
       'status': _safeStatus,
       'progress': progress,
+      'durationDays': durationDays,
+      'target': target,
+      'unit': unit,
       'notes': notes,
       'createdAt': createdAt.toUtc().toIso8601String(),
     };
@@ -95,8 +123,39 @@ class GoalModel {
       'category': _safeCategory,
       'targetDate': targetDate.toUtc().toIso8601String(),
       'priority': _safePriority,
+      'durationDays': durationDays,
+      'target': target,
+      // The backend only accepts units from its whitelist, so an empty unit is
+      // sent as null (absent) instead of a rejected empty string.
+      'unit': unit.isEmpty ? null : unit,
       'notes': notes,
     };
+  }
+
+  /// Payload for the backend `PATCH /goals/:id` endpoint — same editable
+  /// fields as creation; server-managed fields (id, status, progress,
+  /// createdAt) are intentionally omitted so they are never overwritten.
+  Map<String, dynamic> toUpdateJson() {
+    return toCreateJson();
+  }
+
+  /// Date-only form of [date] (midnight, no time component) so day arithmetic
+  /// in the goal form is exact.
+  static DateTime dateOnly(DateTime date) =>
+      DateTime(date.year, date.month, date.day);
+
+  /// Target date for a goal of [durationDays] starting on [startDate].
+  static DateTime targetDateForDuration(
+          DateTime startDate, int durationDays) =>
+      dateOnly(startDate).add(Duration(days: durationDays));
+
+  /// Effective duration (clamped to 1 – 365 days) implied by a manually chosen
+  /// [targetDate], measured from [startDate]. Used when the user overrides the
+  /// target date so Duration and Target Date stay in sync.
+  static int durationForTargetDate(DateTime startDate, DateTime targetDate) {
+    final days =
+        dateOnly(targetDate).difference(dateOnly(startDate)).inDays;
+    return days.clamp(1, 365);
   }
 
   String get _safeCategory {

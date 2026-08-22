@@ -1,8 +1,7 @@
 import {
-  IsString, IsOptional, IsBoolean, IsArray, IsEnum, MaxLength
+  IsString, IsOptional, IsBoolean, IsArray, MaxLength
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { HabitCategory } from '@prisma/client';
 
 export class CreateHabitDto {
   @ApiProperty({ example: 'Morning Run' })
@@ -10,10 +9,14 @@ export class CreateHabitDto {
   @MaxLength(100)
   name: string;
 
-  @ApiProperty({ enum: HabitCategory, default: HabitCategory.OTHER })
-  @IsEnum(HabitCategory)
+  // Free-form so users can pick Health/Wealth/Peace/Others plus any custom
+  // category name typed under "Others". Legacy categories (Fitness, Learning,
+  // …) remain valid values stored in existing rows.
+  @ApiProperty({ example: 'Health', default: 'OTHER' })
+  @IsString()
   @IsOptional()
-  category?: HabitCategory;
+  @MaxLength(50)
+  category?: string;
 
   @ApiPropertyOptional({ example: '🏃' })
   @IsString()

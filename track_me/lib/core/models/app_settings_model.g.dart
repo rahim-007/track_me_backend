@@ -15,7 +15,7 @@ extension GetAppSettingsModelCollection on Isar {
 
 const AppSettingsModelSchema = CollectionSchema(
   name: r'AppSettingsModel',
-  id: -638838212012723072,
+  id: -638838212012723081,
   properties: {
     r'goalRemindersEnabled': PropertySchema(
       id: 0,

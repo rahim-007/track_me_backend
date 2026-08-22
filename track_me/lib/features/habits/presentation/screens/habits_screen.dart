@@ -10,6 +10,7 @@ import '../widgets/add_habit_dialog.dart';
 
 import '../widgets/habit_grid_row.dart';
 import '../widgets/skip_reason_dialog.dart';
+import '../../../notifications/presentation/widgets/notification_bell.dart';
 
 class HabitsScreen extends ConsumerStatefulWidget {
   const HabitsScreen({super.key});
@@ -45,21 +46,9 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
   }
 
   int _calculateMaxStreak(List<HabitModel> habits) {
-    if (habits.isEmpty) return 0;
     int maxStreak = 0;
     for (final habit in habits) {
-      final completed = habit.completedDates.toSet();
-      int currentStreak = 0;
-      DateTime day = DateTime.now();
-      for (int i = 0; i < 365; i++) {
-        final dateStr = DateFormat('yyyy-MM-dd').format(day);
-        if (completed.contains(dateStr)) {
-          currentStreak++;
-          day = day.subtract(const Duration(days: 1));
-        } else {
-          break;
-        }
-      }
+      final currentStreak = calculateHabitStreak(habit);
       if (currentStreak > maxStreak) {
         maxStreak = currentStreak;
       }
@@ -76,10 +65,22 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
       body: SafeArea(
         child: habitsAsync.when(
           data: (habits) {
+            // Only habits scheduled (Repeat) for the selected day are shown.
+            // A habit with no repeat day selected is treated as daily so it
+            // never disappears from the list.
+            final weekdayIndex = _selectedDate.weekday - 1; // 0 = Monday
+            final visibleHabits = habits.where((h) {
+              final hasRepeatDay = h.repeatDays.any((d) => d);
+              if (!hasRepeatDay) return true;
+              return weekdayIndex >= 0 &&
+                  weekdayIndex < h.repeatDays.length &&
+                  h.repeatDays[weekdayIndex];
+            }).toList();
+
             final selectedDateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
             final completedCount =
-                habits.where((h) => h.completedDates.contains(selectedDateStr)).length;
-            final totalCount = habits.length;
+                visibleHabits.where((h) => h.completedDates.contains(selectedDateStr)).length;
+            final totalCount = visibleHabits.length;
             final progress =
                 totalCount > 0 ? completedCount / totalCount : 0.0;
             final percentage = (progress * 100).round();
@@ -118,36 +119,8 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                             ),
                           ],
                         ),
-                        // Notification Icon with Badge
-                        Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            IconButton(
-                              onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Notifications screen coming soon!')),
-                                );
-                              },
-                              icon: Icon(
-                                Icons.notifications_none_rounded,
-                                size: 28,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            Positioned(
-                              top: 8,
-                              right: 8,
-                              child: Container(
-                                width: 10,
-                                height: 10,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFFEF4444),
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                            )
-                          ],
-                        ),
+                        // Notification bell → Notification Center
+                        const NotificationBell(),
                       ],
                     ),
                   ),
@@ -343,26 +316,33 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                   ),
                 ),
 
-                // Habits List Container
+                // Habits List Container — only habits that repeat on the
+                // selected day are shown here.
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
-                  sliver: habits.isEmpty
+                  sliver: visibleHabits.isEmpty
                       ? SliverToBoxAdapter(
                           child: Padding(
                             padding: const EdgeInsets.only(top: 40),
                             child: EmptyStateWidget(
-                              icon: Icons.track_changes_rounded,
-                              title: 'No habits yet',
-                              subtitle: 'Tap the button below to add your first habit',
-                              actionLabel: 'Add Habit',
-                              onAction: _showAddHabitDialog,
+                              icon: habits.isEmpty
+                                  ? Icons.track_changes_rounded
+                                  : Icons.event_available_rounded,
+                              title: habits.isEmpty
+                                  ? 'No habits yet'
+                                  : 'Nothing scheduled today',
+                              subtitle: habits.isEmpty
+                                  ? 'Tap the button below to add your first habit'
+                                  : 'No habit repeats on this day.\nPick another date or add this day in Repeat.',
+                              actionLabel: habits.isEmpty ? 'Add Habit' : null,
+                              onAction: habits.isEmpty ? _showAddHabitDialog : null,
                             ),
                           ),
                         )
                       : SliverList(
                           delegate: SliverChildBuilderDelegate(
                             (context, index) {
-                              final habit = habits[index];
+                              final habit = visibleHabits[index];
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 12),
                                 child: HabitGridRow(
@@ -375,7 +355,7 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                                 ),
                               );
                             },
-                            childCount: habits.length,
+                            childCount: visibleHabits.length,
                           ),
                         ),
                 ),

@@ -71,7 +71,7 @@ class IsarService {
     _isar = await Isar.open(
       schemas,
       directory: dir.path,
-      name: 'track_me_db_v2',
+      name: 'track_me_db_v3',
     );
   }
 

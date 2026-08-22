@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'dart:math';
@@ -9,6 +10,7 @@ import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/shared_widgets.dart';
 import '../../data/models/goal_model.dart';
+import '../../data/models/goal_units.dart';
 import '../../providers/goals_provider.dart';
 import '../widgets/add_goal_dialog.dart';
 
@@ -332,7 +334,7 @@ class _GoalCard extends ConsumerWidget {
     final effectiveCategory = isFinance ? 'finance' : goal.category;
     double tempProgress = goal.progress;
     final themeColor = _getThemeColor(effectiveCategory);
-    final parsed = _parseGoalDetails(goal.name, effectiveCategory, tempProgress);
+    final parsed = _parseGoalDetails(effectiveCategory, tempProgress);
 
     showModalBottomSheet(
       context: context,
@@ -444,9 +446,11 @@ class _GoalCard extends ConsumerWidget {
                               IconButton(
                                 onPressed: () {
                                   setModalState(() {
-                                    final step = effectiveCategory.toLowerCase() == 'finance' ? 100 : 1;
-                                    final current = (parsed['target'] * tempProgress).round();
-                                    final newVal = (current - step).clamp(0, parsed['target']);
+                                    final step = parsed['step'] as double;
+                                    final current =
+                                        (parsed['target'] as double) * tempProgress;
+                                    final newVal = (current - step)
+                                        .clamp(0.0, parsed['target'] as double);
                                     tempProgress = newVal / parsed['target'];
                                     parsed['current'] = newVal;
                                   });
@@ -462,10 +466,10 @@ class _GoalCard extends ConsumerWidget {
                               ),
                               Text(
                                 parsed['suffix'].toString().isNotEmpty
-                                    ? '${parsed['current']} ${parsed['suffix'].toString().trim()}'
+                                    ? '${formatGoalValue(parsed['current'])} ${parsed['suffix'].toString().trim()}'
                                     : (effectiveCategory.toLowerCase() == 'finance' 
                                         ? '${parsed['prefix']}${NumberFormat('#,##0').format(parsed['current'])}' 
-                                        : '${parsed['current']}%'),
+                                        : '${formatGoalValue(parsed['current'])}%'),
                                 style: TextStyle(
                                   fontSize: 22,
                                   fontWeight: FontWeight.w900,
@@ -475,9 +479,11 @@ class _GoalCard extends ConsumerWidget {
                               IconButton(
                                 onPressed: () {
                                   setModalState(() {
-                                    final step = effectiveCategory.toLowerCase() == 'finance' ? 100 : 1;
-                                    final current = (parsed['target'] * tempProgress).round();
-                                    final newVal = (current + step).clamp(0, parsed['target']);
+                                    final step = parsed['step'] as double;
+                                    final current =
+                                        (parsed['target'] as double) * tempProgress;
+                                    final newVal = (current + step)
+                                        .clamp(0.0, parsed['target'] as double);
                                     tempProgress = newVal / parsed['target'];
                                     parsed['current'] = newVal;
                                   });
@@ -496,12 +502,14 @@ class _GoalCard extends ConsumerWidget {
                         ),
                         const SizedBox(height: 10),
 
-                        // Quick Increment Buttons Row
+                        // Quick Increment Buttons Row — amounts follow the unit
+                        // type: money (100/500/1000), measurement (0.5/1/2.5),
+                        // counts (1/5/10).
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: _buildQuickActionButtons(
                             context,
-                            effectiveCategory.toLowerCase() == 'finance' ? [100, 500, 1000] : [5, 10, 20],
+                            _quickIncrements(parsed),
                             parsed,
                             tempProgress,
                             themeColor,
@@ -521,6 +529,23 @@ class _GoalCard extends ConsumerWidget {
                         // Stats Grid Row (Target, Due, Record, Left)
                         _buildStatsGrid(parsed, themeColor, effectiveCategory),
                         const SizedBox(height: 24),
+
+                        // Edit Goal — opens the goal form pre-filled with the
+                        // current values.
+                        AppButton.outlined(
+                          label: 'Edit Goal',
+                          icon: Icons.edit_rounded,
+                          foregroundColor: themeColor,
+                          onPressed: () {
+                            Navigator.pop(context);
+                            showDialog(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (_) => AddGoalDialog(goal: goal),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 10),
 
                         // Save Button
                         AppButton(
@@ -632,61 +657,109 @@ class _GoalCard extends ConsumerWidget {
     }
   }
 
-  Map<String, dynamic> _parseGoalDetails(String name, String category, double progress) {
-    final regex = RegExp(r'(\d[\d,]*)');
-    final match = regex.firstMatch(name);
-
-    int target = 100;
+  /// Resolves the numeric target/unit of this goal for the progress UI.
+  ///
+  /// Stored `target`/`unit` fields (added with the type-aware tracker) take
+  /// precedence; legacy goals without them fall back to parsing the target out
+  /// of the goal name, exactly as before.
+  Map<String, dynamic> _parseGoalDetails(String category, double progress) {
+    final isFinance = category.toLowerCase() == 'finance';
     String prefix = '';
     String suffix = '';
+    double target;
+    bool allowsDecimals;
+    double step;
 
-    if (name.contains('₹') || name.contains(r'$')) {
-      prefix = '₹';
-    } else if (name.contains('€')) {
-      prefix = '€';
-    } else if (name.contains('£')) {
-      prefix = '£';
-    }
-
-    if (match != null) {
-      final numberStr = match.group(0)!.replaceAll(',', '');
-      target = int.tryParse(numberStr) ?? 100;
-
-      if (category.toLowerCase() == 'finance' && prefix.isEmpty) {
-        prefix = '₹';
-      }
-
-      if (category.toLowerCase() != 'finance') {
-        final index = name.indexOf(match.group(0)!);
-        if (index != -1) {
-          final rest = name.substring(index + match.group(0)!.length).trim();
-          if (rest.isNotEmpty) {
-            suffix = ' $rest';
-          }
-        }
+    if (goal.hasTarget) {
+      // Modern goals carry an explicit target + unit.
+      target = goal.target;
+      final unit = goal.unit.trim();
+      if (unit.isEmpty) {
+        if (isFinance) prefix = '₹';
+      } else if (isCurrencyUnitSymbol(unit)) {
+        prefix = unit; // ₹50,000 → shown as a prefix
+      } else {
+        suffix = ' $unit'; // 5 kg → shown as a suffix
       }
     } else {
-      if (category.toLowerCase() == 'finance') {
+      // Legacy goal — infer target/unit from the name (previous behavior).
+      final regex = RegExp(r'(\d[\d,]*)');
+      final match = regex.firstMatch(goal.name);
+
+      if (goal.name.contains('₹') || goal.name.contains(r'$')) {
         prefix = '₹';
-        target = 10000;
+      } else if (goal.name.contains('€')) {
+        prefix = '€';
+      } else if (goal.name.contains('£')) {
+        prefix = '£';
+      }
+
+      if (match != null) {
+        target = double.tryParse(match.group(0)!.replaceAll(',', '')) ?? 100;
+        if (isFinance && prefix.isEmpty) prefix = '₹';
+        if (!isFinance) {
+          final index = goal.name.indexOf(match.group(0)!);
+          if (index != -1) {
+            final rest =
+                goal.name.substring(index + match.group(0)!.length).trim();
+            if (rest.isNotEmpty) suffix = ' $rest';
+          }
+        }
       } else {
-        suffix = '';
+        target = isFinance ? 10000 : 100;
+        if (isFinance) prefix = '₹';
       }
     }
 
-    int current = (target * progress).round();
+    // Input rules follow the unit type: measurement → decimals + 0.5 steps,
+    // money → whole numbers + 100 steps, counts → whole numbers + 1 steps.
+    final unit = goal.unit.trim();
+    if (unit.isNotEmpty) {
+      allowsDecimals = unitAllowsDecimals(unit);
+      step = isCurrencyUnitSymbol(unit) ? 100 : (allowsDecimals ? 0.5 : 1);
+    } else if (prefix.isNotEmpty) {
+      allowsDecimals = false;
+      step = 100;
+    } else if (suffix.isNotEmpty) {
+      // Legacy measurement parsed from the name (e.g. "Lose 5 kg") — decimals
+      // and half-steps make sense.
+      allowsDecimals = true;
+      step = 0.5;
+    } else {
+      // No unit at all — permissive decimals, unit steps.
+      allowsDecimals = true;
+      step = 1;
+    }
+
+    final current = (target * progress).clamp(0.0, target);
 
     return {
       'target': target,
       'current': current,
       'prefix': prefix,
       'suffix': suffix,
+      'allowsDecimals': allowsDecimals,
+      'step': step,
     };
   }
 
+  /// Formats [value] for display using the goal's resolved unit:
+  /// '0.5 kg', '₹50,000', '2.75 km', '5' (no unit).
+  String _fmtValue(Map<String, dynamic> parsed, num value) {
+    final suffix = parsed['suffix'].toString().trim();
+    final prefix = parsed['prefix'].toString();
+    if (suffix.isNotEmpty) {
+      return '${formatGoalValue(value)} $suffix';
+    }
+    if (prefix.isNotEmpty) {
+      return '$prefix${NumberFormat('#,##0').format(value)}';
+    }
+    return formatGoalValue(value);
+  }
+
   Widget _buildCircularProgress(double progress, Map<String, dynamic> parsed, Color themeColor, String category) {
-    final currentStr = '${parsed['prefix']}${NumberFormat('#,##0').format(parsed['current'])}';
-    final targetStr = '${parsed['prefix']}${NumberFormat('#,##0').format(parsed['target'])}';
+    final currentStr = _fmtValue(parsed, parsed['current']);
+    final targetStr = _fmtValue(parsed, parsed['target']);
 
     return SizedBox(
       width: 170,
@@ -714,7 +787,7 @@ class _GoalCard extends ConsumerWidget {
               const SizedBox(height: 6),
               Text(
                 parsed['suffix'].toString().isNotEmpty
-                    ? '${parsed['current']}'
+                    ? formatGoalValue(parsed['current'])
                     : currentStr,
                 style: TextStyle(
                   fontSize: 22,
@@ -724,7 +797,7 @@ class _GoalCard extends ConsumerWidget {
               ),
               Text(
                 parsed['suffix'].toString().isNotEmpty
-                    ? '/ ${parsed['target']}${parsed['suffix']}'
+                    ? '/ ${formatGoalValue(parsed['target'])}${parsed['suffix']}'
                     : 'of $targetStr',
                 style: TextStyle(
                   fontSize: 12,
@@ -748,9 +821,15 @@ class _GoalCard extends ConsumerWidget {
     );
   }
 
+  List<num> _quickIncrements(Map<String, dynamic> parsed) {
+    final prefix = parsed['prefix'].toString();
+    if (prefix.isNotEmpty) return [100, 500, 1000]; // money
+    return (parsed['allowsDecimals'] as bool) ? [0.5, 1, 2.5] : [1, 5, 10];
+  }
+
   List<Widget> _buildQuickActionButtons(
     BuildContext context,
-    List<int> increments,
+    List<num> increments,
     Map<String, dynamic> parsed,
     double progress,
     Color themeColor,
@@ -769,8 +848,9 @@ class _GoalCard extends ConsumerWidget {
             child: OutlinedButton(
               onPressed: () {
                 setModalState(() {
-                  final current = (parsed['target'] * progress).round();
-                  final newVal = (current + inc).clamp(0, parsed['target']);
+                  final current = (parsed['target'] as double) * progress;
+                  final newVal =
+                      (current + inc).clamp(0.0, parsed['target'] as double);
                   onUpdated(newVal / parsed['target']);
                   parsed['current'] = newVal;
                 });
@@ -782,7 +862,9 @@ class _GoalCard extends ConsumerWidget {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
               child: Text(
-                isFinance ? '+ ${parsed['prefix']}$inc' : '+ $inc',
+                isFinance
+                    ? '+ ${parsed['prefix']}${formatGoalValue(inc)}'
+                    : '+ ${formatGoalValue(inc)}',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
@@ -828,7 +910,11 @@ class _GoalCard extends ConsumerWidget {
     StateSetter setModalState,
     Function(double) onUpdated,
   ) {
-    final controller = TextEditingController(text: '${parsed['current']}');
+    final allowsDecimals = parsed['allowsDecimals'] as bool;
+    final suffix = parsed['suffix'].toString().trim();
+    final prefix = parsed['prefix'].toString();
+    final controller =
+        TextEditingController(text: formatGoalValue(parsed['current']));
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -836,12 +922,23 @@ class _GoalCard extends ConsumerWidget {
         title: Text('Enter Custom Value', style: TextStyle(color: AppColors.onSurface)),
         content: TextField(
           controller: controller,
-          keyboardType: TextInputType.number,
+          keyboardType: allowsDecimals
+              ? const TextInputType.numberWithOptions(decimal: true)
+              : TextInputType.number,
+          inputFormatters: [
+            TextInputFormatter.withFunction((oldValue, newValue) {
+              final pattern =
+                  allowsDecimals ? decimalValuePattern : integerValuePattern;
+              return pattern.hasMatch(newValue.text) ? newValue : oldValue;
+            }),
+          ],
           autofocus: true,
           style: TextStyle(color: AppColors.onSurface),
           decoration: InputDecoration(
-            labelText: parsed['suffix'].toString().isNotEmpty ? 'Reps' : 'Amount',
-            prefixText: parsed['prefix'],
+            labelText: suffix.isNotEmpty
+                ? 'Current $suffix'
+                : (prefix.isNotEmpty ? 'Amount' : 'Current value'),
+            prefixText: prefix,
             labelStyle: TextStyle(color: AppColors.textSecondary),
           ),
         ),
@@ -852,10 +949,13 @@ class _GoalCard extends ConsumerWidget {
           ),
           TextButton(
             onPressed: () {
-              final val = int.tryParse(controller.text);
+              final text = controller.text.replaceAll(',', '');
+              final val =
+                  allowsDecimals ? double.tryParse(text) : int.tryParse(text);
               if (val != null) {
                 setModalState(() {
-                  final cleanVal = val.clamp(0, parsed['target']);
+                  final cleanVal =
+                      val.clamp(0.0, parsed['target'] as double);
                   onUpdated(cleanVal / parsed['target']);
                   parsed['current'] = cleanVal;
                 });
@@ -870,8 +970,9 @@ class _GoalCard extends ConsumerWidget {
   }
 
   Widget _buildMilestoneCard(double progress, Map<String, dynamic> parsed, Color themeColor) {
-    final target = parsed['target'] as int;
-    final current = (target * progress).round();
+    final target = parsed['target'] as double;
+    final current = (target * progress).clamp(0.0, target);
+    final suffix = parsed['suffix'].toString().trim();
 
     double milestonePercent = 0.5;
     if (progress >= 0.5 && progress < 0.75) {
@@ -880,25 +981,25 @@ class _GoalCard extends ConsumerWidget {
       milestonePercent = 1.0;
     }
 
-    final milestoneVal = (target * milestonePercent).round();
-    final needed = milestoneVal - current;
+    final milestoneVal = target * milestonePercent;
+    final needed = (milestoneVal - current).clamp(0.0, milestoneVal);
 
     String milestoneTitle = '';
     String milestoneDesc = '';
 
     if (milestonePercent == 0.5) {
-      milestoneTitle = parsed['suffix'].toString().isNotEmpty
-          ? '$milestoneVal ${parsed['suffix'].toString().trim()} Milestone'
+      milestoneTitle = suffix.isNotEmpty
+          ? '${formatGoalValue(milestoneVal)} $suffix Milestone'
           : '${parsed['prefix']}${NumberFormat('#,##0').format(milestoneVal)} Milestone';
       milestoneDesc = 'You are halfway there! Keep going! 💪';
     } else if (milestonePercent == 0.75) {
-      milestoneTitle = parsed['suffix'].toString().isNotEmpty
-          ? '$milestoneVal ${parsed['suffix'].toString().trim()} Milestone'
+      milestoneTitle = suffix.isNotEmpty
+          ? '${formatGoalValue(milestoneVal)} $suffix Milestone'
           : '${parsed['prefix']}${NumberFormat('#,##0').format(milestoneVal)} Milestone';
-      milestoneDesc = 'Only ${parsed['prefix']}$needed more to reach! 🚀';
+      milestoneDesc = 'Only ${_fmtValue(parsed, needed)} more to reach! 🚀';
     } else {
-      milestoneTitle = parsed['suffix'].toString().isNotEmpty
-          ? 'Complete $target ${parsed['suffix'].toString().trim()}'
+      milestoneTitle = suffix.isNotEmpty
+          ? 'Complete ${formatGoalValue(target)} $suffix'
           : 'Reach ${parsed['prefix']}${NumberFormat('#,##0').format(target)} Goal';
       milestoneDesc = 'Almost done! You got this! 🔥';
     }
@@ -971,9 +1072,12 @@ class _GoalCard extends ConsumerWidget {
   }
 
   Widget _buildStatsGrid(Map<String, dynamic> parsed, Color themeColor, String category) {
-    final targetStr = '${parsed['prefix']}${NumberFormat('#,##0').format(parsed['target'])}${parsed['suffix']}';
-    final currentStr = '${parsed['prefix']}${NumberFormat('#,##0').format(parsed['current'])}${parsed['suffix']}';
-    final leftStr = '${parsed['prefix']}${NumberFormat('#,##0').format((parsed['target'] - parsed['current']).clamp(0, parsed['target']))}${parsed['suffix']}';
+    final targetStr = _fmtValue(parsed, parsed['target']);
+    final currentStr = _fmtValue(parsed, parsed['current']);
+    final leftStr = _fmtValue(
+      parsed,
+      (parsed['target'] - parsed['current']).clamp(0.0, parsed['target'] as double),
+    );
     final isFinance = category.toLowerCase() == 'finance';
 
     return Row(

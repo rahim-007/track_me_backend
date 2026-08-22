@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/local/isar_service.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../core/services/firebase_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../auth/providers/auth_provider.dart';
 import '../../../onboarding/data/models/onboarding_pref_model.dart';
@@ -70,6 +73,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     if (!mounted) return;
 
     if (authenticated) {
+      // Best-effort: keep the backend's FCM token + timezone fresh on every
+      // launch while logged in (tokens rotate, the device timezone can change,
+      // and the previous device may be long gone).
+      unawaited(FirebaseService.registerDeviceWithBackend());
       context.go(AppRoutes.dashboard);
     } else {
       context.go(AppRoutes.login);
@@ -126,11 +133,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'AI-Powered Productivity',
+                  'A Product of BEX-SIGMA TECH',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.75),
                     fontSize: 15,
-                    fontWeight: FontWeight.w400,
+                    fontWeight: FontWeight.w300,
+                    letterSpacing: 1.8,
                   ),
                 ),
                 const SizedBox(height: 64),

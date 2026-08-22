@@ -15,6 +15,7 @@ class DioClient {
   final _secureStorage = const FlutterSecureStorage();
 
   void init() {
+    debugPrint('[DioClient] ▶ BASE_URL = ${AppEnv.baseUrl}');
     dio = Dio(
       BaseOptions(
         baseUrl: AppEnv.baseUrl,
@@ -109,16 +110,41 @@ class DioClient {
   InterceptorsWrapper _retryInterceptor() {
     return InterceptorsWrapper(
       onError: (error, handler) async {
-        if (error.type == DioExceptionType.connectionError ||
-            error.type == DioExceptionType.receiveTimeout) {
-          // Only auto-retry idempotent reads — retrying a POST on a flaky link
-          // can duplicate data (e.g. double expenses) and doubles latency.
+        final status = error.response?.statusCode;
+        final isServerUnavailable = status == 503 || status == 502 || status == 504;
+        final isNetworkError = error.type == DioExceptionType.connectionError ||
+            error.type == DioExceptionType.receiveTimeout;
+
+        if (isServerUnavailable || isNetworkError) {
+          // 503/502/504: server is cold-starting (Render free tier) or temporarily
+          // unavailable — safe to retry any method since no data was processed.
+          // Network errors: only retry idempotent reads to avoid duplicate writes.
           final method = error.requestOptions.method.toUpperCase();
-          if (method == 'GET' || method == 'HEAD') {
-            try {
-              final response = await dio.fetch(error.requestOptions);
-              return handler.resolve(response);
-            } catch (_) {}
+          final canRetry = isServerUnavailable || method == 'GET' || method == 'HEAD';
+
+          if (canRetry) {
+            final retryCount =
+                (error.requestOptions.extra['_retryCount'] as int?) ?? 0;
+            const maxRetries = 3;
+
+            if (retryCount < maxRetries) {
+              error.requestOptions.extra['_retryCount'] = retryCount + 1;
+              // Exponential back-off: 2s, 4s, 8s
+              final waitSeconds = 1 << (retryCount + 1); // 2, 4, 8
+              debugPrint(
+                '[api] ${isServerUnavailable ? "503" : "network"} error — '
+                'retry ${retryCount + 1}/$maxRetries after ${waitSeconds}s '
+                '(${error.requestOptions.method} ${error.requestOptions.uri.path})',
+              );
+              await Future<void>.delayed(Duration(seconds: waitSeconds));
+              try {
+                final response = await dio.fetch(error.requestOptions);
+                return handler.resolve(response);
+              } catch (e) {
+                // Let the next interceptor loop handle further retries
+                return handler.next(error);
+              }
+            }
           }
         }
         handler.next(error);

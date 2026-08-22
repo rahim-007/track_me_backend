@@ -15,7 +15,7 @@ extension GetExpenseLocalModelCollection on Isar {
 
 const ExpenseLocalModelSchema = CollectionSchema(
   name: r'ExpenseLocalModel',
-  id: -2966191266169261568,
+  id: -2966191266169261604,
   properties: {
     r'amount': PropertySchema(
       id: 0,
@@ -75,7 +75,7 @@ const ExpenseLocalModelSchema = CollectionSchema(
   idName: r'id',
   indexes: {
     r'expenseId': IndexSchema(
-      id: -8289172275633361920,
+      id: -8289172275633362361,
       name: r'expenseId',
       unique: true,
       replace: false,

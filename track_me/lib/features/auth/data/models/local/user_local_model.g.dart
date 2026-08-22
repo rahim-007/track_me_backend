@@ -15,7 +15,7 @@ extension GetUserLocalModelCollection on Isar {
 
 const UserLocalModelSchema = CollectionSchema(
   name: r'UserLocalModel',
-  id: 1805101702450821120,
+  id: 1805101702450821015,
   properties: {
     r'avatarUrl': PropertySchema(
       id: 0,
@@ -50,7 +50,7 @@ const UserLocalModelSchema = CollectionSchema(
   idName: r'id',
   indexes: {
     r'userId': IndexSchema(
-      id: -2005826577402374912,
+      id: -2005826577402374815,
       name: r'userId',
       unique: true,
       replace: false,

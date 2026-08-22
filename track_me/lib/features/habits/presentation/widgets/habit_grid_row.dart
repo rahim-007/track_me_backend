@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../data/models/habit_model.dart';
 import '../../providers/habits_provider.dart';
+import 'add_habit_dialog.dart';
 
 class HabitGridRow extends ConsumerWidget {
   final HabitModel habit;
@@ -20,23 +21,10 @@ class HabitGridRow extends ConsumerWidget {
     required this.onSkip,
   }) : super(key: key);
 
-  /// Compute streak: count consecutive completed days backward from today
-  int get _streak {
-    if (habit.completedDates.isEmpty) return 0;
-    final completed = habit.completedDates.toSet();
-    int streak = 0;
-    DateTime day = DateTime.now();
-    for (int i = 0; i < 365; i++) {
-      final dateStr = DateFormat('yyyy-MM-dd').format(day);
-      if (completed.contains(dateStr)) {
-        streak++;
-        day = day.subtract(const Duration(days: 1));
-      } else {
-        break;
-      }
-    }
-    return streak;
-  }
+  /// Per-habit streak: consecutive *scheduled* days completed (unscheduled
+  /// days are ignored, so a Mon/Wed/Fri habit is never broken by Tue/Thu).
+  /// A scheduled day that is skipped or missing breaks the streak.
+  int get _streak => calculateHabitStreak(habit);
 
   Color _getCategoryColor() {
     final cat = habit.category.toLowerCase();
@@ -44,6 +32,8 @@ class HabitGridRow extends ConsumerWidget {
     if (cat.contains('learn')) return const Color(0xFF3B82F6); // Learning
     if (cat.contains('mind')) return const Color(0xFF8B5CF6); // Mindfulness
     if (cat.contains('health')) return const Color(0xFFF59E0B); // Health
+    if (cat.contains('wealth')) return const Color(0xFF059669); // Wealth
+    if (cat.contains('peace')) return const Color(0xFF06B6D4); // Peace
     if (cat.contains('person')) return const Color(0xFFEC4899); // Personal
     if (cat.contains('fin')) return const Color(0xFF059669); // Finance
     return const Color(0xFF7C3AED); // Default purple
@@ -224,7 +214,10 @@ class HabitGridRow extends ConsumerWidget {
                     ),
                     const SizedBox(width: 16),
                     GestureDetector(
-                      onTap: isFuture
+                      // A skipped habit stays skipped — tapping its status
+                      // button must never flip it to Completed. Completed can
+                      // still be tapped to undo (existing behavior).
+                      onTap: isFuture || isSkipped
                           ? null
                           : () {
                               onComplete(selectedDate);
@@ -535,6 +528,36 @@ class HabitGridRow extends ConsumerWidget {
                 ),
                 const SizedBox(height: 24),
               ],
+            // Edit
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (_) => AddHabitDialog(initialHabit: habit),
+                  );
+                },
+                icon: Icon(Icons.edit_outlined, color: AppColors.primary),
+                label: Text(
+                  'Edit Habit',
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  side: BorderSide(color: AppColors.primary),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
             // Actions
             Row(
               children: [

@@ -129,12 +129,11 @@ class HabitModel {
     };
   }
 
+  // Categories are free-form text now (Health/Wealth/Peace/Others plus any
+  // custom name typed under "Others"). Legacy values (Fitness, Learning, …)
+  // must pass through unchanged so existing habits keep their category.
   String get _safeCategory {
-    const validCategories = {
-      'HEALTH', 'FITNESS', 'LEARNING', 'MINDFULNESS',
-      'PRODUCTIVITY', 'SOCIAL', 'FINANCE', 'OTHER'
-    };
-    final catUpper = category.toUpperCase();
-    return validCategories.contains(catUpper) ? catUpper : 'OTHER';
+    final catUpper = category.trim().toUpperCase();
+    return catUpper.isEmpty ? 'OTHER' : catUpper;
   }
 }

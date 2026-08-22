@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/data/latest.dart' as tz_init;
 
 import 'app/app.dart';
 import 'core/local/isar_service.dart';
@@ -52,7 +52,7 @@ void main() async {
   // (2) Synchronous, pure-Dart init — cannot hang, so it is safe before runApp.
   //     All providers fetch the DioClient() singleton, so the client must be
   //     ready before the first widget builds.
-  tz.initializeTimeZones();
+  tz_init.initializeTimeZones();
   DioClient().init();
 
   // (3) Bounded read of the saved theme — the UI appears immediately even if
@@ -106,6 +106,12 @@ Future<void> _initServicesAsync() async {
     debugPrint('[startup] Notifications init…');
     await NotificationService.initialize().timeout(const Duration(seconds: 8));
     debugPrint('[startup] Notifications ready');
+
+    // Ask for POST_NOTIFICATIONS (Android 13+) + SCHEDULE_EXACT_ALARM once at
+    // startup so FCM pushes and exact-timed reminders can be shown even for
+    // users who never create a habit with a reminder time. Safe to call
+    // repeatedly — already-granted/denied states resolve silently.
+    await NotificationService.requestPermissions();
   } catch (e) {
     debugPrint('[startup] Notifications init failed: $e');
   }

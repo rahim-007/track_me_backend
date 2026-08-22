@@ -20,6 +20,10 @@ import '../../features/expenses/presentation/screens/expense_detail_screen.dart'
 import '../../features/expenses/presentation/screens/expense_analytics_screen.dart';
 import '../../features/expenses/presentation/screens/all_transactions_screen.dart';
 import '../../features/expenses/data/models/expense_model.dart';
+import '../../features/debts/data/models/debt_model.dart';
+import '../../features/debts/presentation/screens/debt_list_screen.dart';
+import '../../features/debts/presentation/screens/debt_detail_screen.dart';
+import '../../features/notifications/presentation/screens/notifications_screen.dart';
 import '../shell/main_shell.dart';
 
 part 'app_router.g.dart';
@@ -184,6 +188,40 @@ GoRouter appRouter(Ref ref) {
           transitionsBuilder: _slideTransition,
         ),
       ),
+
+      // Debt / Loan Tracker (standalone)
+      GoRoute(
+        path: AppRoutes.debts,
+        name: 'debts',
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const DebtListScreen(),
+          transitionsBuilder: _slideTransition,
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.debtDetail,
+        name: 'debt-detail',
+        pageBuilder: (context, state) {
+          final debt = state.extra as DebtModel;
+          return CustomTransitionPage(
+            key: state.pageKey,
+            child: DebtDetailScreen(initialDebt: debt),
+            transitionsBuilder: _slideTransition,
+          );
+        },
+      ),
+
+      // Notification Center (full-screen, with back button)
+      GoRoute(
+        path: AppRoutes.notifications,
+        name: 'notifications',
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const NotificationsScreen(),
+          transitionsBuilder: _slideTransition,
+        ),
+      ),
     ],
     errorBuilder: (context, state) => Scaffold(
       body: Center(
@@ -248,5 +286,8 @@ class AppRoutes {
   static const String expenseAnalytics = '/expense-analytics';
   static const String allTransactions = '/all-transactions';
   static const String extraIncome = '/extra-income';
+  static const String debts = '/debts';
+  static const String debtDetail = '/debt-detail';
   static const String profile = '/profile';
+  static const String notifications = '/notifications';
 }

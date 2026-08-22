@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -5,6 +8,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/network/dio_client.dart';
+import '../../../core/services/firebase_service.dart';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -41,14 +45,25 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = AuthLoading();
     try {
       final client = DioClient();
+      debugPrint('[AUTH] Attempting login to: ${client.dio.options.baseUrl}/auth/login');
+      debugPrint('[AUTH] Email: $email');
       final response = await client.dio.post(
         '/auth/login',
         data: {'email': email, 'password': password},
       );
+      debugPrint('[AUTH] Login response status: ${response.statusCode}');
       final responseData = response.data['data'] ?? response.data;
       await _saveTokens(responseData);
       state = AuthSuccess(userId: responseData['user']['id'].toString());
+      // Best-effort: register this device (FCM token + timezone) once logged in.
+      unawaited(FirebaseService.registerDeviceWithBackend());
     } catch (e) {
+      debugPrint('[AUTH] ❌ Login FAILED: $e');
+      if (e is DioException) {
+        debugPrint('[AUTH] ❌ Status: ${e.response?.statusCode}');
+        debugPrint('[AUTH] ❌ Body: ${e.response?.data}');
+        debugPrint('[AUTH] ❌ URL: ${e.requestOptions.uri}');
+      }
       state = AuthError(message: _parseError(e));
     }
   }
@@ -68,6 +83,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final responseData = response.data['data'] ?? response.data;
       await _saveTokens(responseData);
       state = AuthSuccess(userId: responseData['user']['id'].toString());
+      // Best-effort: register this device (FCM token + timezone) once logged in.
+      unawaited(FirebaseService.registerDeviceWithBackend());
     } catch (e) {
       state = AuthError(message: _parseError(e));
     }
@@ -96,6 +113,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final responseData = response.data['data'] ?? response.data;
       await _saveTokens(responseData);
       state = AuthSuccess(userId: responseData['user']['id'].toString());
+      // Best-effort: register this device (FCM token + timezone) once logged in.
+      unawaited(FirebaseService.registerDeviceWithBackend());
     } catch (e) {
       state = AuthError(message: _parseError(e));
     }
@@ -146,7 +165,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
   String _parseError(dynamic error) {
     debugPrint('AuthNotifier Error: $error');
     try {
-      final msg = (error as dynamic).response?.data['message'];
+      final response = (error as dynamic).response;
+      final statusCode = response?.statusCode as int?;
+
+      // 503/502/504: backend is cold-starting on Render free tier.
+      if (statusCode == 503 || statusCode == 502 || statusCode == 504) {
+        return 'The server is starting up after a period of inactivity. '
+            'Please wait a moment and try again.';
+      }
+
+      final msg = response?.data['message'];
       if (msg is List) return msg.first.toString();
       if (msg is String) return msg;
     } catch (_) {}
@@ -154,6 +182,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final errStr = error.toString();
       if (errStr.contains('PlatformException')) {
         return 'Google Sign-in failed: $errStr. Ensure your device\'s debug SHA-1 is registered in Google Cloud Console.';
+      }
+      if (errStr.contains('SocketException') || errStr.contains('Failed host lookup')) {
+        return 'No internet connection. Please check your network and try again.';
       }
       return errStr;
     }
@@ -168,6 +199,10 @@ final authNotifierProvider = StateNotifierProvider<AuthNotifier, AuthState>(
     secureStorage: const FlutterSecureStorage(),
     googleSignIn: GoogleSignIn(
       scopes: ['email', 'profile'],
+      // Web OAuth client ID from Firebase (client_type 3). On Android this
+      // sets the audience of the ID token, which the backend verifies against
+      // GOOGLE_CLIENT_ID.
+      serverClientId: '768660062825-tka4s28ugud55ekh7rou9e8mt9ih8esg.apps.googleusercontent.com',
     ),
   ),
 );

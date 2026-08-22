@@ -15,7 +15,7 @@ extension GetHabitLocalModelCollection on Isar {
 
 const HabitLocalModelSchema = CollectionSchema(
   name: r'HabitLocalModel',
-  id: 5978891884979768320,
+  id: 5978891884979768156,
   properties: {
     r'category': PropertySchema(
       id: 0,
@@ -70,7 +70,7 @@ const HabitLocalModelSchema = CollectionSchema(
   idName: r'id',
   indexes: {
     r'habitId': IndexSchema(
-      id: 1000409552522198784,
+      id: 1000409552522198739,
       name: r'habitId',
       unique: true,
       replace: false,

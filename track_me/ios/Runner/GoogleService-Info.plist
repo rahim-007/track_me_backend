@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>API_KEY</key>
+	<string>AIzaSyCPMHQZgh46eRU3HI2ikpuZD_d0XEdUTrM</string>
+	<key>GCM_SENDER_ID</key>
+	<string>768660062825</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.trackme.trackMe</string>
+	<key>PROJECT_ID</key>
+	<string>track-me-ac11c</string>
+	<key>STORAGE_BUCKET</key>
+	<string>track-me-ac11c.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>CLIENT_ID</key>
+	<string>768660062825-pvch5krjk4h59lljk3u1eptevd4q29cq.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.768660062825-pvch5krjk4h59lljk3u1eptevd4q29cq</string>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:768660062825:ios:a07d2deba5970740dd58f8</string>
+</dict>
+</plist>

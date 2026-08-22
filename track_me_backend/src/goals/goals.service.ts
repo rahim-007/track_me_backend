@@ -1,7 +1,16 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateGoalDto } from './dto/create-goal.dto';
 import { UpdateGoalDto } from './dto/update-goal.dto';
+import {
+  currentValueForProgress,
+  isCountOnlyUnit,
+  isWholeUnitValue,
+} from './goal-units';
 
 @Injectable()
 export class GoalsService {
@@ -38,18 +47,27 @@ export class GoalsService {
   }
 
   async update(userId: string, id: string, dto: UpdateGoalDto) {
+    // Ownership check — a user may only edit their own goal. `findFirst` with
+    // the userId also makes this a 404 (not a data leak) for foreign goals.
+    const existing = await this.prisma.goal.findFirst({
+      where: { id, userId },
+      select: { id: true },
+    });
+    if (!existing) {
+      throw new NotFoundException('Goal not found');
+    }
+
     const data: any = { ...dto };
     if (dto.targetDate) {
       data.targetDate = new Date(dto.targetDate);
     }
-    const result = await this.prisma.goal.updateMany({
-      where: { id, userId },
+
+    // Return the updated goal (server-managed fields like id, userId, progress,
+    // status, createdAt are preserved because they are not part of the DTO).
+    return this.prisma.goal.update({
+      where: { id },
       data,
     });
-    if (result.count === 0) {
-      throw new NotFoundException('Goal not found');
-    }
-    return result;
   }
 
   async updateProgress(userId: string, id: string, progress: number, notes?: string) {
@@ -58,12 +76,27 @@ export class GoalsService {
 
     const goal = await this.prisma.goal.findFirst({
       where: { id, userId },
-      select: { id: true },
+      select: { id: true, target: true, unit: true },
     });
 
     // Never record history for goals the user doesn't own (or that don't exist)
     if (!goal) {
       throw new NotFoundException('Goal not found');
+    }
+
+    // Type-aware validation: a count-based goal (books, tasks, ₹…) must never
+    // land on a fractional unit value, even when the request bypasses the app
+    // (e.g. progress 0.25 on a 10-book target = 2.5 books → reject).
+    const currentValue = currentValueForProgress(safeProgress, goal.target);
+    if (
+      currentValue !== null &&
+      isCountOnlyUnit(goal.unit) &&
+      !isWholeUnitValue(currentValue)
+    ) {
+      throw new BadRequestException(
+        `Progress must be a whole number of ${goal.unit} for this goal ` +
+          `(got ${currentValue} ${goal.unit})`,
+      );
     }
 
     // Keep progress + history atomic

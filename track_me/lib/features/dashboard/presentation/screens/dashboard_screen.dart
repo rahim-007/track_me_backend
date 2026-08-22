@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
+import '../../../notifications/presentation/widgets/notification_bell.dart';
+
 import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/shared_widgets.dart';
@@ -19,6 +21,20 @@ import '../../../habits/data/models/habit_model.dart';
 import '../../../goals/data/models/goal_model.dart';
 import '../../../expenses/providers/expenses_provider.dart';
 import '../../../expenses/data/models/dashboard_data.dart';
+
+/// Habits that are scheduled on [date]. A habit with no repeat day selected is
+/// treated as daily so it never disappears from the dashboard.
+@visibleForTesting
+List<HabitModel> habitsScheduledOn(List<HabitModel> habits, DateTime date) {
+  final weekdayIndex = date.weekday - 1; // 0 = Monday
+  return habits.where((h) {
+    final hasRepeatDay = h.repeatDays.any((d) => d);
+    if (!hasRepeatDay) return true;
+    return weekdayIndex >= 0 &&
+        weekdayIndex < h.repeatDays.length &&
+        h.repeatDays[weekdayIndex];
+  }).toList();
+}
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -143,9 +159,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       ],
                     ),
                   ),
-                  // Notification bell
+                  // Notification bell → Notification Center
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(2),
                     decoration: BoxDecoration(
                       color: AppColors.surface,
                       borderRadius: BorderRadius.circular(12),
@@ -159,28 +175,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         ),
                       ],
                     ),
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        const Icon(
-                          Icons.notifications_none_rounded,
-                          color: Color(0xFF7C3AED),
-                          size: 22,
-                        ),
-                        Positioned(
-                          right: 1,
-                          top: 1,
-                          child: Container(
-                            width: 6.5,
-                            height: 6.5,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF7C3AED),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                    child: const NotificationBell(size: 22, color: Color(0xFF7C3AED)),
                   ),
                   const SizedBox(width: 12),
                   // Avatar
@@ -315,10 +310,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   const SizedBox(height: 12),
                   habitsAsync.when(
                     data: (habits) {
-                      if (habits.isEmpty) {
+                      final todaysHabits =
+                          habitsScheduledOn(habits, DateTime.now());
+                      if (todaysHabits.isEmpty) {
                         return const Center(child: Text("No habits for today"));
                       }
-                      final displayed = habits.take(3).toList();
+                      final displayed = todaysHabits.take(3).toList();
                       return Column(
                         children: displayed
                             .map((h) => _HabitCompactCard(habit: h))
@@ -498,8 +495,11 @@ class _ProgressSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final total = habits.length;
-    final completed = habits.where((h) => h.isCompletedToday).length;
+    // Only count habits that are actually scheduled for today, so a Mon–Fri
+    // habit no longer skews the "Habits Done" count on the weekend.
+    final todayHabits = habitsScheduledOn(habits, DateTime.now());
+    final total = todayHabits.length;
+    final completed = todayHabits.where((h) => h.isCompletedToday).length;
     final percent = total > 0 ? completed / total : 0.0;
     final streak = profile?.currentStreak ?? 0;
 
@@ -989,6 +989,10 @@ class _HabitCompactCard extends ConsumerWidget {
       case 'mindfulness':
       case 'mental':
         return const Color(0xFF10B981); // Green
+      case 'wealth':
+        return const Color(0xFF059669); // Emerald
+      case 'peace':
+        return const Color(0xFF06B6D4); // Cyan
       default:
         return const Color(0xFF7C3AED); // Default purple
     }

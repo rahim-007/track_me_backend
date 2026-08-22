@@ -13,6 +13,7 @@ import '../../data/models/expense_category.dart';
 import '../../providers/expenses_provider.dart';
 import '../../providers/extra_income_provider.dart';
 import '../../providers/expense_analytics_provider.dart';
+import '../../../debts/providers/debts_provider.dart';
 import '../../../profile/providers/profile_provider.dart';
 import '../widgets/bento_finance_grid.dart';
 import '../widgets/transaction_card.dart';
@@ -70,6 +71,10 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
     final selectedFilter = ref.watch(expenseFilterProvider);
     final extraIncomeTotal = ref.watch(extraIncomeTotalProvider);
     final extraIncomeCount = ref.watch(extraIncomeCountProvider);
+    // Debt / Loan Tracker entry summary (informational only — never feeds
+    // any Cash Flow calculation).
+    final debtTotal = ref.watch(debtOutstandingTotalProvider);
+    final debtCount = ref.watch(activeDebtCountProvider);
 
     return budgetState.when(
       skipLoadingOnRefresh: true,
@@ -89,6 +94,8 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
             selectedFilter: selectedFilter,
             extraIncomeTotal: extraIncomeTotal,
             extraIncomeCount: extraIncomeCount,
+            debtTotal: debtTotal,
+            debtCount: debtCount,
           ),
           data: (dashboard) => analyticsState.when(
             skipLoadingOnRefresh: true,
@@ -100,6 +107,8 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
               selectedFilter: selectedFilter,
               extraIncomeTotal: extraIncomeTotal,
               extraIncomeCount: extraIncomeCount,
+              debtTotal: debtTotal,
+              debtCount: debtCount,
             ),
             data: (analytics) => _buildDashboard(
               budget: budget,
@@ -108,6 +117,8 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
               selectedFilter: selectedFilter,
               extraIncomeTotal: extraIncomeTotal,
               extraIncomeCount: extraIncomeCount,
+              debtTotal: debtTotal,
+              debtCount: debtCount,
             ),
           ),
         );
@@ -208,6 +219,8 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
     required ExpenseFilterType selectedFilter,
     double extraIncomeTotal = 0,
     int extraIncomeCount = 0,
+    double debtTotal = 0,
+    int debtCount = 0,
   }) {
     final todayTotal = dashboard?.today.total ?? 0.0;
     final dailyGoal = dashboard?.today.dailyGoal ?? budget.dailyGoal ?? 0.0;
@@ -353,6 +366,9 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
                       extraIncomeTotal: extraIncomeTotal,
                       extraIncomeCount: extraIncomeCount,
                       onExtraIncomeTap: () => context.push(AppRoutes.extraIncome),
+                      debtTotal: debtTotal,
+                      debtCount: debtCount,
+                      onDebtTap: () => context.push(AppRoutes.debts),
                     ),
                     const SizedBox(height: 20),
 

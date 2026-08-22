@@ -1,0 +1,23 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Track Me (Local Backend)",
+      "request": "launch",
+      "type": "dart",
+      "args": [
+        "--dart-define=BASE_URL=http://192.168.31.156:3001/api",
+        "--dart-define=PRODUCTION=false"
+      ]
+    },
+    {
+      "name": "Track Me (Render Cloud)",
+      "request": "launch",
+      "type": "dart",
+      "args": [
+        "--dart-define=BASE_URL=https://track-me-backend-pe6j.onrender.com/api",
+        "--dart-define=PRODUCTION=true"
+      ]
+    }
+  ]
+}

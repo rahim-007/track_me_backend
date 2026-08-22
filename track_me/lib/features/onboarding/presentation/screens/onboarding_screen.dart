@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:isar/isar.dart';
 
 import '../../../../core/local/isar_service.dart';
 import '../../../../core/router/app_router.dart';
@@ -20,32 +19,32 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   final List<_OnboardingPage> _pages = const [
     _OnboardingPage(
-      title: 'AI Personal\nProductivity',
+      title: 'Build Better Habits',
       description:
-          'Receive AI-powered insights and personalized productivity recommendations tailored just for you.',
-      emoji: '🤖',
+          'Create healthy habits, track your streaks, and build lasting consistency with simple daily tracking.',
+      icon: Icons.task_alt_rounded,
       gradientColors: [Color(0xFF7C3AED), Color(0xFF6366F1)],
     ),
     _OnboardingPage(
-      title: 'Build Better\nHabits',
+      title: 'Track Your Progress',
       description:
-          'Create habits, track streaks, and build long-term consistency with smart reminders.',
-      emoji: '✅',
+          'Monitor your habits, goals, and daily activities in one place and see how far you\u2019ve come.',
+      icon: Icons.insights_rounded,
       gradientColors: [Color(0xFF06B6D4), Color(0xFF3B82F6)],
     ),
     _OnboardingPage(
-      title: 'Manage Your\nGoals',
+      title: 'Manage Your Goals',
       description:
-          'Organize your goals with milestones, deadlines, and visual progress tracking.',
-      emoji: '🎯',
+          'Set meaningful goals, track milestones, and stay focused on the progress that matters to you.',
+      icon: Icons.track_changes_rounded,
       gradientColors: [Color(0xFF10B981), Color(0xFF059669)],
     ),
     _OnboardingPage(
-      title: 'Your AI\nCoach',
+      title: 'Take Control of Your Day',
       description:
-          'Get weekly reports, habit analysis, and personalized recommendations from your AI coach.',
-      emoji: '⭐',
-      gradientColors: [Color(0xFFF59E0B), Color(0xFFEF4444)],
+          'Track your habits, goals, and finances, build better routines, and stay consistent every day.',
+      icon: Icons.emoji_events_rounded,
+      gradientColors: [Color(0xFF6366F1), Color(0xFF06B6D4)],
     ),
   ];
 
@@ -109,8 +108,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               child: PageView.builder(
                 controller: _pageController,
                 itemCount: _pages.length,
-                onPageChanged: (index) =>
-                    setState(() => _currentPage = index),
+                onPageChanged: (index) => setState(() => _currentPage = index),
                 itemBuilder: (context, index) {
                   return _OnboardingPageView(page: _pages[index]);
                 },
@@ -184,71 +182,92 @@ class _OnboardingPageView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Illustration Container
-          TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0.0, end: 1.0),
-            duration: const Duration(milliseconds: 600),
-            curve: Curves.easeOutBack,
-            builder: (context, value, child) {
-              return Transform.scale(
-                scale: value,
-                child: child,
-              );
-            },
-            child: Container(
-              width: 200,
-              height: 200,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: page.gradientColors,
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: page.gradientColors.first.withOpacity(0.35),
-                    blurRadius: 40,
-                    offset: const Offset(0, 16),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // Responsive sizing: short screens use a more compact illustration
+          // and spacing so the content never overflows, while taller screens
+          // keep the full, balanced layout.
+          final compact = constraints.maxHeight < 540;
+          final circleSize = compact ? 150.0 : 200.0;
+          final iconSize = compact ? 54.0 : 72.0;
+          final afterIllustrationGap = compact ? 32.0 : 48.0;
+          final titleGap = compact ? 12.0 : 16.0;
+
+          // Centers the content when there is room and scrolls on very small
+          // screens as a fallback, guaranteeing no "bottom overflowed" errors.
+          return SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Illustration Container
+                  TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0.0, end: 1.0),
+                    duration: const Duration(milliseconds: 600),
+                    curve: Curves.easeOutBack,
+                    builder: (context, value, child) {
+                      return Transform.scale(
+                        scale: value,
+                        child: child,
+                      );
+                    },
+                    child: Container(
+                      width: circleSize,
+                      height: circleSize,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: page.gradientColors,
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: page.gradientColors.first.withOpacity(0.35),
+                            blurRadius: 40,
+                            offset: const Offset(0, 16),
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Icon(
+                          page.icon,
+                          size: iconSize,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  SizedBox(height: afterIllustrationGap),
+
+                  // Title
+                  Text(
+                    page.title,
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          height: 1.2,
+                        ),
+                    textAlign: TextAlign.center,
+                  ),
+
+                  SizedBox(height: titleGap),
+
+                  // Description
+                  Text(
+                    page.description,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: AppColors.textSecondary,
+                          height: 1.6,
+                        ),
+                    textAlign: TextAlign.center,
                   ),
                 ],
               ),
-              child: Center(
-                child: Text(
-                  page.emoji,
-                  style: const TextStyle(fontSize: 72),
-                ),
-              ),
             ),
-          ),
-
-          const SizedBox(height: 48),
-
-          // Title
-          Text(
-            page.title,
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-              height: 1.2,
-            ),
-            textAlign: TextAlign.center,
-          ),
-
-          const SizedBox(height: 16),
-
-          // Description
-          Text(
-            page.description,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: AppColors.textSecondary,
-              height: 1.6,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -257,13 +276,13 @@ class _OnboardingPageView extends StatelessWidget {
 class _OnboardingPage {
   final String title;
   final String description;
-  final String emoji;
+  final IconData icon;
   final List<Color> gradientColors;
 
   const _OnboardingPage({
     required this.title,
     required this.description,
-    required this.emoji,
+    required this.icon,
     required this.gradientColors,
   });
 }

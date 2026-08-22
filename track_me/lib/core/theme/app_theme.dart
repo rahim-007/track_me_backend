@@ -274,15 +274,16 @@ class AppTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: AppColors.onSurface,
+        backgroundColor: AppColors.surface,
         contentTextStyle: GoogleFonts.inter(
           fontSize: 14,
           fontWeight: FontWeight.w400,
-          color: Colors.white,
+          color: AppColors.onSurface,
         ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
+        insetPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       ),
       dialogTheme: DialogTheme(
         backgroundColor: AppColors.surface,
@@ -587,15 +588,16 @@ class AppTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: AppColors.onSurface,
+        backgroundColor: AppColors.surface,
         contentTextStyle: GoogleFonts.inter(
           fontSize: 14,
           fontWeight: FontWeight.w400,
-          color: Colors.white,
+          color: AppColors.onSurface,
         ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
+        insetPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       ),
       dialogTheme: DialogTheme(
         backgroundColor: AppColors.surface,

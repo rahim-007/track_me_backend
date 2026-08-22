@@ -15,7 +15,7 @@ extension GetBudgetLocalModelCollection on Isar {
 
 const BudgetLocalModelSchema = CollectionSchema(
   name: r'BudgetLocalModel',
-  id: -4211117892613486080,
+  id: -4211117892613485833,
   properties: {
     r'budgetId': PropertySchema(
       id: 0,
@@ -75,7 +75,7 @@ const BudgetLocalModelSchema = CollectionSchema(
   idName: r'id',
   indexes: {
     r'budgetId': IndexSchema(
-      id: 1954233043883219456,
+      id: 1954233043883219522,
       name: r'budgetId',
       unique: true,
       replace: false,

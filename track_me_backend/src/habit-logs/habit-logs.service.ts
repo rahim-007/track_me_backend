@@ -27,10 +27,11 @@ export class HabitLogsService {
       where: { habitId, date: parsedDate, userId },
     });
 
-    // Idempotent: marking an already-completed habit again is a no-op (returns
-    // the existing log) rather than a 409 — the app double-taps freely and the
-    // totalCompleted counter is never double-incremented because we skip it.
-    if (existing && !existing.isSkipped) {
+    // Idempotent + state-safe: a repeated tap on an already-completed habit is
+    // a no-op, and an existing Skipped record must NEVER flip to Completed from
+    // a blind completion request. The app un-completes via DELETE first, so a
+    // fresh completion always creates a brand-new record here.
+    if (existing) {
       return existing;
     }
 
@@ -66,7 +67,11 @@ export class HabitLogsService {
     await this.assertOwnedHabit(userId, habitId);
     const parsedDate = new Date(date);
 
-    return this.prisma.habitLog.upsert({
+    const existing = await this.prisma.habitLog.findFirst({
+      where: { habitId, date: parsedDate, userId },
+    });
+
+    const log = await this.prisma.habitLog.upsert({
       where: { habitId_date: { habitId, date: parsedDate } },
       update: {
         isSkipped: true,
@@ -81,6 +86,18 @@ export class HabitLogsService {
         skipReason: reason,
       },
     });
+
+    // Keep totalCompleted in sync when a completion is converted to a skip — a
+    // habit/date can only ever be in one state, so the completed count must go
+    // down for that day. Re-skipping an already-skipped day is a no-op here.
+    if (existing && !existing.isSkipped) {
+      await this.prisma.habit.update({
+        where: { id: habitId },
+        data: { totalCompleted: { decrement: 1 } },
+      });
+    }
+
+    return log;
   }
 
   async uncomplete(userId: string, habitId: string, date: string) {

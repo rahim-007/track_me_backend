@@ -15,6 +15,9 @@ class BentoFinanceGrid extends StatelessWidget {
   final double extraIncomeTotal;
   final int extraIncomeCount;
   final VoidCallback? onExtraIncomeTap;
+  final double debtTotal;
+  final int debtCount;
+  final VoidCallback? onDebtTap;
 
   const BentoFinanceGrid({
     super.key,
@@ -30,6 +33,9 @@ class BentoFinanceGrid extends StatelessWidget {
     this.extraIncomeTotal = 0,
     this.extraIncomeCount = 0,
     this.onExtraIncomeTap,
+    this.debtTotal = 0,
+    this.debtCount = 0,
+    this.onDebtTap,
   });
 
   @override
@@ -219,7 +225,7 @@ class BentoFinanceGrid extends StatelessWidget {
         ),
         const SizedBox(height: 12),
 
-        // Row 3: Budget Left, Daily Limit, Over
+        // Row 3: Loss, Daily Limit, Profit
         IntrinsicHeight(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -227,10 +233,10 @@ class BentoFinanceGrid extends StatelessWidget {
               Expanded(
                 child: _BentoCard(
                   child: _BentoTileContent(
-                    icon: Icons.check_circle_outline_rounded,
-                    iconColor: const Color(0xFF10B981),
-                    value: '₹${NumberFormat('#,##0').format(monthlyProfit)}',
-                    label: 'Profit',
+                    icon: Icons.error_outline_rounded,
+                    iconColor: const Color(0xFFEF4444),
+                    value: '₹${NumberFormat('#,##0').format(monthlyLoss)}',
+                    label: 'Loss',
                   ),
                 ),
               ),
@@ -249,22 +255,137 @@ class BentoFinanceGrid extends StatelessWidget {
               Expanded(
                 child: _BentoCard(
                   child: _BentoTileContent(
-                    icon: Icons.error_outline_rounded,
-                    iconColor: const Color(0xFFEF4444),
-                    value: '₹${NumberFormat('#,##0').format(monthlyLoss)}',
-                    label: 'Loss',
+                    icon: Icons.check_circle_outline_rounded,
+                    iconColor: const Color(0xFF10B981),
+                    value: '₹${NumberFormat('#,##0').format(monthlyProfit)}',
+                    label: 'Profit',
                   ),
                 ),
               ),
             ],
           ),
         ),
+        const SizedBox(height: 12),
+
+        // Row 4: Debt / Loan Tracker entry (standalone — informational only)
+        _DebtLoanCard(
+          total: debtTotal,
+          count: debtCount,
+          onTap: onDebtTap,
+        ),
       ],
     );
   }
 }
 
-/// Standalone Extra Income tile — thin purple outline + NEW badge.
+/// Standalone Debt / Loan Tracker entry tile — thin purple outline.
+/// Shows total outstanding (informational); never feeds Cash Flow calculations.
+class _DebtLoanCard extends StatelessWidget {
+  final double total;
+  final int count;
+  final VoidCallback? onTap;
+
+  const _DebtLoanCard({
+    required this.total,
+    required this.count,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedScale(
+        duration: const Duration(milliseconds: 150),
+        scale: 1.0,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 84),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: AppColors.primary.withOpacity(0.45),
+              width: 1.2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black
+                    .withOpacity(AppColors.isDarkMode ? 0.15 : 0.03),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.account_balance_rounded,
+                    color: AppColors.primary, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Debt / Loan',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        '₹${NumberFormat('#,##0').format(total)} outstanding',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primary,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                '$count ${count == 1 ? 'debt' : 'debts'}',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 18,
+                color: AppColors.textSecondary,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Standalone Extra Income tile — thin purple outline.
 /// Purely informational; does not feed any budget/income calculation.
 class _ExtraIncomeCard extends StatelessWidget {
   final double total;
@@ -318,23 +439,6 @@ class _ExtraIncomeCard extends StatelessWidget {
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                         color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 5, vertical: 1.5),
-                    decoration: BoxDecoration(
-                      color: AppColors.success,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Text(
-                      'NEW',
-                      style: TextStyle(
-                        fontSize: 7,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                        letterSpacing: 0.5,
                       ),
                     ),
                   ),

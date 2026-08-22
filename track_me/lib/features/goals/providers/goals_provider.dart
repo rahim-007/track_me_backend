@@ -95,6 +95,37 @@ class GoalsNotifier extends StateNotifier<GoalsState> {
     }
   }
 
+  Future<void> updateGoal(GoalModel goal) async {
+    _dirtySinceLoad = true;
+    final updated = (state.valueOrNull ?? <GoalModel>[])
+        .map((g) => g.id == goal.id ? goal : g)
+        .toList();
+    state = AsyncValue.data(updated);
+    await _cacheGoals(updated);
+
+    if (!goal.id.startsWith('temp_')) {
+      try {
+        final client = DioClient();
+        final response = await client.dio.patch(
+          '/goals/${goal.id}',
+          data: goal.toUpdateJson(),
+        );
+        // Reconcile with the server's copy (returns the updated goal).
+        final serverGoal = GoalModel.fromJson(
+          response.data['data'] as Map<String, dynamic>,
+        );
+        final reconciled = (state.valueOrNull ?? <GoalModel>[])
+            .map((g) => g.id == goal.id ? serverGoal : g)
+            .toList();
+        state = AsyncValue.data(reconciled);
+        await _cacheGoals(reconciled);
+      } catch (_) {
+        // Keep the optimistic local update; the backend keeps its old values
+        // until the next sync.
+      }
+    }
+  }
+
   Future<void> updateProgress(String goalId, double progress) async {
     _dirtySinceLoad = true;
     final updated = (state.valueOrNull ?? <GoalModel>[]).map((g) {

@@ -16,7 +16,7 @@ extension GetOnboardingPrefModelCollection on Isar {
 
 const OnboardingPrefModelSchema = CollectionSchema(
   name: r'OnboardingPrefModel',
-  id: -1169878603712611840,
+  id: -1169878603712611955,
   properties: {
     r'completedAt': PropertySchema(
       id: 0,

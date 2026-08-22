@@ -20,8 +20,20 @@ class _ExpenseSetupWizardState extends ConsumerState<ExpenseSetupWizard> {
   int _currentPage = 0;
   bool _isSaving = false;
 
+  /// True while a page transition is running — guards against double-taps on
+  /// Continue advancing two pages at once.
+  bool _isAnimatingPage = false;
+
   final _incomeController = TextEditingController();
   final _savingsController = TextEditingController();
+  final _incomeFocusNode = FocusNode();
+  final _savingsFocusNode = FocusNode();
+
+  /// Set once the user edits a field, so the async budget pre-fill never
+  /// overwrites (or resurrects) a value the user has already typed or cleared.
+  bool _userEditedIncome = false;
+  bool _userEditedSavings = false;
+
   late int _selectedMonth;
   late int _selectedYear;
   late int _daysInMonth;
@@ -34,20 +46,23 @@ class _ExpenseSetupWizardState extends ConsumerState<ExpenseSetupWizard> {
     _selectedYear = now.year;
     _daysInMonth = DateTime(_selectedYear, _selectedMonth + 1, 0).day;
 
-    _incomeController.addListener(_onTextChanged);
-    _savingsController.addListener(_onTextChanged);
+    _incomeController.addListener(_onIncomeChanged);
+    _savingsController.addListener(_onSavingsChanged);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final budgetState = ref.read(budgetProvider);
       budgetState.whenData((budget) {
         if (budget != null && mounted) {
           setState(() {
-            if (_incomeController.text.isEmpty) {
+            // Pre-fill only fields the user hasn't touched. This keeps the
+            // entered value intact when the budget resolves after the user
+            // has already started (or finished) typing.
+            if (!_userEditedIncome && _incomeController.text.isEmpty) {
               _incomeController.text = budget.monthlyIncome % 1 == 0
                   ? budget.monthlyIncome.toInt().toString()
                   : budget.monthlyIncome.toString();
             }
-            if (_savingsController.text.isEmpty) {
+            if (!_userEditedSavings && _savingsController.text.isEmpty) {
               _savingsController.text = budget.savingsTarget % 1 == 0
                   ? budget.savingsTarget.toInt().toString()
                   : budget.savingsTarget.toString();
@@ -61,7 +76,13 @@ class _ExpenseSetupWizardState extends ConsumerState<ExpenseSetupWizard> {
     });
   }
 
-  void _onTextChanged() {
+  void _onIncomeChanged() {
+    _userEditedIncome = true;
+    setState(() {});
+  }
+
+  void _onSavingsChanged() {
+    _userEditedSavings = true;
     setState(() {});
   }
 
@@ -78,15 +99,20 @@ class _ExpenseSetupWizardState extends ConsumerState<ExpenseSetupWizard> {
 
   @override
   void dispose() {
-    _incomeController.removeListener(_onTextChanged);
-    _savingsController.removeListener(_onTextChanged);
+    _incomeController.removeListener(_onIncomeChanged);
+    _savingsController.removeListener(_onSavingsChanged);
     _pageController.dispose();
     _incomeController.dispose();
     _savingsController.dispose();
+    _incomeFocusNode.dispose();
+    _savingsFocusNode.dispose();
     super.dispose();
   }
 
   void _nextPage() {
+    // Never allow a second tap to advance while a transition is running.
+    if (_isAnimatingPage || _currentPage >= 2) return;
+
     if (_currentPage == 0) {
       final income = double.tryParse(_incomeController.text.replaceAll(',', ''));
       if (income == null || income <= 0) {
@@ -112,12 +138,25 @@ class _ExpenseSetupWizardState extends ConsumerState<ExpenseSetupWizard> {
         return;
       }
     }
-    if (_currentPage < 2) {
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 350),
-        curve: Curves.easeInOutCubic,
-      );
-    }
+
+    // Dismiss the keyboard first so the page slides without racing the
+    // keyboard-driven viewport resize, then hand focus to the next field once
+    // the transition has fully settled.
+    setState(() => _isAnimatingPage = true);
+    FocusManager.instance.primaryFocus?.unfocus();
+    _pageController
+        .nextPage(
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeInOutCubic,
+        )
+        .whenComplete(() {
+      if (!mounted) return;
+      setState(() => _isAnimatingPage = false);
+      // The incoming field should be focused/ready for input.
+      if (_currentPage == 1) {
+        _savingsFocusNode.requestFocus();
+      }
+    });
   }
 
   Future<void> _finish() async {
@@ -302,6 +341,7 @@ class _ExpenseSetupWizardState extends ConsumerState<ExpenseSetupWizard> {
             ),
             child: TextField(
               controller: _incomeController,
+              focusNode: _incomeFocusNode,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.,]'))],
               autofocus: true,
@@ -370,9 +410,13 @@ class _ExpenseSetupWizardState extends ConsumerState<ExpenseSetupWizard> {
             ),
             child: TextField(
               controller: _savingsController,
+              focusNode: _savingsFocusNode,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.,]'))],
-              autofocus: true,
+              // Focus is handed here explicitly after the page transition
+              // settles (see _nextPage), which is more reliable than autofocus
+              // firing mid PageView animation.
+              autofocus: false,
               style: const TextStyle(
                 fontSize: 36,
                 fontWeight: FontWeight.w800,

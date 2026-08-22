@@ -15,7 +15,7 @@ extension GetGoalLocalModelCollection on Isar {
 
 const GoalLocalModelSchema = CollectionSchema(
   name: r'GoalLocalModel',
-  id: 4039699931059601920,
+  id: 4039699931059601878,
   properties: {
     r'category': PropertySchema(
       id: 0,
@@ -70,7 +70,7 @@ const GoalLocalModelSchema = CollectionSchema(
   idName: r'id',
   indexes: {
     r'goalId': IndexSchema(
-      id: 2738626632585230848,
+      id: 2738626632585230611,
       name: r'goalId',
       unique: true,
       replace: false,

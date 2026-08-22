@@ -16,7 +16,7 @@ extension GetMissedHabitReasonLocalModelCollection on Isar {
 
 const MissedHabitReasonLocalModelSchema = CollectionSchema(
   name: r'MissedHabitReasonLocalModel',
-  id: 3883439466895681024,
+  id: 3883439466895680949,
   properties: {
     r'createdAt': PropertySchema(
       id: 0,
@@ -66,7 +66,7 @@ const MissedHabitReasonLocalModelSchema = CollectionSchema(
   idName: r'id',
   indexes: {
     r'missedDate': IndexSchema(
-      id: 8955166464275098624,
+      id: 8955166464275099061,
       name: r'missedDate',
       unique: false,
       replace: false,

@@ -25,9 +25,10 @@ class AppConstants {
   static const String languageKey = 'language';
 
   // API Timeouts (milliseconds)
-  // Connect timeout is kept short so an unreachable backend fails fast instead
-  // of freezing every screen on a 30s spinner.
-  static const int connectTimeout = 10000;
+  // Connect timeout is generous enough to survive a Render free-tier cold
+  // start (which can take up to 30–60 s) while still failing fast on a truly
+  // unreachable host. The retry interceptor handles 503s with backoff.
+  static const int connectTimeout = 30000;
   static const int receiveTimeout = 30000;
   static const int sendTimeout = 30000;
 
@@ -37,7 +38,13 @@ class AppConstants {
   // Habit Config
   static const int maxHabitsPerDay = 20;
   static const List<String> weekDays = [
-    'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'
+    'Mon',
+    'Tue',
+    'Wed',
+    'Thu',
+    'Fri',
+    'Sat',
+    'Sun'
   ];
 
   // Notification IDs
@@ -78,14 +85,13 @@ class AppConstants {
   // Habit Categories
   static const List<String> habitCategories = [
     'Health',
-    'Fitness',
-    'Learning',
-    'Mindfulness',
-    'Productivity',
-    'Social',
-    'Finance',
-    'Other',
+    'Wealth',
+    'Peace',
+    'Others',
   ];
+
+  /// Label for the habit category that opens a free-text input.
+  static const String habitCustomCategoryLabel = 'Others';
 
   // Goal Categories
   static const List<String> goalCategories = [
@@ -99,6 +105,10 @@ class AppConstants {
     'Other',
   ];
 
+  // Goal Durations (days) — shown in the goal form's Duration selector.
+  // The list ends with 365 Days and existing options are never removed.
+  static const List<int> goalDurations = [30, 60, 90, 180, 365];
+
   // Skip Reasons
   static const List<String> skipReasons = [
     'Feeling Sick',
@@ -109,17 +119,19 @@ class AppConstants {
     'Other',
   ];
 
-  // Habit Emojis
-  static const List<String> habitEmojis = [
-    '💧', '🏃', '📚', '🧘', '💪', '🥗', '😴', '✍️',
-    '🎯', '🧹', '🎵', '🌿', '💊', '🚴', '🧠', '❤️',
-    '🛁', '☀️', '🌙', '📝', '🎨', '🍎', '🧘‍♀️', '🏋️',
-  ];
-
   // Habit Colors (hex)
   static const List<String> habitColors = [
-    '#7C3AED', '#6366F1', '#3B82F6', '#06B6D4',
-    '#10B981', '#F59E0B', '#EF4444', '#EC4899',
-    '#8B5CF6', '#059669', '#0EA5E9', '#14B8A6',
+    '#7C3AED',
+    '#6366F1',
+    '#3B82F6',
+    '#06B6D4',
+    '#10B981',
+    '#F59E0B',
+    '#EF4444',
+    '#EC4899',
+    '#8B5CF6',
+    '#059669',
+    '#0EA5E9',
+    '#14B8A6',
   ];
 }

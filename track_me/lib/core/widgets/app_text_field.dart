@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../theme/app_colors.dart';
 
 /// Premium app text field
@@ -14,6 +15,7 @@ class AppTextField extends StatefulWidget {
   final void Function(String)? onSubmitted;
   final IconData? prefixIcon;
   final Widget? suffixWidget;
+  final List<TextInputFormatter>? inputFormatters;
   final bool readOnly;
   final int maxLines;
   final FocusNode? focusNode;
@@ -32,6 +34,7 @@ class AppTextField extends StatefulWidget {
     this.onSubmitted,
     this.prefixIcon,
     this.suffixWidget,
+    this.inputFormatters,
     this.readOnly = false,
     this.maxLines = 1,
     this.focusNode,
@@ -61,6 +64,7 @@ class _AppTextFieldState extends State<AppTextField> {
       validator: widget.validator,
       onChanged: widget.onChanged,
       onFieldSubmitted: widget.onSubmitted,
+      inputFormatters: widget.inputFormatters,
       readOnly: widget.readOnly,
       maxLines: widget.obscureText ? 1 : widget.maxLines,
       focusNode: widget.focusNode,

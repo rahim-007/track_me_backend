@@ -13,6 +13,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { MissedReasonsModule } from './missed-reasons/missed-reasons.module';
 import { ExpensesModule } from './expenses/expenses.module';
 import { ExtraIncomeModule } from './extra-income/extra-income.module';
+import { DebtsModule } from './debts/debts.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { ExtraIncomeModule } from './extra-income/extra-income.module';
     MissedReasonsModule,
     ExpensesModule,
     ExtraIncomeModule,
+    DebtsModule,
   ],
   providers: [
     // Global rate limiting — the ThrottlerModule config did nothing before
