@@ -37,12 +37,11 @@ class CashFlowScreen extends ConsumerWidget {
       backgroundColor: AppColors.background,
       floatingActionButton: viewedPast || period == null
           ? null
-          : FloatingActionButton.extended(
+          : FloatingActionButton(
               onPressed: () => AddEntrySheet.show(context),
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('Add Entry'),
+              child: const Icon(Icons.add_rounded, size: 24),
             ),
       body: SafeArea(
         child: RefreshIndicator(
