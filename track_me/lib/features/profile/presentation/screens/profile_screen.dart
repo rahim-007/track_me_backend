@@ -14,7 +14,6 @@ import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/shared_widgets.dart';
 import '../../providers/profile_provider.dart';
 import '../../../auth/providers/auth_provider.dart';
-import '../../../expenses/providers/expenses_provider.dart';
 
 final appVersionProvider = FutureProvider<String>((ref) async {
   try {
@@ -359,69 +358,6 @@ class ProfileScreen extends ConsumerWidget {
                 ),
 
                 const SizedBox(height: 24),
-
-                // Finance Summary
-                Text(
-                  '💵 Finance Summary',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ref.watch(budgetProvider).when(
-                  data: (budget) {
-                    if (budget == null) {
-                      return AppCard(
-                        child: const Padding(
-                          padding: EdgeInsets.all(16),
-                          child: Center(
-                            child: Text('No budget configured yet'),
-                          ),
-                        ),
-                      );
-                    }
-                    return ref.watch(expenseDashboardProvider).when(
-                      data: (dashboard) {
-                        return AppCard(
-                          padding: EdgeInsets.zero,
-                          child: Column(
-                            children: [
-                              _DetailRow(
-                                icon: Icons.attach_money_rounded,
-                                label: 'Monthly Income',
-                                value: '₹${NumberFormat('#,##0').format(budget.monthlyIncome)}',
-                              ),
-                              const Divider(height: 1),
-                              _DetailRow(
-                                icon: Icons.savings_rounded,
-                                label: 'Savings Target',
-                                value: '₹${NumberFormat('#,##0').format(budget.savingsTarget)}',
-                              ),
-                              const Divider(height: 1),
-                              _DetailRow(
-                                icon: Icons.money_off_rounded,
-                                label: 'Monthly Expenses',
-                                value: '₹${NumberFormat('#,##0').format(dashboard.month.totalExpenses)}',
-                              ),
-                              const Divider(height: 1),
-                              _DetailRow(
-                                icon: Icons.account_balance_wallet_rounded,
-                                label: 'Remaining Budget',
-                                value: '₹${NumberFormat('#,##0').format(dashboard.month.remainingBudget)}',
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                      loading: () => const ShimmerBox(height: 150, borderRadius: 20),
-                      error: (_, __) => const Center(child: Text('Error loading finance summary')),
-                    );
-                  },
-                  loading: () => const ShimmerBox(height: 150, borderRadius: 20),
-                  error: (_, __) => const Center(child: Text('Error loading budget')),
-                ),
-
-                const SizedBox(height: 20),
 
                 // Logout
                 OutlinedButton.icon(

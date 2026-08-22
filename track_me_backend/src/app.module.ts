@@ -11,9 +11,7 @@ import { AiModule } from './ai/ai.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { MissedReasonsModule } from './missed-reasons/missed-reasons.module';
-import { ExpensesModule } from './expenses/expenses.module';
-import { ExtraIncomeModule } from './extra-income/extra-income.module';
-import { DebtsModule } from './debts/debts.module';
+import { CashFlowModule } from './cashflow/cashflow.module';
 
 @Module({
   imports: [
@@ -43,9 +41,7 @@ import { DebtsModule } from './debts/debts.module';
     AiModule,
     NotificationsModule,
     MissedReasonsModule,
-    ExpensesModule,
-    ExtraIncomeModule,
-    DebtsModule,
+    CashFlowModule,
   ],
   providers: [
     // Global rate limiting — the ThrottlerModule config did nothing before

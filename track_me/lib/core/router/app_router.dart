@@ -13,16 +13,6 @@ import '../../features/goals/presentation/screens/goals_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../../features/splash/presentation/screens/splash_screen.dart';
-import '../../features/expenses/presentation/screens/expenses_screen.dart';
-import '../../features/expenses/presentation/screens/extra_income_screen.dart';
-import '../../features/expenses/presentation/screens/expense_setup_wizard.dart';
-import '../../features/expenses/presentation/screens/expense_detail_screen.dart';
-import '../../features/expenses/presentation/screens/expense_analytics_screen.dart';
-import '../../features/expenses/presentation/screens/all_transactions_screen.dart';
-import '../../features/expenses/data/models/expense_model.dart';
-import '../../features/debts/data/models/debt_model.dart';
-import '../../features/debts/presentation/screens/debt_list_screen.dart';
-import '../../features/debts/presentation/screens/debt_detail_screen.dart';
 import '../../features/notifications/presentation/screens/notifications_screen.dart';
 import '../shell/main_shell.dart';
 
@@ -113,14 +103,6 @@ GoRouter appRouter(Ref ref) {
           ),
 
           GoRoute(
-            path: AppRoutes.expenses,
-            name: 'expenses',
-            pageBuilder: (context, state) => _noTransitionPage(
-              state: state,
-              child: const ExpensesScreen(),
-            ),
-          ),
-          GoRoute(
             path: AppRoutes.profile,
             name: 'profile',
             pageBuilder: (context, state) => _noTransitionPage(
@@ -129,87 +111,6 @@ GoRouter appRouter(Ref ref) {
             ),
           ),
         ],
-      ),
-
-      // Expense Setup (full-screen, outside shell)
-      GoRoute(
-        path: AppRoutes.expenseSetup,
-        name: 'expense-setup',
-        pageBuilder: (context, state) => CustomTransitionPage(
-          key: state.pageKey,
-          child: const ExpenseSetupWizard(),
-          transitionsBuilder: _slideTransition,
-        ),
-      ),
-
-      // Expense Detail
-      GoRoute(
-        path: AppRoutes.expenseDetail,
-        name: 'expense-detail',
-        pageBuilder: (context, state) {
-          final expense = state.extra as ExpenseModel;
-          return CustomTransitionPage(
-            key: state.pageKey,
-            child: ExpenseDetailScreen(expense: expense),
-            transitionsBuilder: _slideTransition,
-          );
-        },
-      ),
-
-      // Expense Analytics
-      GoRoute(
-        path: AppRoutes.expenseAnalytics,
-        name: 'expense-analytics',
-        pageBuilder: (context, state) => CustomTransitionPage(
-          key: state.pageKey,
-          child: const ExpenseAnalyticsScreen(),
-          transitionsBuilder: _slideTransition,
-        ),
-      ),
-
-      // All Transactions
-      GoRoute(
-        path: AppRoutes.allTransactions,
-        name: 'all-transactions',
-        pageBuilder: (context, state) => CustomTransitionPage(
-          key: state.pageKey,
-          child: const AllTransactionsScreen(),
-          transitionsBuilder: _slideTransition,
-        ),
-      ),
-
-      // Extra Income (standalone)
-      GoRoute(
-        path: AppRoutes.extraIncome,
-        name: 'extra-income',
-        pageBuilder: (context, state) => CustomTransitionPage(
-          key: state.pageKey,
-          child: const ExtraIncomeScreen(),
-          transitionsBuilder: _slideTransition,
-        ),
-      ),
-
-      // Debt / Loan Tracker (standalone)
-      GoRoute(
-        path: AppRoutes.debts,
-        name: 'debts',
-        pageBuilder: (context, state) => CustomTransitionPage(
-          key: state.pageKey,
-          child: const DebtListScreen(),
-          transitionsBuilder: _slideTransition,
-        ),
-      ),
-      GoRoute(
-        path: AppRoutes.debtDetail,
-        name: 'debt-detail',
-        pageBuilder: (context, state) {
-          final debt = state.extra as DebtModel;
-          return CustomTransitionPage(
-            key: state.pageKey,
-            child: DebtDetailScreen(initialDebt: debt),
-            transitionsBuilder: _slideTransition,
-          );
-        },
       ),
 
       // Notification Center (full-screen, with back button)
@@ -280,14 +181,6 @@ class AppRoutes {
   static const String habits = '/habits';
   static const String goals = '/goals';
 
-  static const String expenses = '/expenses';
-  static const String expenseSetup = '/expense-setup';
-  static const String expenseDetail = '/expense-detail';
-  static const String expenseAnalytics = '/expense-analytics';
-  static const String allTransactions = '/all-transactions';
-  static const String extraIncome = '/extra-income';
-  static const String debts = '/debts';
-  static const String debtDetail = '/debt-detail';
   static const String profile = '/profile';
   static const String notifications = '/notifications';
 }

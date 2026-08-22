@@ -8,8 +8,6 @@ import '../../features/habits/data/models/local/missed_habit_reason_local_model.
 import '../../features/goals/data/models/local/goal_local_model.dart';
 import '../../features/onboarding/data/models/onboarding_pref_model.dart';
 import '../models/app_settings_model.dart';
-import '../../features/expenses/data/models/local/budget_local_model.dart';
-import '../../features/expenses/data/models/local/expense_local_model.dart';
 
 class IsarService {
   IsarService._();
@@ -64,8 +62,6 @@ class IsarService {
       GoalLocalModelSchema,
       OnboardingPrefModelSchema,
       AppSettingsModelSchema,
-      BudgetLocalModelSchema,
-      ExpenseLocalModelSchema,
     ];
 
     _isar = await Isar.open(

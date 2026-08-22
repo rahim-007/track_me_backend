@@ -31,7 +31,7 @@ class MainShell extends ConsumerWidget {
   int _locationToIndex(String location) {
     if (location.startsWith(AppRoutes.habits)) return 1;
     if (location.startsWith(AppRoutes.goals)) return 2;
-    if (location.startsWith(AppRoutes.expenses)) return 3;
+    if (location.startsWith(AppRoutes.cashflow)) return 3;
     if (location.startsWith(AppRoutes.profile)) return 4;
     return 0;
   }
@@ -48,7 +48,7 @@ class MainShell extends ConsumerWidget {
         context.go(AppRoutes.goals);
         break;
       case 3:
-        context.go(AppRoutes.expenses);
+        context.go(AppRoutes.cashflow);
         break;
       case 4:
         context.go(AppRoutes.profile);
