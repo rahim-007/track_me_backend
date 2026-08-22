@@ -75,7 +75,6 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
       ]);
 
       if (_dirtySinceLoad) return;
-
       final current = CashFlowPeriodModel.fromJson(
         results[0].data['data'] as Map<String, dynamic>,
         isCurrent: true,
@@ -109,8 +108,20 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
       state = next;
       await _persist();
       await _loadTransactions(current.id);
-    } catch (_) {
-      // Cached state already applied; stay offline-friendly.
+    } catch (e) {
+      // Network/parse failure. Cached data (if any) is already applied;
+      // otherwise surface an error so the UI can show a retry button
+      // instead of spinning forever.
+      if (!_dirtySinceLoad && state.current.valueOrNull == null) {
+        state = CashFlowState(
+          current: AsyncValue.error(e, StackTrace.current),
+          history: state.history,
+          transactions: state.transactions,
+          debts: state.debts,
+          yetToReceive: state.yetToReceive,
+          yetToGive: state.yetToGive,
+        );
+      }
     }
   }
 
