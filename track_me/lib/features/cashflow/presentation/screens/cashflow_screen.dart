@@ -35,6 +35,7 @@ class CashFlowScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: viewedPast || period == null
           ? null
           : FloatingActionButton(
