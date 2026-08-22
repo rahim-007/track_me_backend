@@ -71,7 +71,6 @@ model User {
   currentStreak   Int       @default(0)
   longestStreak   Int       @default(0)
   isEmailVerified Boolean   @default(false)
-  savingsBalance  Float     @default(0.0)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -83,11 +82,8 @@ model User {
   refreshTokens      RefreshToken[]
   passwordResetTokens PasswordResetToken[]
   missedHabitReasons MissedHabitReason[]
-  monthlyBudgets     MonthlyBudget[]
-  expenses           Expense[]
-  monthlySettlements MonthlySettlement[]
-  extraIncomes       ExtraIncome[]
-  debts              Debt[]
+  cashFlowPeriods    CashFlowPeriod[]
+  cashFlowDebts      CashFlowDebt[]
 
   @@index([email])
   @@index([googleId])
@@ -290,147 +286,77 @@ model MissedHabitReason {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Expense Tracker
+// Cash Flow Tracker
+//
+// One CashFlowPeriod per calendar month per user. Opening balances carry
+// forward from the previous period's computed closing balances; closing
+// balances themselves are never stored. Transactions belong to exactly one
+// period and are reset each month. The debt ledger (CashFlowDebt) is a
+// continuous give/receive list that is NOT reset at month boundaries.
 // ─────────────────────────────────────────────────────────────────────────────
 
-enum ExpenseCategory {
-  FOOD
-  TRANSPORT
-  SHOPPING
-  BILLS
-  HEALTH
-  EDUCATION
-  ENTERTAINMENT
-  TRAVEL
-  SALARY
-  OTHER
+enum CashFlowTxnKind {
+  INCOME
+  OUTFLOW
 }
 
-enum PaymentMethod {
-  CASH
-  UPI
-  CREDIT_CARD
-  DEBIT_CARD
-  BANK_TRANSFER
-}
+model CashFlowPeriod {
+  id                String @id @default(cuid())
+  userId            String
+  user              User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  month             Int // 1-12
+  year              Int
+  openingBank       Float
+  openingCash       Float
+  openingCreditCard Float
+  openingDebt       Float
+  createdAt         DateTime @default(now())
 
-model MonthlyBudget {
-  id              String   @id @default(cuid())
-  userId          String
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  month           Int
-  year            Int
-  monthlyIncome   Float
-  savingsTarget   Float
-  spendableBudget Float
-  dailyGoal       Float
-  daysInMonth     Int
-  monthlyProfit   Float    @default(0.0)
-  monthlyLoss     Float    @default(0.0)
-  settled         Boolean  @default(false)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  transactions CashFlowTransaction[]
 
   @@unique([userId, month, year])
   @@index([userId])
-  @@map("monthly_budgets")
+  @@map("cashflow_periods")
 }
 
-model Expense {
-  id            String          @id @default(cuid())
-  userId        String
-  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title         String
-  amount        Float
-  category      ExpenseCategory @default(OTHER)
-  paymentMethod PaymentMethod   @default(CASH)
-  date          DateTime        @db.Date
-  time          String?
-  notes         String?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-
-  @@index([userId])
-  @@index([userId, date])
-  @@index([userId, category])
-  @@map("expenses")
-}
-
-model MonthlySettlement {
-  id                      String   @id @default(cuid())
-  userId                  String
-  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  month                   Int
-  year                    Int
-  totalBudget             Float
-  totalExpenses           Float
-  totalProfit             Float
-  totalLoss               Float
-  netResult               Float
-  savingsBeforeSettlement Float
-  savingsAfterSettlement  Float
-  settlementDate          DateTime @default(now())
-
-  @@unique([userId, month, year])
-  @@index([userId])
-  @@map("monthly_settlements")
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Extra Income (standalone financial log — independent of the expense budget,
-// income, savings, P&L, analytics and reports. Purely informational.)
-// ─────────────────────────────────────────────────────────────────────────────
-
-model ExtraIncome {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title     String
+model CashFlowTransaction {
+  id        String          @id @default(cuid())
+  periodId  String
+  period    CashFlowPeriod  @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  kind      CashFlowTxnKind
+  category  String // income: E | S | B | I | G ; outflow: E | S | D | I
   amount    Float
-  date      DateTime @db.Date
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  note      String?
+  date      DateTime        @db.Date
+  createdAt DateTime        @default(now())
+
+  @@index([periodId])
+  @@index([periodId, date])
+  @@map("cashflow_transactions")
+}
+
+enum CashFlowDebtDirection {
+  GIVE // I owe them
+  RECEIVE // they owe me
+}
+
+model CashFlowDebt {
+  id        String                @id @default(cuid())
+  userId    String
+  user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  direction CashFlowDebtDirection
+  person    String
+  amount    Float
+  note      String?
+  date      DateTime              @db.Date
+  settled   Boolean               @default(false)
+  settledAt DateTime?
+  createdAt DateTime              @default(now())
 
   @@index([userId])
-  @@index([userId, date])
-  @@map("extra_incomes")
+  @@index([userId, direction, settled])
+  @@map("cashflow_debts")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Debt / Loan Tracker (standalone — never feeds Cash Flow calculations)
-// ─────────────────────────────────────────────────────────────────────────────
-
-model Debt {
-  id               String     @id @default(cuid())
-  userId           String
-  user             User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name             String
-  originalAmount   Float
-  lenderName       String?
-  dueDate          DateTime?
-  installmentAmount Float?
-  description      String?
-  status           DebtStatus @default(ACTIVE)
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
-
-  payments DebtPayment[]
-
-  @@index([userId])
-  @@index([userId, status])
-  @@map("debts")
-}
-
-model DebtPayment {
-  id          String   @id @default(cuid())
-  debtId      String
-  debt        Debt     @relation(fields: [debtId], references: [id], onDelete: Cascade)
-  amount      Float
-  paymentDate DateTime
-  note        String?
-  createdAt   DateTime @default(now())
-
-  @@index([debtId])
-  @@index([debtId, paymentDate])
-  @@map("debt_payments")
-}
+//
