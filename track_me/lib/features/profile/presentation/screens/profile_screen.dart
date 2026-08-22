@@ -11,7 +11,6 @@ import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_text_field.dart';
-import '../../../../core/widgets/shared_widgets.dart';
 import '../../providers/profile_provider.dart';
 import '../../../auth/providers/auth_provider.dart';
 

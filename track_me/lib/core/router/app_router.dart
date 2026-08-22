@@ -9,6 +9,7 @@ import '../../features/auth/presentation/screens/register_screen.dart';
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
 import '../../features/habits/presentation/screens/habits_screen.dart';
 import '../../features/goals/presentation/screens/goals_screen.dart';
+import '../../features/cashflow/presentation/screens/cashflow_screen.dart';
 
 import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
@@ -101,7 +102,14 @@ GoRouter appRouter(Ref ref) {
               child: const GoalsScreen(),
             ),
           ),
-
+          GoRoute(
+            path: AppRoutes.cashflow,
+            name: 'cashflow',
+            pageBuilder: (context, state) => _noTransitionPage(
+              state: state,
+              child: const CashFlowScreen(),
+            ),
+          ),
           GoRoute(
             path: AppRoutes.profile,
             name: 'profile',
@@ -180,6 +188,7 @@ class AppRoutes {
   static const String dashboard = '/dashboard';
   static const String habits = '/habits';
   static const String goals = '/goals';
+  static const String cashflow = '/cashflow';
 
   static const String profile = '/profile';
   static const String notifications = '/notifications';
