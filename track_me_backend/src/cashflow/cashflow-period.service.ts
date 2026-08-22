@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Optional, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   computeClosingBalances,
@@ -34,11 +34,15 @@ type PeriodRow = {
  */
 @Injectable()
 export class CashFlowPeriodService {
+  private readonly now: () => Date;
+
   constructor(
     private readonly prisma: PrismaService,
     /** Injectable clock so month-rollover logic can be tested deterministically. */
-    private readonly now: () => Date = () => new Date(),
-  ) {}
+    @Optional() now?: () => Date,
+  ) {
+    this.now = now ?? (() => new Date());
+  }
 
   /** All periods for the user, oldest first. */
   async listPeriods(userId: string) {
