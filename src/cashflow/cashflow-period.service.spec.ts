@@ -231,4 +231,48 @@ describe('CashFlowPeriodService — month rollover & carry-forward', () => {
       NotFoundException,
     );
   });
+
+  it('allows initial setup after getCurrentPeriod auto-opened a period', async () => {
+    const prisma = makePrismaMock();
+    const svc = new CashFlowPeriodService(prisma as any, () => FIXED_AUG_2026);
+
+    // First, user loads current period (auto-creates 0-balance period for Aug 2026)
+    const autoCreated = await svc.getCurrentPeriod('u1');
+    expect(autoCreated.openingBank).toBe(0);
+
+    // Then user completes setup sheet for Aug 2026
+    const setup = await svc.createFirstPeriod('u1', {
+      month: 8,
+      year: 2026,
+      openingBank: 5000,
+      openingCash: 1000,
+      openingCreditCard: -500,
+      openingDebt: 0,
+    });
+
+    expect(setup.openingBank).toBe(5000);
+    expect(setup.openingCash).toBe(1000);
+    expect(setup.openingCreditCard).toBe(-500);
+  });
+
+  it('accepts OUTFLOW transactions with category D and DO', async () => {
+    const prisma = makePrismaMock();
+    const svc = new CashFlowPeriodService(prisma as any, () => FIXED_AUG_2026);
+
+    const txnD = await svc.createTransaction('u1', {
+      kind: 'OUTFLOW',
+      category: 'D',
+      amount: 150,
+      date: '2026-08-10',
+    } as any);
+    expect(txnD.category).toBe('D');
+
+    const txnDO = await svc.createTransaction('u1', {
+      kind: 'OUTFLOW',
+      category: 'DO',
+      amount: 50,
+      date: '2026-08-11',
+    } as any);
+    expect(txnDO.category).toBe('DO');
+  });
 });

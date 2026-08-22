@@ -63,38 +63,78 @@ export class CashFlowPeriodService {
     return this.serialize(period);
   }
 
-  /** Manual first-month setup. Only allowed when no period exists yet. */
+  /** Manual first-month setup or initial balance configuration. */
   async createFirstPeriod(userId: string, dto: CreatePeriodDto) {
-    const existing = await this.prisma.cashFlowPeriod.findFirst({
-      where: { userId },
+    const openingCash = dto.openingCash ?? 0;
+    const existingForMonth = await this.prisma.cashFlowPeriod.findFirst({
+      where: { userId, month: dto.month, year: dto.year },
     });
-    if (existing) {
-      throw new BadRequestException(
-        'A period already exists — subsequent periods open automatically at month rollover',
-      );
+
+    let period: PeriodRow;
+    if (existingForMonth) {
+      period = await this.prisma.cashFlowPeriod.update({
+        where: { id: existingForMonth.id },
+        data: {
+          openingBank: dto.openingBank,
+          openingCash,
+          openingCreditCard: dto.openingCreditCard,
+          openingDebt: dto.openingDebt,
+        },
+      });
+    } else {
+      period = await this.prisma.cashFlowPeriod.create({
+        data: {
+          userId,
+          month: dto.month,
+          year: dto.year,
+          openingBank: dto.openingBank,
+          openingCash,
+          openingCreditCard: dto.openingCreditCard,
+          openingDebt: dto.openingDebt,
+        },
+      });
     }
-    const period = await this.prisma.cashFlowPeriod.create({
-      data: {
-        userId,
-        month: dto.month,
-        year: dto.year,
-        openingBank: dto.openingBank,
-        openingCash: 0,
-        openingCreditCard: dto.openingCreditCard,
-        openingDebt: dto.openingDebt,
-      },
-    });
-    // Normalize cash so a first entry can't be lost: v1 posts everything to
-    // bank, but keep whatever cash value the user entered via openingCash.
-    if (dto.openingCash !== undefined) {
-      return this.serialize(
-        await this.prisma.cashFlowPeriod.update({
-          where: { id: period.id },
-          data: { openingCash: dto.openingCash },
-        }),
-      );
-    }
+
+    await this.recalculateFuturePeriods(userId, dto.month, dto.year);
     return this.serialize(period);
+  }
+
+  private async recalculateFuturePeriods(userId: string, fromMonth?: number, fromYear?: number) {
+    const periods = await this.prisma.cashFlowPeriod.findMany({
+      where: { userId },
+      orderBy: [{ year: 'asc' }, { month: 'asc' }],
+    });
+
+    for (let i = 1; i < periods.length; i++) {
+      const prev = periods[i - 1];
+      const curr = periods[i];
+
+      if (fromMonth !== undefined && fromYear !== undefined) {
+        if (curr.year < fromYear || (curr.year === fromYear && curr.month <= fromMonth)) {
+          continue;
+        }
+      }
+
+      const closing = await this.computeClosing(userId, prev);
+
+      if (
+        curr.openingBank !== closing.closingBank ||
+        curr.openingCash !== closing.closingCash ||
+        curr.openingCreditCard !== closing.closingCreditCard ||
+        curr.openingDebt !== closing.closingDebt
+      ) {
+        const updated = await this.prisma.cashFlowPeriod.update({
+          where: { id: curr.id },
+          data: {
+            openingBank: closing.closingBank,
+            openingCash: closing.closingCash,
+            openingCreditCard: closing.closingCreditCard,
+            openingDebt: closing.closingDebt,
+          },
+        });
+        periods[i] = updated;
+      }
+    }
   }
 
   /** Edit the current period's opening balances. Past periods are immutable. */
@@ -118,6 +158,7 @@ export class CashFlowPeriodService {
         ...(dto.openingDebt !== undefined && { openingDebt: dto.openingDebt }),
       },
     });
+    await this.recalculateFuturePeriods(userId, updated.month, updated.year);
     return this.serialize(updated);
   }
 
@@ -131,16 +172,34 @@ export class CashFlowPeriodService {
   }
 
   async createTransaction(userId: string, dto: CreateTransactionDto) {
-    const period = await this.ensureCurrentPeriod(userId);
-    const date = new Date(dto.date);
-    if (
-      date.getMonth() + 1 !== period.month ||
-      date.getFullYear() !== period.year
-    ) {
-      throw new BadRequestException(
-        `Entry date must fall inside the current period (${period.month}/${period.year})`,
-      );
+    if (dto.kind === 'INCOME' && !['E', 'S', 'B', 'I', 'G'].includes(dto.category)) {
+      throw new BadRequestException(`Invalid category '${dto.category}' for INCOME entry`);
     }
+    if (dto.kind === 'OUTFLOW' && !['E', 'S', 'D', 'I', 'DO'].includes(dto.category)) {
+      throw new BadRequestException(`Invalid category '${dto.category}' for OUTFLOW entry`);
+    }
+
+    const dateParts = dto.date.split('T')[0].split('-').map((p) => parseInt(p, 10));
+    const year = dateParts[0];
+    const month = dateParts[1];
+    const day = dateParts[2] || 1;
+
+    let period = await this.prisma.cashFlowPeriod.findFirst({
+      where: { userId, month, year },
+    });
+
+    if (!period) {
+      const current = await this.ensureCurrentPeriod(userId);
+      if (current.month === month && current.year === year) {
+        period = current;
+      } else {
+        throw new BadRequestException(
+          `Entry date must fall inside a valid period (${current.month}/${current.year})`,
+        );
+      }
+    }
+
+    const date = new Date(Date.UTC(year, month - 1, day));
     const txn = await this.prisma.cashFlowTransaction.create({
       data: {
         periodId: period.id,
