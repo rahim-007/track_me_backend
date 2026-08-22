@@ -162,6 +162,21 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
     required double debt,
   }) async {
     _dirtySinceLoad = true;
+    final existingCurrent = state.current.valueOrNull;
+    final optimisticPeriod = CashFlowPeriodModel(
+      id: existingCurrent?.id ?? 'period_${month}_$year',
+      month: month,
+      year: year,
+      openingBank: bank,
+      openingCash: cash,
+      openingCreditCard: creditCard,
+      openingDebt: debt,
+      closingBank: bank,
+      isCurrent: true,
+    );
+    state = state.copyWith(current: AsyncValue.data(optimisticPeriod));
+    await _persist();
+
     try {
       final response = await DioClient().dio.post('/cashflow/periods', data: {
         'month': month,
@@ -171,16 +186,15 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
         'openingCreditCard': creditCard,
         'openingDebt': debt,
       });
+      final periodData =
+          (response.data['data'] ?? response.data) as Map<String, dynamic>;
       final period = CashFlowPeriodModel.fromJson(
-        response.data['data'] as Map<String, dynamic>,
+        periodData,
         isCurrent: true,
       );
       state = state.copyWith(current: AsyncValue.data(period));
-      await load();
-    } catch (_) {
-      await load();
-      rethrow;
-    }
+      await _persist();
+    } catch (_) {}
   }
 
   Future<void> updateOpeningBalances({
@@ -207,8 +221,9 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
       final response = await DioClient()
           .dio
           .post('/cashflow/transactions', data: txn.toCreateJson());
-      final saved =
-          TransactionModel.fromJson(response.data['data'] as Map<String, dynamic>);
+      final savedData =
+          (response.data['data'] ?? response.data) as Map<String, dynamic>;
+      final saved = TransactionModel.fromJson(savedData);
       final updated = state.transactions
           .map((t) => t.id == txn.id ? saved : t)
           .toList();
@@ -242,32 +257,53 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
 
   Future<void> addDebt(DebtEntryModel entry) async {
     _dirtySinceLoad = true;
+    state = state.copyWith(debts: [entry, ...state.debts]);
     try {
       final response = await DioClient()
           .dio
           .post('/cashflow/debts', data: entry.toCreateJson());
-      final saved = DebtEntryModel.fromJson(response.data['data'] as Map<String, dynamic>);
-      state = state.copyWith(debts: [saved, ...state.debts]);
+      final savedData =
+          (response.data['data'] ?? response.data) as Map<String, dynamic>;
+      final saved = DebtEntryModel.fromJson(savedData);
+      final updated =
+          state.debts.map((d) => d.id == entry.id ? saved : d).toList();
+      state = state.copyWith(debts: updated);
       await _refreshDebtSummary();
       await _persist();
     } catch (_) {
-      rethrow;
+      await _persist();
     }
   }
 
   Future<void> setDebtSettled(DebtEntryModel entry, bool settled) async {
     _dirtySinceLoad = true;
+    final updatedLocal = DebtEntryModel(
+      id: entry.id,
+      theyOweMe: entry.theyOweMe,
+      person: entry.person,
+      amount: entry.amount,
+      note: entry.note,
+      date: entry.date,
+      settled: settled,
+    );
+    state = state.copyWith(
+      debts: state.debts.map((d) => d.id == entry.id ? updatedLocal : d).toList(),
+    );
     try {
       final response = await DioClient()
           .dio
           .patch('/cashflow/debts/${entry.id}', data: {'settled': settled});
-      final updated = DebtEntryModel.fromJson(response.data['data'] as Map<String, dynamic>);
+      final savedData =
+          (response.data['data'] ?? response.data) as Map<String, dynamic>;
+      final updated = DebtEntryModel.fromJson(savedData);
       state = state.copyWith(
         debts: state.debts.map((d) => d.id == entry.id ? updated : d).toList(),
       );
       await _refreshDebtSummary();
       await _persist();
-    } catch (_) {}
+    } catch (_) {
+      await _persist();
+    }
   }
 
   Future<void> deleteDebt(String id) async {
