@@ -14,7 +14,7 @@
 //
 //   closingCreditCard = openingCreditCard
 //                       + OUTFLOW where account=CREDIT_CARD   (debt increases)
-//                       (INCOME to credit card is rejected at the API layer)
+//                       - OUTFLOW (category D Debt Repayment) where account=BANK|CASH (debt decreases)
 //
 //   closingDebt       = openingDebt   (ledger tracked separately in CashFlowDebtService)
 //
@@ -33,6 +33,7 @@ export interface OpeningBalances {
 
 export type TxnLike = {
   kind: string;
+  category?: string;
   amount: number;
   /** Which account pocket this entry affects. null = BANK (legacy compat). */
   account?: string | null;
@@ -71,6 +72,7 @@ function effectiveAccount(account: string | null | undefined): string {
  *   - INCOME  to CASH  → increases closingCash
  *   - OUTFLOW from CASH → decreases closingCash
  *   - OUTFLOW from CREDIT_CARD → increases closingCreditCard (more debt owed)
+ *   - OUTFLOW category 'D' (Debt Repayment) from BANK/CASH → decreases closingCreditCard (less debt owed)
  *
  * The starting balances (openingBank/Cash/CreditCard) are NEVER modified;
  * only the closing values change.
@@ -100,13 +102,17 @@ export function computeClosingBalances(
       if (acct === 'CASH') {
         cashDelta -= t.amount;
       } else if (acct === 'CREDIT_CARD') {
-        creditCardDelta += t.amount; // more debt owed
+        creditCardDelta += t.amount; // debt increases
       } else {
         // BANK (default) or any other value
         bankDelta -= t.amount;
       }
+
+      // Debt Repayment (category 'D') paid from Bank or Cash reduces Credit Card debt owed
+      if (t.category === 'D' && acct !== 'CREDIT_CARD') {
+        creditCardDelta -= t.amount;
+      }
     }
-    // Unknown kinds are ignored (no impact on any balance).
   }
 
   const netCashFlow = round2(totalIncome - totalOutflow);
