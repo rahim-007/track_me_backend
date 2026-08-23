@@ -30,9 +30,9 @@ class CategoryGrid extends StatelessWidget {
           crossAxisCount: 2,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 10,
-          crossAxisSpacing: 10,
-          childAspectRatio: 2.6,
+          mainAxisSpacing: 11,
+          crossAxisSpacing: 11,
+          childAspectRatio: 2.35,
           children: tiles,
         ),
       ],
@@ -69,32 +69,41 @@ class _CategoryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppColors.border),
+        boxShadow: AppColors.isDarkMode
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.03),
+                  blurRadius: 12,
+                  offset: const Offset(0, 3),
+                ),
+              ],
       ),
       child: Row(
         children: [
           Container(
-            width: 32,
-            height: 32,
+            width: 40,
+            height: 40,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(9),
+              color: color.withOpacity(0.13),
+              borderRadius: BorderRadius.circular(13),
             ),
             child: Text(
               letter,
               style: TextStyle(
-                fontWeight: FontWeight.w900,
-                fontSize: 12.5,
+                fontWeight: FontWeight.w800,
+                fontSize: 14,
                 color: color,
               ),
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 11),
           Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -106,7 +115,7 @@ class _CategoryTile extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
-                    fontSize: 11.5,
+                    fontSize: 13.5,
                     color: AppColors.textPrimary,
                   ),
                 ),
@@ -115,7 +124,7 @@ class _CategoryTile extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 9.5,
+                    fontSize: 10.5,
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -127,7 +136,7 @@ class _CategoryTile extends StatelessWidget {
             '₹${NumberFormat.compact().format(total)}',
             style: TextStyle(
               fontWeight: FontWeight.w800,
-              fontSize: 12,
+              fontSize: 13,
               color: total > 0 ? color : AppColors.textHint,
             ),
           ),

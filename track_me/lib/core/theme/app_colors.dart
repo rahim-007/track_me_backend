@@ -60,21 +60,21 @@ class AppColors {
 
   static const Color infoLight = Color(0xFFDBEAFE);
 
-  // Surfaces
+  // Surfaces — app-exact design tokens
   static const Color _surfaceLight = Color(0xFFFFFFFF);
-  static const Color _surfaceDark = Color(0xFF1F1D2B);
+  static const Color _surfaceDark = Color(0xFF16161D);
   static Color get surface => isDarkMode ? _surfaceDark : _surfaceLight;
 
-  static const Color _backgroundLight = Color(0xFFF8F7FF);
-  static const Color _backgroundDark = Color(0xFF13111A);
+  static const Color _backgroundLight = Color(0xFFF1EFF9);
+  static const Color _backgroundDark = Color(0xFF0B0B10);
   static Color get background => isDarkMode ? _backgroundDark : _backgroundLight;
 
-  static const Color _surfaceVariantLight = Color(0xFFF3F4F6);
-  static const Color _surfaceVariantDark = Color(0xFF2D2A3A);
+  static const Color _surfaceVariantLight = Color(0xFFECEAF6);
+  static const Color _surfaceVariantDark = Color(0xFF1C1C24);
   static Color get surfaceVariant => isDarkMode ? _surfaceVariantDark : _surfaceVariantLight;
 
-  static const Color _surfaceElevatedLight = Color(0xFFF9FAFB);
-  static const Color _surfaceElevatedDark = Color(0xFF252333);
+  static const Color _surfaceElevatedLight = Color(0xFFFFFFFF);
+  static const Color _surfaceElevatedDark = Color(0xFF1C1C24);
   static Color get surfaceElevated => isDarkMode ? _surfaceElevatedDark : _surfaceElevatedLight;
 
   // Text
@@ -96,14 +96,31 @@ class AppColors {
   static const Color _textDisabledDark = Color(0xFF4B5563);
   static Color get textDisabled => isDarkMode ? _textDisabledDark : _textDisabledLight;
 
-  // Borders & Dividers
-  static const Color _borderLight = Color(0xFFE5E7EB);
-  static const Color _borderDark = Color(0xFF2D2A3A);
+  // Borders & Dividers — hairline, app-exact
+  static const Color _borderLight = Color(0xFFE4E2EF);
+  static const Color _borderDark = Color(0xFF26262F);
   static Color get border => isDarkMode ? _borderDark : _borderLight;
 
-  static const Color _dividerLight = Color(0xFFF3F4F6);
-  static const Color _dividerDark = Color(0xFF2D2A3A);
+  static const Color _dividerLight = Color(0xFFECEAF6);
+  static const Color _dividerDark = Color(0xFF26262F);
   static Color get divider => isDarkMode ? _dividerDark : _dividerLight;
+
+  // Pastel card tints (Habits hero cards, light + dark)
+  static List<Color> get progressCardGradient => isDarkMode
+      ? [const Color(0xFF1D1730), const Color(0xFF171226)]
+      : [const Color(0xFFE7E0F8), const Color(0xFFEFEAFB)];
+
+  static List<Color> get streakCardGradient => isDarkMode
+      ? [const Color(0xFF2A2013), const Color(0xFF1E1810)]
+      : [const Color(0xFFFBEDDB), const Color(0xFFFDF4E7)];
+
+  static Color get streakText => isDarkMode
+      ? const Color(0xFFF97316)
+      : const Color(0xFFC2410C);
+
+  static Color get navBackground => isDarkMode
+      ? const Color(0xFF0E0E13)
+      : const Color(0xFFFBFAFE);
 
   // Habit Category Colors
   static const Color habitHealth = Color(0xFF10B981);

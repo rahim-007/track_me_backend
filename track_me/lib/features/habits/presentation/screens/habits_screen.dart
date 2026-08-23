@@ -8,9 +8,13 @@ import '../../data/models/habit_model.dart';
 import '../../providers/habits_provider.dart';
 import '../widgets/add_habit_dialog.dart';
 
+import '../widgets/flame_explosion_overlay.dart';
 import '../widgets/habit_grid_row.dart';
 import '../widgets/skip_reason_dialog.dart';
 import '../../../notifications/presentation/widgets/notification_bell.dart';
+
+/// Toggle for 3D Animations & FX in Habits.
+final isHabit3dFxEnabledProvider = StateProvider<bool>((_) => true);
 
 class HabitsScreen extends ConsumerStatefulWidget {
   const HabitsScreen({super.key});
@@ -119,8 +123,49 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                             ),
                           ],
                         ),
-                        // Notification bell → Notification Center
-                        const NotificationBell(),
+                        Row(
+                          children: [
+                            Consumer(
+                              builder: (context, ref, child) {
+                                final is3d =
+                                    ref.watch(isHabit3dFxEnabledProvider);
+                                return InkWell(
+                                  onTap: () => ref
+                                      .read(isHabit3dFxEnabledProvider.notifier)
+                                      .state = !is3d,
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: is3d
+                                          ? AppColors.primary.withOpacity(0.12)
+                                          : AppColors.surfaceVariant,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: is3d
+                                            ? AppColors.primary
+                                            : AppColors.border,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      is3d ? '✨ 3D ON' : '3D OFF',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                        color: is3d
+                                            ? AppColors.primary
+                                            : AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(width: 10),
+                            const NotificationBell(),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -139,16 +184,14 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
-                                colors: AppColors.isDarkMode 
-                                    ? [const Color(0xFF2D1E54), const Color(0xFF1E143A)] 
-                                    : [const Color(0xFFF3F0FF), const Color(0xFFEBE5FF)],
+                                colors: AppColors.progressCardGradient,
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               ),
                               borderRadius: BorderRadius.circular(24),
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.primary.withOpacity(0.06),
+                                  color: AppColors.primary.withOpacity(AppColors.isDarkMode ? 0.10 : 0.08),
                                   blurRadius: 16,
                                   offset: const Offset(0, 4),
                                 ),
@@ -228,16 +271,14 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
-                                colors: AppColors.isDarkMode 
-                                    ? [const Color(0xFF452C16), const Color(0xFF352110)] 
-                                    : [const Color(0xFFFFF7ED), const Color(0xFFFFEFE0)],
+                                colors: AppColors.streakCardGradient,
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               ),
                               borderRadius: BorderRadius.circular(24),
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(0xFFEA580C).withOpacity(0.04),
+                                  color: const Color(0xFFEA580C).withOpacity(AppColors.isDarkMode ? 0.08 : 0.05),
                                   blurRadius: 16,
                                   offset: const Offset(0, 4),
                                 ),
@@ -259,7 +300,7 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                                       style: TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.w800,
-                                        color: AppColors.isDarkMode ? const Color(0xFFF97316) : const Color(0xFFC2410C),
+                                        color: AppColors.streakText,
                                       ),
                                     ),
                                   ],
@@ -270,7 +311,7 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w700,
-                                    color: AppColors.isDarkMode ? const Color(0xFFF97316) : const Color(0xFFC2410C),
+                                    color: AppColors.streakText,
                                   ),
                                 ),
                                 const SizedBox(height: 2),
@@ -349,7 +390,23 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                                   habit: habit,
                                   selectedDate: _selectedDate,
                                   onComplete: (date) {
-                                    ref.read(habitsProvider.notifier).toggleCompletion(habit, date);
+                                    final dateStr =
+                                        DateFormat('yyyy-MM-dd').format(date);
+                                    final isCompleting = !habit
+                                        .completedDates
+                                        .contains(dateStr);
+                                    ref
+                                        .read(habitsProvider.notifier)
+                                        .toggleCompletion(habit, date);
+
+                                    if (isCompleting &&
+                                        completedCount + 1 == totalCount) {
+                                      final is3d = ref
+                                          .read(isHabit3dFxEnabledProvider);
+                                      if (is3d) {
+                                        FlameExplosionOverlay.show(context);
+                                      }
+                                    }
                                   },
                                   onSkip: (date) => _showSkipReasonDialog(habit, date),
                                 ),

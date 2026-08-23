@@ -54,17 +54,21 @@ class CashFlowScreen extends ConsumerWidget {
               Text(
                 'Cash Flow',
                 style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.5,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.6,
                   color: AppColors.textPrimary,
                 ),
               ),
+              const SizedBox(height: 4),
               Text(
                 'Where your money comes from and where it goes',
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textSecondary),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
               state.current.when(
                 data: (_) => period == null
                     ? const SizedBox.shrink()
@@ -174,11 +178,20 @@ class _PeriodSelector extends ConsumerWidget {
       borderRadius: BorderRadius.circular(14),
       onTap: () => _pickPeriod(context, ref),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: AppColors.surface,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(color: AppColors.border),
+          boxShadow: AppColors.isDarkMode
+              ? null
+              : [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 14,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
         ),
         child: Row(
           children: [
@@ -417,8 +430,6 @@ class _BalanceCards extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final closingBank =
-        period.closingBank != 0 ? period.closingBank : period.openingBank;
     return GridView.count(
       crossAxisCount: 2,
       shrinkWrap: true,
@@ -429,24 +440,24 @@ class _BalanceCards extends StatelessWidget {
       children: [
         _BalanceCard(
           label: 'Bank',
-          value: closingBank,
+          value: period.closingBank,
           icon: Icons.account_balance_rounded,
           accent: AppColors.primary,
           sub: 'Updates with every entry',
         ),
         _BalanceCard(
           label: 'Cash in hand',
-          value: period.openingCash,
+          value: period.closingCash,
           icon: Icons.payments_rounded,
           accent: AppColors.success,
-          sub: 'Carried forward',
+          sub: 'Updates with every entry',
         ),
         _BalanceCard(
           label: 'Credit card',
-          value: period.openingCreditCard,
+          value: period.closingCreditCard,
           icon: Icons.credit_card_rounded,
           accent: AppColors.error,
-          sub: 'Owed, carried forward',
+          sub: 'Owed this month',
         ),
         _BalanceCard(
           label: 'Net this month',
@@ -480,11 +491,20 @@ class _BalanceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.border),
+        boxShadow: AppColors.isDarkMode
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -493,23 +513,23 @@ class _BalanceCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                width: 28,
-                height: 28,
+                width: 34,
+                height: 34,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: accent.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(9),
+                  color: accent.withOpacity(0.13),
+                  borderRadius: BorderRadius.circular(11),
                 ),
-                child: Icon(icon, size: 15, color: accent),
+                child: Icon(icon, size: 17, color: accent),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 9),
               Flexible(
                 child: Text(
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 11.5,
+                    fontSize: 13,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textSecondary,
                   ),
@@ -522,8 +542,9 @@ class _BalanceCard extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 19,
-              fontWeight: FontWeight.w900,
+              fontSize: 23,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.3,
               color: AppColors.textPrimary,
             ),
           ),
@@ -531,7 +552,7 @@ class _BalanceCard extends StatelessWidget {
             sub,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 9.5, color: AppColors.textHint),
+            style: TextStyle(fontSize: 10, color: AppColors.textHint),
           ),
         ],
       ),
@@ -553,11 +574,20 @@ class _InflowVsOutflowCard extends StatelessWidget {
     final incomeShare = total == 0 ? 0.5 : period.totalIncome / total;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.border),
+        boxShadow: AppColors.isDarkMode
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -570,19 +600,21 @@ class _InflowVsOutflowCard extends StatelessWidget {
                   children: [
                     Row(children: [
                       Icon(Icons.south_west_rounded,
-                          size: 15, color: AppColors.success),
-                      const SizedBox(width: 4),
+                          size: 16, color: AppColors.success),
+                      const SizedBox(width: 5),
                       Text('Inflow',
                           style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
                               color: AppColors.textSecondary)),
                     ]),
+                    const SizedBox(height: 6),
                     Text(
                       '+₹${NumberFormat('#,##0.##').format(period.totalIncome)}',
                       style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w900,
+                          fontSize: 21,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
                           color: AppColors.success),
                     ),
                   ],
@@ -597,19 +629,21 @@ class _InflowVsOutflowCard extends StatelessWidget {
                       children: [
                         Text('Outflow',
                             style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
                                 color: AppColors.textSecondary)),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: 5),
                         Icon(Icons.north_east_rounded,
-                            size: 15, color: AppColors.error),
+                            size: 16, color: AppColors.error),
                       ],
                     ),
+                    const SizedBox(height: 6),
                     Text(
                       '−₹${NumberFormat('#,##0.##').format(period.totalOutflow)}',
                       style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w900,
+                          fontSize: 21,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
                           color: AppColors.error),
                     ),
                   ],
@@ -617,7 +651,7 @@ class _InflowVsOutflowCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           ClipRRect(
             borderRadius: BorderRadius.circular(99),
             child: SizedBox(
@@ -647,9 +681,9 @@ class _SectionTitle extends StatelessWidget {
     return Text(
       text,
       style: TextStyle(
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: FontWeight.w800,
-        letterSpacing: 0.8,
+        letterSpacing: 1.8,
         color: AppColors.textSecondary,
       ),
     );
@@ -672,14 +706,23 @@ class _DebtSummaryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(20),
       onTap: () => DebtLedgerSheet.show(context),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
           color: AppColors.surface,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(color: AppColors.border),
+          boxShadow: AppColors.isDarkMode
+              ? null
+              : [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 14,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
         ),
         child: Row(
           children: [
