@@ -315,8 +315,8 @@ export class CashFlowPeriodService {
   private async computeClosing(userId: string, period: PeriodRow) {
     const txns = await this.prisma.cashFlowTransaction.findMany({
       where: { periodId: period.id },
-      // Include `account` so per-pocket math is correct.
-      select: { kind: true, amount: true, account: true },
+      // Include `category` and `account` so per-pocket math is correct.
+      select: { kind: true, amount: true, category: true, account: true },
     });
     const opening: OpeningBalances = {
       openingBank: period.openingBank,
