@@ -60,7 +60,11 @@ export class CashFlowPeriodService {
    */
   async getCurrentPeriod(userId: string) {
     const period = await this.ensureCurrentPeriod(userId);
-    return this.serialize(period);
+    await this.recalculateFuturePeriods(userId);
+    const fresh = await this.prisma.cashFlowPeriod.findFirst({
+      where: { id: period.id },
+    });
+    return this.serialize(fresh ?? period);
   }
 
   /** Manual first-month setup or initial balance configuration. */
@@ -222,6 +226,10 @@ export class CashFlowPeriodService {
         account,
       },
     });
+
+    // Recalculate opening/closing balance chain so subsequent periods update automatically
+    await this.recalculateFuturePeriods(userId, period.month, period.year);
+
     return this.serializeTxn(txn);
   }
 
@@ -230,7 +238,17 @@ export class CashFlowPeriodService {
       where: { id: txnId, period: { userId } },
     });
     if (!existing) throw new NotFoundException('Transaction not found');
+
+    const period = await this.prisma.cashFlowPeriod.findFirst({
+      where: { id: existing.periodId },
+    });
+
     await this.prisma.cashFlowTransaction.delete({ where: { id: txnId } });
+
+    if (period) {
+      await this.recalculateFuturePeriods(userId, period.month, period.year);
+    }
+
     return { deleted: true };
   }
 
