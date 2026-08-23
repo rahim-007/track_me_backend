@@ -301,6 +301,16 @@ enum CashFlowTxnKind {
   OUTFLOW
 }
 
+/// Which account pocket a transaction posts to / from.
+/// BANK     = bank account (default / backward-compat when null)
+/// CASH     = physical cash in hand
+/// CREDIT_CARD = credit card (outflows increase debt; income rejected)
+enum CashFlowAccount {
+  BANK
+  CASH
+  CREDIT_CARD
+}
+
 model CashFlowPeriod {
   id                String @id @default(cuid())
   userId            String
@@ -321,15 +331,18 @@ model CashFlowPeriod {
 }
 
 model CashFlowTransaction {
-  id        String          @id @default(cuid())
+  id        String           @id @default(cuid())
   periodId  String
-  period    CashFlowPeriod  @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  period    CashFlowPeriod   @relation(fields: [periodId], references: [id], onDelete: Cascade)
   kind      CashFlowTxnKind
-  category  String // income: E | S | B | I | G ; outflow: E | S | D | I
+  category  String           // income: E | S | B | I | G ; outflow: E | S | D | I
   amount    Float
   note      String?
-  date      DateTime        @db.Date
-  createdAt DateTime        @default(now())
+  date      DateTime         @db.Date
+  // Which account pocket this entry posts to (INCOME) or from (OUTFLOW).
+  // Null = BANK for backward compatibility with existing rows.
+  account   CashFlowAccount?
+  createdAt DateTime         @default(now())
 
   @@index([periodId])
   @@index([periodId, date])

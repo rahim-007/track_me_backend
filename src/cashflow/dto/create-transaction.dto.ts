@@ -42,4 +42,15 @@ export class CreateTransactionDto {
   })
   @IsDateString()
   date: string;
+
+  @ApiPropertyOptional({
+    enum: ['BANK', 'CASH', 'CREDIT_CARD'],
+    description:
+      'Account pocket this entry posts to (INCOME) or from (OUTFLOW). ' +
+      'Defaults to BANK when omitted (backward compatibility). ' +
+      'INCOME + CREDIT_CARD is not allowed.',
+  })
+  @IsOptional()
+  @IsEnum(['BANK', 'CASH', 'CREDIT_CARD'])
+  account?: 'BANK' | 'CASH' | 'CREDIT_CARD';
 }

@@ -179,6 +179,14 @@ export class CashFlowPeriodService {
       throw new BadRequestException(`Invalid category '${dto.category}' for OUTFLOW entry`);
     }
 
+    // INCOME cannot post to a credit card — that doesn't make financial sense
+    // and would corrupt the credit-card balance calculation.
+    if (dto.kind === 'INCOME' && dto.account === 'CREDIT_CARD') {
+      throw new BadRequestException(
+        'INCOME transactions cannot post to CREDIT_CARD. Use BANK or CASH.',
+      );
+    }
+
     const dateParts = dto.date.split('T')[0].split('-').map((p) => parseInt(p, 10));
     const year = dateParts[0];
     const month = dateParts[1];
@@ -199,6 +207,9 @@ export class CashFlowPeriodService {
       }
     }
 
+    // Resolve the effective account (default BANK keeps legacy behaviour).
+    const account = dto.account ?? 'BANK';
+
     const date = new Date(Date.UTC(year, month - 1, day));
     const txn = await this.prisma.cashFlowTransaction.create({
       data: {
@@ -208,6 +219,7 @@ export class CashFlowPeriodService {
         amount: dto.amount,
         note: dto.note ?? null,
         date,
+        account,
       },
     });
     return this.serializeTxn(txn);
@@ -303,7 +315,8 @@ export class CashFlowPeriodService {
   private async computeClosing(userId: string, period: PeriodRow) {
     const txns = await this.prisma.cashFlowTransaction.findMany({
       where: { periodId: period.id },
-      select: { kind: true, amount: true },
+      // Include `account` so per-pocket math is correct.
+      select: { kind: true, amount: true, account: true },
     });
     const opening: OpeningBalances = {
       openingBank: period.openingBank,
@@ -326,7 +339,7 @@ export class CashFlowPeriodService {
   private async serialize(period: PeriodRow) {
     const txns = await this.prisma.cashFlowTransaction.findMany({
       where: { periodId: period.id },
-      select: { kind: true, amount: true, category: true },
+      select: { kind: true, amount: true, category: true, account: true },
     });
     const opening: OpeningBalances = {
       openingBank: period.openingBank,
@@ -370,8 +383,14 @@ export class CashFlowPeriodService {
     amount: number;
     note: string | null;
     date: Date;
+    account: string | null;
     createdAt: Date;
   }) {
-    return { ...t, date: t.date.toISOString().slice(0, 10) };
+    return {
+      ...t,
+      date: t.date.toISOString().slice(0, 10),
+      // Normalise null → 'BANK' so clients always receive an explicit value.
+      account: t.account ?? 'BANK',
+    };
   }
 }
