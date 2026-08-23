@@ -49,11 +49,26 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen> {
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddGoalDialog,
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 6,
-        shape: const CircleBorder(),
-        child: const Icon(Icons.add_rounded, size: 30),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+        child: Container(
+          width: 56,
+          height: 56,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: AppColors.primaryGradient,
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withOpacity(0.35),
+                blurRadius: 14,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: const Icon(Icons.add_rounded, color: Colors.white, size: 28),
+        ),
       ),
       body: SafeArea(
         child: goalsAsync.when(
@@ -312,9 +327,9 @@ class _GoalCard extends ConsumerWidget {
 
     final cleanName = name.toLowerCase();
     if (cleanName.contains(r'$') ||
-        cleanName.contains('₹') ||
-        cleanName.contains('€') ||
-        cleanName.contains('£')) {
+        cleanName.contains('â‚¹') ||
+        cleanName.contains('â‚¬') ||
+        cleanName.contains('Â£')) {
       return true;
     }
 
@@ -502,7 +517,7 @@ class _GoalCard extends ConsumerWidget {
                         ),
                         const SizedBox(height: 10),
 
-                        // Quick Increment Buttons Row — amounts follow the unit
+                        // Quick Increment Buttons Row â€” amounts follow the unit
                         // type: money (100/500/1000), measurement (0.5/1/2.5),
                         // counts (1/5/10).
                         Row(
@@ -530,7 +545,7 @@ class _GoalCard extends ConsumerWidget {
                         _buildStatsGrid(parsed, themeColor, effectiveCategory),
                         const SizedBox(height: 24),
 
-                        // Edit Goal — opens the goal form pre-filled with the
+                        // Edit Goal â€” opens the goal form pre-filled with the
                         // current values.
                         AppButton.outlined(
                           label: 'Edit Goal',
@@ -626,34 +641,34 @@ class _GoalCard extends ConsumerWidget {
   String _getMotivationalSubtitle(String category) {
     switch (category.toLowerCase()) {
       case 'finance':
-        return 'Small steps today, big freedom tomorrow. 💰';
+        return 'Small steps today, big freedom tomorrow. ðŸ’°';
       case 'fitness':
-        return 'Stronger every day! You\'ve got this! 🔥';
+        return 'Stronger every day! You\'ve got this! ðŸ”¥';
       case 'education':
-        return 'Knowledge is power. Keep learning! 🎓';
+        return 'Knowledge is power. Keep learning! ðŸŽ“';
       case 'personal':
-        return 'Invest in yourself. You are worth it! 🌟';
+        return 'Invest in yourself. You are worth it! ðŸŒŸ';
       default:
-        return 'Every action counts. Keep moving forward! 🚀';
+        return 'Every action counts. Keep moving forward! ðŸš€';
     }
   }
 
   String _getCategoryEmoji(String category) {
     switch (category.toLowerCase()) {
       case 'finance':
-        return '💰';
+        return 'ðŸ’°';
       case 'fitness':
-        return '💪';
+        return 'ðŸ’ª';
       case 'education':
-        return '📚';
+        return 'ðŸ“š';
       case 'health':
-        return '🥗';
+        return 'ðŸ¥—';
       case 'relationships':
-        return '❤️';
+        return 'â¤ï¸';
       case 'personal':
-        return '🎯';
+        return 'ðŸŽ¯';
       default:
-        return '🚀';
+        return 'ðŸš€';
     }
   }
 
@@ -675,28 +690,28 @@ class _GoalCard extends ConsumerWidget {
       target = goal.target;
       final unit = goal.unit.trim();
       if (unit.isEmpty) {
-        if (isFinance) prefix = '₹';
+        if (isFinance) prefix = 'â‚¹';
       } else if (isCurrencyUnitSymbol(unit)) {
-        prefix = unit; // ₹50,000 → shown as a prefix
+        prefix = unit; // â‚¹50,000 â†’ shown as a prefix
       } else {
-        suffix = ' $unit'; // 5 kg → shown as a suffix
+        suffix = ' $unit'; // 5 kg â†’ shown as a suffix
       }
     } else {
-      // Legacy goal — infer target/unit from the name (previous behavior).
+      // Legacy goal â€” infer target/unit from the name (previous behavior).
       final regex = RegExp(r'(\d[\d,]*)');
       final match = regex.firstMatch(goal.name);
 
-      if (goal.name.contains('₹') || goal.name.contains(r'$')) {
-        prefix = '₹';
-      } else if (goal.name.contains('€')) {
-        prefix = '€';
-      } else if (goal.name.contains('£')) {
-        prefix = '£';
+      if (goal.name.contains('â‚¹') || goal.name.contains(r'$')) {
+        prefix = 'â‚¹';
+      } else if (goal.name.contains('â‚¬')) {
+        prefix = 'â‚¬';
+      } else if (goal.name.contains('Â£')) {
+        prefix = 'Â£';
       }
 
       if (match != null) {
         target = double.tryParse(match.group(0)!.replaceAll(',', '')) ?? 100;
-        if (isFinance && prefix.isEmpty) prefix = '₹';
+        if (isFinance && prefix.isEmpty) prefix = 'â‚¹';
         if (!isFinance) {
           final index = goal.name.indexOf(match.group(0)!);
           if (index != -1) {
@@ -707,12 +722,12 @@ class _GoalCard extends ConsumerWidget {
         }
       } else {
         target = isFinance ? 10000 : 100;
-        if (isFinance) prefix = '₹';
+        if (isFinance) prefix = 'â‚¹';
       }
     }
 
-    // Input rules follow the unit type: measurement → decimals + 0.5 steps,
-    // money → whole numbers + 100 steps, counts → whole numbers + 1 steps.
+    // Input rules follow the unit type: measurement â†’ decimals + 0.5 steps,
+    // money â†’ whole numbers + 100 steps, counts â†’ whole numbers + 1 steps.
     final unit = goal.unit.trim();
     if (unit.isNotEmpty) {
       allowsDecimals = unitAllowsDecimals(unit);
@@ -721,12 +736,12 @@ class _GoalCard extends ConsumerWidget {
       allowsDecimals = false;
       step = 100;
     } else if (suffix.isNotEmpty) {
-      // Legacy measurement parsed from the name (e.g. "Lose 5 kg") — decimals
+      // Legacy measurement parsed from the name (e.g. "Lose 5 kg") â€” decimals
       // and half-steps make sense.
       allowsDecimals = true;
       step = 0.5;
     } else {
-      // No unit at all — permissive decimals, unit steps.
+      // No unit at all â€” permissive decimals, unit steps.
       allowsDecimals = true;
       step = 1;
     }
@@ -744,7 +759,7 @@ class _GoalCard extends ConsumerWidget {
   }
 
   /// Formats [value] for display using the goal's resolved unit:
-  /// '0.5 kg', '₹50,000', '2.75 km', '5' (no unit).
+  /// '0.5 kg', 'â‚¹50,000', '2.75 km', '5' (no unit).
   String _fmtValue(Map<String, dynamic> parsed, num value) {
     final suffix = parsed['suffix'].toString().trim();
     final prefix = parsed['prefix'].toString();
@@ -991,17 +1006,17 @@ class _GoalCard extends ConsumerWidget {
       milestoneTitle = suffix.isNotEmpty
           ? '${formatGoalValue(milestoneVal)} $suffix Milestone'
           : '${parsed['prefix']}${NumberFormat('#,##0').format(milestoneVal)} Milestone';
-      milestoneDesc = 'You are halfway there! Keep going! 💪';
+      milestoneDesc = 'You are halfway there! Keep going! ðŸ’ª';
     } else if (milestonePercent == 0.75) {
       milestoneTitle = suffix.isNotEmpty
           ? '${formatGoalValue(milestoneVal)} $suffix Milestone'
           : '${parsed['prefix']}${NumberFormat('#,##0').format(milestoneVal)} Milestone';
-      milestoneDesc = 'Only ${_fmtValue(parsed, needed)} more to reach! 🚀';
+      milestoneDesc = 'Only ${_fmtValue(parsed, needed)} more to reach! ðŸš€';
     } else {
       milestoneTitle = suffix.isNotEmpty
           ? 'Complete ${formatGoalValue(target)} $suffix'
           : 'Reach ${parsed['prefix']}${NumberFormat('#,##0').format(target)} Goal';
-      milestoneDesc = 'Almost done! You got this! 🔥';
+      milestoneDesc = 'Almost done! You got this! ðŸ”¥';
     }
 
     final milestoneProgress = (current / milestoneVal).clamp(0.0, 1.0);
