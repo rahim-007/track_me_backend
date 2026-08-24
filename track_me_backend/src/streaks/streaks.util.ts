@@ -69,6 +69,7 @@ export function computeHabitStreak(
   now: Date = new Date(),
 ): number {
   let streak = 0;
+  const todayStr = toDateStr(now);
   const day = new Date(now);
   for (let i = 0; i < MAX_SCAN_DAYS; i++) {
     const dateStr = toDateStr(day);
@@ -80,7 +81,13 @@ export function computeHabitStreak(
     if (completedDateStrs.has(dateStr)) {
       streak++;
     } else {
-      break;
+      // Today is in progress (grace period) — keep the streak from yesterday
+      if (dateStr === todayStr) {
+        day.setUTCDate(day.getUTCDate() - 1);
+        continue;
+      } else {
+        break;
+      }
     }
     day.setUTCDate(day.getUTCDate() - 1);
   }

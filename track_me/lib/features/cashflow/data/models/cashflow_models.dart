@@ -8,6 +8,32 @@ library;
 
 enum TxnKind { income, outflow }
 
+/// Which account pocket a transaction posts to (INCOME) or from (OUTFLOW).
+/// [bank]       = bank account — default / backward-compat when null.
+/// [cash]       = physical cash in hand.
+/// [creditCard] = credit card (outflows increase debt).
+enum CashFlowAccount {
+  bank('BANK', '🏦 Bank'),
+  cash('CASH', '💵 Cash'),
+  creditCard('CREDIT_CARD', '💳 Credit Card');
+
+  final String apiValue;
+  final String label;
+  const CashFlowAccount(this.apiValue, this.label);
+
+  static CashFlowAccount fromApi(String? value) {
+    switch (value) {
+      case 'CASH':
+        return CashFlowAccount.cash;
+      case 'CREDIT_CARD':
+        return CashFlowAccount.creditCard;
+      // null or 'BANK' → BANK (backward compat)
+      default:
+        return CashFlowAccount.bank;
+    }
+  }
+}
+
 /// Income categories — ESBI quadrant + Gift.
 enum IncomeCategory {
   E('E', 'Employee', 'Salary from a job'),
@@ -54,6 +80,8 @@ class CashFlowPeriodModel {
   final double totalOutflow;
   final double netCashFlow;
   final double closingBank;
+  final double closingCash;
+  final double closingCreditCard;
   final Map<String, double> incomeByCategory;
   final Map<String, double> outflowByCategory;
   final bool isCurrent;
@@ -70,6 +98,8 @@ class CashFlowPeriodModel {
     this.totalOutflow = 0,
     this.netCashFlow = 0,
     this.closingBank = 0,
+    this.closingCash = 0,
+    this.closingCreditCard = 0,
     this.incomeByCategory = const {},
     this.outflowByCategory = const {},
     this.isCurrent = false,
@@ -90,7 +120,17 @@ class CashFlowPeriodModel {
       totalIncome: (json['totalIncome'] as num?)?.toDouble() ?? 0,
       totalOutflow: (json['totalOutflow'] as num?)?.toDouble() ?? 0,
       netCashFlow: (json['netCashFlow'] as num?)?.toDouble() ?? 0,
-      closingBank: (json['closingBank'] as num?)?.toDouble() ?? 0,
+      closingBank: (json['closingBank'] as num?)?.toDouble() ??
+          (json['openingBank'] as num?)?.toDouble() ??
+          0,
+      // closingCash is now returned from the backend.
+      // Fall back to openingCash for cached/legacy data that predates this field.
+      closingCash: (json['closingCash'] as num?)?.toDouble() ??
+          (json['openingCash'] as num?)?.toDouble() ??
+          0,
+      closingCreditCard: (json['closingCreditCard'] as num?)?.toDouble() ??
+          (json['openingCreditCard'] as num?)?.toDouble() ??
+          0,
       incomeByCategory:
           ((json['incomeByCategory'] as Map<String, dynamic>?) ?? const {})
               .map((k, v) => MapEntry(k, (v as num).toDouble())),
@@ -113,6 +153,8 @@ class CashFlowPeriodModel {
         'totalOutflow': totalOutflow,
         'netCashFlow': netCashFlow,
         'closingBank': closingBank,
+        'closingCash': closingCash,
+        'closingCreditCard': closingCreditCard,
         'incomeByCategory': incomeByCategory,
         'outflowByCategory': outflowByCategory,
       };
@@ -133,6 +175,9 @@ class TransactionModel {
   final String note;
   /// YYYY-MM-DD
   final String date;
+  /// Which account pocket this entry posts to (income) or from (outflow).
+  /// Defaults to [CashFlowAccount.bank] for legacy transactions without the field.
+  final CashFlowAccount account;
 
   const TransactionModel({
     required this.id,
@@ -141,6 +186,7 @@ class TransactionModel {
     required this.amount,
     required this.note,
     required this.date,
+    this.account = CashFlowAccount.bank,
   });
 
   factory TransactionModel.fromJson(Map<String, dynamic> json) {
@@ -151,6 +197,7 @@ class TransactionModel {
       amount: (json['amount'] as num).toDouble(),
       note: (json['note'] as String?) ?? '',
       date: (json['date'] as String?)?.split('T').first ?? '',
+      account: CashFlowAccount.fromApi(json['account'] as String?),
     );
   }
 
@@ -160,6 +207,7 @@ class TransactionModel {
         'amount': amount,
         if (note.isNotEmpty) 'note': note,
         'date': date,
+        'account': account.apiValue,
       };
 }
 
@@ -173,6 +221,7 @@ class DebtEntryModel {
   /// YYYY-MM-DD
   final String date;
   final bool settled;
+  final String? settledAt;
 
   const DebtEntryModel({
     required this.id,
@@ -182,6 +231,7 @@ class DebtEntryModel {
     required this.note,
     required this.date,
     required this.settled,
+    this.settledAt,
   });
 
   factory DebtEntryModel.fromJson(Map<String, dynamic> json) {
@@ -193,6 +243,7 @@ class DebtEntryModel {
       note: (json['note'] as String?) ?? '',
       date: (json['date'] as String?)?.split('T').first ?? '',
       settled: json['settled'] as bool? ?? false,
+      settledAt: json['settledAt'] as String?,
     );
   }
 

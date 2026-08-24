@@ -54,12 +54,22 @@ describe('computeHabitStreak', () => {
     expect(streak).toBe(2);
   });
 
-  it('daily habit (no repeat day selected) breaks on a missing day', () => {
-    // Mon ✅, Tue ✅, Wed ❌ → breaks on Wed.
+  it('daily habit keeps streak alive on incomplete today (grace period)', () => {
+    // Mon ✅, Tue ✅, Wed (today, incomplete) → streak stays 2 from Mon+Tue.
     const streak = computeHabitStreak(
       { repeatDays: daily },
       completed(['2026-08-10', '2026-08-11']),
       day('2026-08-12'),
+    );
+    expect(streak).toBe(2);
+  });
+
+  it('daily habit breaks on a missing past day', () => {
+    // Mon ✅, Tue ✅, Wed (missing past day), Thu (today, incomplete) → breaks on Wed (0).
+    const streak = computeHabitStreak(
+      { repeatDays: daily },
+      completed(['2026-08-10', '2026-08-11']),
+      day('2026-08-13'),
     );
     expect(streak).toBe(0);
   });

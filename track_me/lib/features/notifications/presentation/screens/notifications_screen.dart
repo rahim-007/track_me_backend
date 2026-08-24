@@ -22,7 +22,9 @@ class NotificationsScreen extends ConsumerWidget {
           children: [
             _NotificationsHeader(
               unreadCount: state.unreadCount,
+              totalCount: state.items.length,
               onMarkAllAsRead: notifier.markAllAsRead,
+              notifier: notifier,
             ),
             Expanded(
               child: RefreshIndicator(
@@ -66,25 +68,117 @@ class NotificationsScreen extends ConsumerWidget {
 
 class _NotificationsHeader extends StatelessWidget {
   final int unreadCount;
+  final int totalCount;
   final Future<void> Function() onMarkAllAsRead;
+  final NotificationsNotifier notifier;
 
   const _NotificationsHeader({
     required this.unreadCount,
+    required this.totalCount,
     required this.onMarkAllAsRead,
+    required this.notifier,
   });
+
+  void _confirmClearAll(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.error.withOpacity(0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.delete_sweep_rounded,
+                color: AppColors.error,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Clear All Notifications?',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'This will permanently delete all notifications from your notification center.',
+          style: TextStyle(
+            fontSize: 13,
+            color: AppColors.textSecondary,
+            height: 1.4,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(dialogContext).pop();
+              await notifier.clearAll();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('All notifications cleared.'),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            ),
+            child: const Text(
+              'Clear All',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final canMarkAll = unreadCount > 0;
+    final canClearAll = totalCount > 0;
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 8, 12, 10),
+      padding: const EdgeInsets.fromLTRB(2, 8, 4, 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           IconButton(
             onPressed: () => context.pop(),
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
             color: AppColors.textPrimary,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            padding: EdgeInsets.zero,
           ),
           const SizedBox(width: 4),
           Expanded(
@@ -94,7 +188,7 @@ class _NotificationsHeader extends StatelessWidget {
                 Text(
                   'Notifications',
                   style: TextStyle(
-                    fontSize: 22,
+                    fontSize: 21,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textPrimary,
                     letterSpacing: -0.4,
@@ -104,7 +198,7 @@ class _NotificationsHeader extends StatelessWidget {
                 Text(
                   'Stay updated with your habits, goals, and progress.',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: FontWeight.w500,
                     color: AppColors.textSecondary,
                   ),
@@ -119,13 +213,22 @@ class _NotificationsHeader extends StatelessWidget {
             style: TextButton.styleFrom(
               foregroundColor:
                   canMarkAll ? AppColors.primary : AppColors.textDisabled,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              minimumSize: const Size(0, 36),
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              minimumSize: const Size(0, 32),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
             child: const Text(
               'Mark all as read',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
             ),
+          ),
+          IconButton(
+            onPressed: canClearAll ? () => _confirmClearAll(context) : null,
+            icon: const Icon(Icons.delete_sweep_rounded, size: 22),
+            color: canClearAll ? AppColors.error : AppColors.textDisabled,
+            tooltip: 'Clear All Notifications',
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            padding: EdgeInsets.zero,
           ),
         ],
       ),

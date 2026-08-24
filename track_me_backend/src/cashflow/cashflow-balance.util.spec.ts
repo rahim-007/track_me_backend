@@ -18,29 +18,111 @@ describe('cashflow-balance.util', () => {
     it('returns opening balances unchanged with no transactions', () => {
       const r = computeClosingBalances(opening, []);
       expect(r.closingBank).toBe(1000);
+      expect(r.closingCash).toBe(500);
+      expect(r.closingCreditCard).toBe(-200);
       expect(r.totalIncome).toBe(0);
       expect(r.totalOutflow).toBe(0);
       expect(r.netCashFlow).toBe(0);
     });
 
-    it('adds income and subtracts outflow from bank', () => {
+    // ─── Backward compatibility ───────────────────────────────────────────────
+
+    it('null account INCOME posts to Bank (legacy compat)', () => {
       const r = computeClosingBalances(opening, [
-        { kind: 'INCOME', amount: 250.5 },
-        { kind: 'OUTFLOW', amount: 100 },
-        { kind: 'OUTFLOW', amount: 50.25 },
+        { kind: 'INCOME', amount: 250, account: null },
       ]);
-      expect(r.totalIncome).toBe(250.5);
-      expect(r.totalOutflow).toBe(150.25);
-      expect(r.netCashFlow).toBe(100.25);
-      expect(r.closingBank).toBe(1100.25);
+      expect(r.closingBank).toBe(1250);
+      expect(r.closingCash).toBe(500);   // unchanged
     });
 
-    it('carries forward the exact closing balance as the next opening', () => {
-      // The core carry-forward invariant: next month's opening equals this
-      // month's closing, computed purely from transactions.
+    it('null account OUTFLOW deducts from Bank (legacy compat)', () => {
+      const r = computeClosingBalances(opening, [
+        { kind: 'OUTFLOW', amount: 100, account: null },
+      ]);
+      expect(r.closingBank).toBe(900);
+      expect(r.closingCash).toBe(500);   // unchanged
+    });
+
+    it('undefined account OUTFLOW deducts from Bank', () => {
+      const r = computeClosingBalances(opening, [
+        { kind: 'OUTFLOW', amount: 50 },  // no account property
+      ]);
+      expect(r.closingBank).toBe(950);
+    });
+
+    // ─── BANK account ────────────────────────────────────────────────────────
+
+    it('INCOME to BANK increases closingBank, leaves Cash unchanged', () => {
+      const r = computeClosingBalances(opening, [
+        { kind: 'INCOME', amount: 5000, account: 'BANK' },
+      ]);
+      expect(r.closingBank).toBe(6000);
+      expect(r.closingCash).toBe(500);
+      expect(r.closingCreditCard).toBe(-200);
+    });
+
+    it('OUTFLOW from BANK decreases closingBank, leaves Cash unchanged', () => {
+      const r = computeClosingBalances(opening, [
+        { kind: 'OUTFLOW', amount: 500, account: 'BANK' },
+      ]);
+      expect(r.closingBank).toBe(500);
+      expect(r.closingCash).toBe(500);
+      expect(r.closingCreditCard).toBe(-200);
+    });
+
+    // ─── CASH account ─────────────────────────────────────────────────────────
+
+    it('INCOME to CASH increases closingCash, leaves Bank unchanged', () => {
+      const r = computeClosingBalances(opening, [
+        { kind: 'INCOME', amount: 3000, account: 'CASH' },
+      ]);
+      expect(r.closingBank).toBe(1000);  // unchanged
+      expect(r.closingCash).toBe(3500);
+      expect(r.closingCreditCard).toBe(-200);
+    });
+
+    it('OUTFLOW from CASH decreases closingCash, leaves Bank unchanged', () => {
+      const r = computeClosingBalances(opening, [
+        { kind: 'OUTFLOW', amount: 200, account: 'CASH' },
+      ]);
+      expect(r.closingBank).toBe(1000);  // unchanged
+      expect(r.closingCash).toBe(300);
+      expect(r.closingCreditCard).toBe(-200);
+    });
+
+    // ─── CREDIT_CARD account ──────────────────────────────────────────────────
+
+    it('OUTFLOW from CREDIT_CARD increases closingCreditCard (more debt), Bank and Cash unchanged', () => {
+      const r = computeClosingBalances(opening, [
+        { kind: 'OUTFLOW', amount: 1000, account: 'CREDIT_CARD' },
+      ]);
+      expect(r.closingBank).toBe(1000);   // unchanged
+      expect(r.closingCash).toBe(500);    // unchanged
+      expect(r.closingCreditCard).toBe(800); // -200 + 1000 = 800 (more owed)
+    });
+
+    // ─── Mixed transactions ───────────────────────────────────────────────────
+
+    it('mixed accounts update each pocket independently', () => {
+      const r = computeClosingBalances(opening, [
+        { kind: 'INCOME',  amount: 5000, account: 'BANK' },        // +5000 bank
+        { kind: 'OUTFLOW', amount: 1000, account: 'CASH' },        // -1000 cash
+        { kind: 'OUTFLOW', amount: 2000, account: 'CREDIT_CARD' }, // +2000 CC debt
+        { kind: 'OUTFLOW', amount: 1000, account: 'BANK' },        // -1000 bank
+      ]);
+      expect(r.closingBank).toBe(5000);   // 1000 + 5000 - 1000
+      expect(r.closingCash).toBe(-500);   // 500 - 1000
+      expect(r.closingCreditCard).toBe(1800); // -200 + 2000
+      expect(r.totalIncome).toBe(5000);
+      expect(r.totalOutflow).toBe(4000);
+      expect(r.netCashFlow).toBe(1000);
+    });
+
+    it('carries forward the exact closing balance as the next opening (Bank)', () => {
+      // The core carry-forward invariant for Bank.
       const julyTxns = [
-        { kind: 'INCOME', amount: 30000 },
-        { kind: 'OUTFLOW', amount: 12500.75 },
+        { kind: 'INCOME',  amount: 30000, account: 'BANK' },
+        { kind: 'OUTFLOW', amount: 12500.75, account: 'BANK' },
       ];
       const july = computeClosingBalances(
         { ...opening, openingBank: 40000 },
@@ -56,8 +138,8 @@ describe('cashflow-balance.util', () => {
 
     it('rounds to 2 decimals to avoid float drift', () => {
       const r = computeClosingBalances({ ...opening, openingBank: 0 }, [
-        { kind: 'INCOME', amount: 0.1 },
-        { kind: 'INCOME', amount: 0.2 },
+        { kind: 'INCOME', amount: 0.1, account: 'BANK' },
+        { kind: 'INCOME', amount: 0.2, account: 'BANK' },
       ]);
       expect(r.totalIncome).toBe(0.3);
       expect(r.closingBank).toBe(0.3);
@@ -65,9 +147,26 @@ describe('cashflow-balance.util', () => {
 
     it('ignores unknown kinds in totals', () => {
       const r = computeClosingBalances(opening, [
-        { kind: 'WEIRD' as any, amount: 999 },
+        { kind: 'WEIRD' as any, amount: 999, account: 'BANK' },
       ]);
       expect(r.closingBank).toBe(1000);
+      expect(r.closingCash).toBe(500);
+    });
+
+    // ─── Starting balance preservation ────────────────────────────────────────
+
+    it('opening balances are never modified, only closing changes', () => {
+      // This is the core invariant: starting balances remain fixed.
+      const openingSnapshot = { ...opening };
+      computeClosingBalances(opening, [
+        { kind: 'INCOME',  amount: 5000, account: 'BANK' },
+        { kind: 'OUTFLOW', amount: 500,  account: 'CASH' },
+        { kind: 'OUTFLOW', amount: 1000, account: 'CREDIT_CARD' },
+      ]);
+      // The `opening` object must be unchanged.
+      expect(opening.openingBank).toBe(openingSnapshot.openingBank);
+      expect(opening.openingCash).toBe(openingSnapshot.openingCash);
+      expect(opening.openingCreditCard).toBe(openingSnapshot.openingCreditCard);
     });
   });
 

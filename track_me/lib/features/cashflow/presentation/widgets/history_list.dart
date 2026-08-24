@@ -90,7 +90,7 @@ class _TxnTile extends ConsumerWidget {
                   ),
                 ),
                 Text(
-                  '${DateFormat('d MMM').format(DateTime.parse(txn.date))} · ${_categoryLabel(txn.category)}',
+                  '${DateFormat('d MMM').format(DateTime.parse(txn.date))} · ${_accountBadge(txn.account)} · ${_categoryLabel(txn.category)}',
                   style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                 ),
               ],
@@ -125,5 +125,16 @@ class _TxnTile extends ConsumerWidget {
       if (c.letter == letter) return c.label;
     }
     return letter;
+  }
+
+  String _accountBadge(CashFlowAccount account) {
+    switch (account) {
+      case CashFlowAccount.bank:
+        return '🏦 Bank';
+      case CashFlowAccount.cash:
+        return '💵 Cash';
+      case CashFlowAccount.creditCard:
+        return '💳 Card';
+    }
   }
 }

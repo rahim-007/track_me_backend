@@ -309,8 +309,11 @@ int calculateHabitStreak(HabitModel habit, {DateTime? from}) {
   if (habit.completedDates.isEmpty) return 0;
   final completed = habit.completedDates.toSet();
   final hasRepeatDay = habit.repeatDays.any((d) => d);
+  final now = from ?? DateTime.now();
+  final todayStr = DateFormat('yyyy-MM-dd').format(now);
+
   int streak = 0;
-  DateTime day = from ?? DateTime.now();
+  DateTime day = now;
   for (int i = 0; i < 366; i++) {
     final dateStr = DateFormat('yyyy-MM-dd').format(day);
     final weekdayIndex = day.weekday - 1; // 0 = Monday
@@ -326,7 +329,13 @@ int calculateHabitStreak(HabitModel habit, {DateTime? from}) {
     if (completed.contains(dateStr)) {
       streak++;
     } else {
-      break;
+      // Today is in progress (grace period) — keep the streak from yesterday
+      if (dateStr == todayStr) {
+        day = day.subtract(const Duration(days: 1));
+        continue;
+      } else {
+        break;
+      }
     }
     day = day.subtract(const Duration(days: 1));
   }

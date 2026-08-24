@@ -5,7 +5,9 @@ import 'package:intl/intl.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../data/models/habit_model.dart';
 import '../../providers/habits_provider.dart';
+import '../screens/habits_screen.dart';
 import 'add_habit_dialog.dart';
+import 'habit_3d_checkbox.dart';
 
 class HabitGridRow extends ConsumerWidget {
   final HabitModel habit;
@@ -109,11 +111,16 @@ class HabitGridRow extends ConsumerWidget {
             children: [
               // Left category color vertical indicator bar
               Positioned(
-                top: 0,
-                bottom: 0,
+                top: 10,
+                bottom: 10,
                 left: 0,
-                width: 6,
-                child: Container(color: categoryColor),
+                width: 5,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: categoryColor,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -125,8 +132,8 @@ class HabitGridRow extends ConsumerWidget {
                       width: 48,
                       height: 48,
                       decoration: BoxDecoration(
-                        color: categoryColor.withOpacity(0.1),
-                        shape: BoxShape.circle,
+                        color: categoryColor.withOpacity(AppColors.isDarkMode ? 0.14 : 0.10),
+                        borderRadius: BorderRadius.circular(16),
                       ),
                       child: Center(
                         child: Text(
@@ -213,15 +220,26 @@ class HabitGridRow extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(width: 16),
-                    GestureDetector(
-                      // A skipped habit stays skipped — tapping its status
-                      // button must never flip it to Completed. Completed can
-                      // still be tapped to undo (existing behavior).
-                      onTap: isFuture || isSkipped
-                          ? null
-                          : () {
-                              onComplete(selectedDate);
-                            },
+                    Consumer(
+                      builder: (context, ref, child) {
+                        final is3d = ref.watch(isHabit3dFxEnabledProvider);
+                        return Habit3dCheckbox(
+                          enabled: is3d && !isFuture && !isSkipped,
+                          accentColor: categoryColor,
+                          onTap: isFuture || isSkipped
+                              ? () {}
+                              : () => onComplete(selectedDate),
+                          child: GestureDetector(
+                            // A skipped habit stays skipped — tapping its status
+                            // button must never flip it to Completed. Completed can
+                            // still be tapped to undo (existing behavior).
+                            onTap: isFuture || isSkipped
+                                ? null
+                                : () => onComplete(selectedDate),
+                            child: child!,
+                          ),
+                        );
+                      },
                       child: AnimatedScale(
                         scale: isDone && !isFuture ? 1.05 : 1.0,
                         duration: const Duration(milliseconds: 150),

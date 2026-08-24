@@ -63,6 +63,18 @@ export class NotificationsController {
     return this.notificationsService.markAllAsRead(req.user.id);
   }
 
+  @Delete('clear-all')
+  @ApiOperation({ summary: 'Clear all notifications for the user' })
+  clearAllNotifications(@Request() req: any) {
+    return this.notificationsService.clearAllNotifications(req.user.id);
+  }
+
+  @Delete()
+  @ApiOperation({ summary: 'Clear all notifications for the user' })
+  clearAllNotificationsRoot(@Request() req: any) {
+    return this.notificationsService.clearAllNotifications(req.user.id);
+  }
+
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a notification' })
   deleteNotification(@Request() req: any, @Param('id') id: string) {

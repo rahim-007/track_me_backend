@@ -171,12 +171,12 @@ class _NavItem extends StatelessWidget {
         children: [
           AnimatedContainer(
             duration: const Duration(milliseconds: 250),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
             decoration: BoxDecoration(
               color: isSelected
-                  ? activeColor.withOpacity(0.08)
+                  ? activeColor.withOpacity(AppColors.isDarkMode ? 0.16 : 0.11)
                   : Colors.transparent,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
               isSelected ? icon : unselectedIcon,

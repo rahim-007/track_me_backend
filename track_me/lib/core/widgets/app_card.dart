@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_shadows.dart';
 
-/// Premium card with soft shadow
+/// Premium card with spatial depth — adaptive Dark + Light themes.
 class AppCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry? padding;
@@ -31,21 +32,12 @@ class AppCard extends StatelessWidget {
         color: gradient == null ? (backgroundColor ?? AppColors.surface) : null,
         gradient: gradient,
         borderRadius: BorderRadius.circular(borderRadius),
-        border: border,
-        boxShadow: hasShadow
-            ? [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 16,
-                  offset: const Offset(0, 4),
-                ),
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.03),
-                  blurRadius: 4,
-                  offset: const Offset(0, 1),
-                ),
-              ]
-            : null,
+        border: border ??
+            Border.all(
+              color: AppColors.topBevelHighlight,
+              width: 1,
+            ),
+        boxShadow: hasShadow ? AppShadows.medium : null,
       ),
       child: Padding(
         padding: padding ?? const EdgeInsets.all(16),

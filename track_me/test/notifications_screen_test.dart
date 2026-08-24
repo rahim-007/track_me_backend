@@ -59,6 +59,12 @@ class _FakeApi implements NotificationsApi {
 
   @override
   Future<void> delete(String id) async => deleted.add(id);
+
+  @override
+  Future<void> clearAll() async {
+    items.clear();
+    unreadCount = 0;
+  }
 }
 
 GoRouter _buildRouter() {
@@ -239,6 +245,25 @@ void main() {
     expect(api.deleted, ['a']);
     expect(find.text('Swipe me'), findsNothing);
     expect(find.text('Keep me'), findsOneWidget);
+  });
+
+  testWidgets('clear all notifications confirms and clears all notifications',
+      (tester) async {
+    final api = _FakeApi(
+      [make('a', title: 'One'), make('b', title: 'Two')],
+      unreadCount: 2,
+    );
+    await pumpScreen(tester, api);
+
+    await tester.tap(find.byTooltip('Clear All Notifications'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Clear All Notifications?'), findsOneWidget);
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Clear All'));
+    await tester.pumpAndSettle();
+
+    expect(api.items, isEmpty);
+    expect(find.text("You're all caught up"), findsOneWidget);
   });
 
   testWidgets('shows the empty state when there are no notifications',

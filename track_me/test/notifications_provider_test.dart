@@ -58,6 +58,12 @@ class _FakeApi implements NotificationsApi {
     deleted.add(id);
     items = items.where((n) => n.id != id).toList();
   }
+
+  @override
+  Future<void> clearAll() async {
+    items.clear();
+    unreadCount = 0;
+  }
 }
 
 void main() {
@@ -177,4 +183,7 @@ class _ThrowingApi implements NotificationsApi {
 
   @override
   Future<void> delete(String id) async => throw Exception('network down');
+
+  @override
+  Future<void> clearAll() async => throw Exception('network down');
 }

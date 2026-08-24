@@ -516,86 +516,74 @@ class _WeekDaySelector extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 10),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.isDarkMode ? Colors.transparent : Colors.black.withOpacity(0.03),
-                blurRadius: 14,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: List.generate(7, (i) {
-              final date = startOfWeek.add(Duration(days: i));
-              final isSelected = date.day == selectedDate.day &&
-                  date.month == selectedDate.month &&
-                  date.year == selectedDate.year;
-              final isToday = date.day == DateTime.now().day &&
-                  date.month == DateTime.now().month &&
-                  date.year == DateTime.now().year;
+        Row(
+          children: List.generate(7, (i) {
+            final date = startOfWeek.add(Duration(days: i));
+            final isSelected = date.day == selectedDate.day &&
+                date.month == selectedDate.month &&
+                date.year == selectedDate.year;
+            final isToday = date.day == DateTime.now().day &&
+                date.month == DateTime.now().month &&
+                date.year == DateTime.now().year;
 
-              return GestureDetector(
+            return Expanded(
+              child: GestureDetector(
                 onTap: () => onDateSelected(date),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      days[i],
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: isSelected || isToday ? FontWeight.w800 : FontWeight.w600,
-                        color: isSelected
-                            ? AppColors.primary
-                            : (isToday ? AppColors.primary.withOpacity(0.65) : AppColors.textSecondary),
-                      ),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  margin: const EdgeInsets.symmetric(horizontal: 3.5),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppColors.primary : AppColors.surface,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: isSelected
+                          ? Colors.transparent
+                          : (isToday ? AppColors.primary.withOpacity(0.45) : AppColors.border),
                     ),
-                    const SizedBox(height: 8),
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
+                    boxShadow: [
+                      BoxShadow(
                         color: isSelected
-                            ? AppColors.primary
-                            : (isToday ? AppColors.primaryContainer : Colors.transparent),
-                        shape: BoxShape.circle,
-                        boxShadow: isSelected
-                            ? [
-                                BoxShadow(
-                                  color: AppColors.primary.withOpacity(0.25),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 3),
-                                )
-                              ]
-                            : [],
-                        border: isToday && !isSelected
-                            ? Border.all(color: AppColors.primary.withOpacity(0.4), width: 1.5)
-                            : null,
+                            ? AppColors.primary.withOpacity(AppColors.isDarkMode ? 0.40 : 0.30)
+                            : (AppColors.isDarkMode
+                                ? Colors.transparent
+                                : Colors.black.withOpacity(0.03)),
+                        blurRadius: 12,
+                        offset: const Offset(0, 5),
                       ),
-                      child: Center(
-                        child: Text(
-                          '${date.day}',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: isSelected || isToday ? FontWeight.w800 : FontWeight.w500,
-                            color: isSelected
-                                ? Colors.white
-                                : (isToday ? AppColors.primary : AppColors.textPrimary),
-                          ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        days[i].toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.6,
+                          color: isSelected
+                              ? Colors.white.withOpacity(0.75)
+                              : AppColors.textSecondary,
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 5),
+                      Text(
+                        '${date.day}',
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w800,
+                          color: isSelected
+                              ? Colors.white
+                              : (isToday ? AppColors.primary : AppColors.textPrimary),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              );
-            }),
-          ),
+              ),
+            );
+          }),
         ),
       ],
     );

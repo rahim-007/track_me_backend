@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Track Me — Cash Flow Design (Exact) + Light Mode</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   TRACK ME · EXACT APP DESIGN LANGUAGE (from screenshots)
+   Flat dark cards · letter-avatar grids · purple accents
+   Dark (default) + Light mode
+   ============================================================ */
+:root{
+  --bg:#0B0B10;
+  --card:#16161D;
+  --card-2:#1C1C24;
+  --line:rgba(255,255,255,.055);
+  --text:#F2F2F5;
+  --muted:#8A8A96;
+  --faint:#67676F;
+  --silver:#9C9CAA;
+  --purple:#8B7CF6;
+  --purple-soft:#A99EFF;
+  --green:#34D399;
+  --red:#F87171;
+  --amber:#FBBF24;
+  --nav:#0E0E13;
+  --chip-purple:rgba(139,124,246,.16);
+  --chip-green:rgba(52,211,153,.13);
+  --chip-red:rgba(248,113,113,.13);
+  --chip-amber:rgba(251,191,36,.13);
+  --shadow:0 10px 26px -14px rgba(0,0,0,.6);
+}
+body.light{
+  --bg:#F3F3F7;
+  --card:#FFFFFF;
+  --card-2:#F8F8FB;
+  --line:rgba(23,23,35,.07);
+  --text:#17171F;
+  --muted:#6E6E7A;
+  --faint:#9A9AA6;
+  --silver:#4A4A58;
+  --purple:#7C5CE0;
+  --purple-soft:#6D4FE0;
+  --green:#0C9D6C;
+  --red:#D9384F;
+  --amber:#B57A0A;
+  --nav:#FFFFFF;
+  --chip-purple:rgba(124,92,224,.11);
+  --chip-green:rgba(12,157,108,.11);
+  --chip-red:rgba(217,56,79,.10);
+  --chip-amber:rgba(181,122,10,.12);
+  --shadow:0 10px 24px -16px rgba(30,30,60,.18);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  font-family:'Plus Jakarta Sans',system-ui,sans-serif;
+  background:var(--bg);color:var(--text);min-height:100vh;
+  transition:background .35s ease,color .3s ease;
+}
+
+/* ---------- page chrome ---------- */
+.chrome{
+  position:sticky;top:0;z-index:60;display:flex;align-items:center;gap:13px;
+  padding:13px 22px;border-bottom:1px solid var(--line);
+  background:color-mix(in srgb,var(--bg) 78%,transparent);
+  backdrop-filter:blur(16px);
+}
+.dot{width:10px;height:10px;border-radius:50%}
+.dot:nth-child(1){background:#FF5F57}.dot:nth-child(2){background:#FEBC2E}.dot:nth-child(3){background:#28C840}
+.chrome b{font-size:12.5px;letter-spacing:.4px;color:var(--muted)}
+.badge{margin-left:auto;font-size:10.5px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;
+  color:var(--purple-soft);border:1.5px solid var(--purple);padding:6px 13px;border-radius:999px}
+.mode-btn{
+  width:44px;height:44px;border-radius:14px;border:1px solid var(--line);cursor:pointer;
+  background:var(--card);color:var(--text);font-size:18px;transition:.25s;
+}
+.mode-btn:hover{transform:translateY(-2px);border-color:var(--purple)}
+
+.intro{max-width:1240px;margin:34px auto 4px;padding:0 24px}
+.intro h1{font-size:clamp(24px,3.6vw,36px);font-weight:800;line-height:1.15}
+.intro h1 em{font-style:normal;color:var(--purple-soft)}
+.intro p{color:var(--muted);margin-top:9px;font-size:14.5px;max-width:780px;line-height:1.65}
+
+.sec-title{max-width:1240px;margin:52px auto -8px;padding:0 24px;display:flex;align-items:center;gap:13px}
+.sec-title h2{font-size:19px;font-weight:800;white-space:nowrap}
+.sec-title::after{content:"";height:1px;flex:1;background:var(--line)}
+.sec-title em{font-style:normal;font-size:10.5px;font-weight:800;letter-spacing:1.8px;color:var(--purple-soft);text-transform:uppercase}
+
+.stage{display:flex;flex-wrap:wrap;justify-content:center;align-items:flex-start;gap:42px;padding:30px 20px;max-width:1400px;margin:0 auto}
+.phone-wrap{text-align:center}
+.phone-label{margin-top:18px;display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;
+  background:var(--card);border:1px solid var(--line);border-radius:999px;padding:8px 16px}
+.phone-label i{width:7px;height:7px;border-radius:50%;background:var(--purple)}
+
+/* ---------- phone frame ---------- */
+.phone{width:380px;height:800px;border-radius:52px;position:relative;background:#000;padding:11px;
+  border:1px solid #2b2b34;box-shadow:0 0 0 2px #101018,0 44px 90px -28px rgba(0,0,0,.8)}
+.screen{width:100%;height:100%;border-radius:42px;overflow:hidden;position:relative;
+  background:var(--bg);display:flex;flex-direction:column;transition:background .35s ease}
+.notch{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:110px;height:26px;background:#000;border-radius:999px;z-index:9}
+.scroll{flex:1;overflow-y:auto;overflow-x:hidden;padding:52px 18px 120px;scroll-behavior:smooth}
+.scroll::-webkit-scrollbar{width:5px}
+.scroll::-webkit-scrollbar-thumb{background:var(--chip-purple);border-radius:99px}
+.homebar{position:absolute;bottom:6px;left:50%;transform:translateX(-50%);width:118px;height:4px;border-radius:99px;background:rgba(128,128,140,.45);z-index:10}
+
+/* ---------- EXACT APP COMPONENTS ---------- */
+.cf-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:16px}
+.cf-head h1{font-size:31px;font-weight:800;letter-spacing:.2px}
+.cf-head p{color:var(--muted);font-size:13.5px;margin-top:5px;font-weight:500}
+.pill3d{border:1.5px solid var(--purple);color:var(--purple-soft);background:transparent;border-radius:999px;
+  padding:9px 15px;font-size:12.5px;font-weight:800;cursor:pointer;white-space:nowrap;transition:.25s;font-family:inherit}
+.pill3d:hover{background:var(--chip-purple)}
+
+.bar-card{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);
+  border-radius:18px;padding:16px;margin-bottom:14px;transition:.25s}
+.bar-card b{font-size:16.5px;font-weight:800;flex:1}
+.bar-card .cal{font-size:19px}
+.chev{color:var(--muted);font-size:17px}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+.bal-card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:16px;transition:transform .3s,border-color .3s}
+.bal-top{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.bal-top b{font-size:15.5px;font-weight:700}
+.ico-chip{width:42px;height:42px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.ic-purple{background:var(--chip-purple)}.ic-green{background:var(--chip-green)}
+.ic-red{background:var(--chip-red)}.ic-amber{background:var(--chip-amber)}
+.amt{font-size:25px;font-weight:700;color:var(--silver);letter-spacing:.4px;line-height:1}
+.amt.green{color:var(--green)}.amt.red{color:var(--red)}
+.bal-card small,.src-card small{display:block;color:var(--faint);font-size:12px;margin-top:12px;font-weight:500}
+
+.io-card{display:flex;justify-content:space-between;align-items:flex-start;background:var(--card);
+  border:1px solid var(--line);border-radius:20px;padding:18px;margin-top:12px;transition:transform .3s}
+.io-lbl{font-size:14px;font-weight:600}
+.io-card .right{text-align:right}
+.io-val{display:block;font-size:23px;font-weight:800;margin-top:8px;letter-spacing:.3px}
+.io-val.green{color:var(--green)}.io-val.red{color:var(--red)}
+
+.sec{font-size:12.5px;font-weight:800;letter-spacing:2.2px;color:var(--muted);text-transform:uppercase;margin:24px 2px 11px}
+
+.src-card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px;
+  display:flex;align-items:center;gap:11px;transition:transform .3s,border-color .3s;min-width:0}
+.src-ava{width:44px;height:44px;border-radius:13px;display:flex;align-items:center;justify-content:center;
+  font-size:15px;font-weight:800;flex-shrink:0}
+.sa-green{background:var(--chip-green);color:var(--green)}
+.sa-red{background:var(--chip-red);color:var(--red)}
+.sa-purple{background:var(--chip-purple);color:var(--purple-soft)}
+.sa-amber{background:var(--chip-amber);color:var(--amber)}
+.src-info{flex:1;min-width:0}
+.src-info b{font-size:14.5px;font-weight:700;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.src-info small{color:var(--muted);font-size:11.5px;font-weight:500;display:block;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.src-amt{font-size:13px;font-weight:800;color:var(--faint);flex-shrink:0}
+.src-amt.green{color:var(--green)}.src-amt.red{color:var(--red)}
+
+.debt-card{display:flex;align-items:center;gap:13px;background:var(--card);border:1px solid var(--line);
+  border-radius:20px;padding:16px;margin-top:2px;transition:transform .3s;cursor:pointer}
+.debt-card:hover{border-color:var(--purple)}
+.debt-card .d-title{font-size:16.5px;font-weight:800}
+.debt-card .d-sub{font-size:13px;color:var(--muted);margin-top:4px;font-weight:500}
+.debt-card .d-sub b.g{color:var(--green);font-weight:800}
+.debt-card .d-sub b.r{color:var(--red);font-weight:800}
+.debt-card .arr{margin-left:auto;color:var(--muted);font-size:19px}
+
+.tx-card{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);
+  border-radius:18px;padding:14px;margin-bottom:10px;transition:transform .25s,border-color .25s}
+.tx-card:hover{border-color:var(--line);transform:translateX(2px)}
+.tx-info{flex:1;min-width:0}
+.tx-info b{font-size:15px;font-weight:700;display:block}
+.tx-info small{color:var(--muted);font-size:12px;font-weight:500;display:block;margin-top:3px}
+.tx-right{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.tx-amt{font-size:14.5px;font-weight:800}
+.tx-amt.green{color:var(--green)}.tx-amt.red{color:var(--red)}
+.tx-del{background:none;border:none;color:var(--faint);font-size:15px;cursor:pointer;transition:.2s;padding:4px}
+.tx-del:hover{color:var(--red);transform:scale(1.15)}
+
+/* 3D hover mode (toggled by the 3D ON pill) */
+.card3d{transition:transform .35s cubic-bezier(.34,1.4,.64,1),border-color .3s}
+body.d3 .card3d:hover{transform:perspective(750px) rotateX(3.5deg) rotateY(-3deg) translateY(-3px);border-color:var(--purple)}
+
+/* ---------- FAB + bottom nav ---------- */
+.fab{position:absolute;bottom:92px;left:50%;transform:translateX(-50%);width:60px;height:60px;border-radius:50%;
+  border:none;background:var(--purple);color:#fff;font-size:27px;font-weight:500;cursor:pointer;z-index:8;
+  box-shadow:0 12px 28px -8px var(--purple);transition:.28s cubic-bezier(.34,1.56,.64,1)}
+.fab:hover{transform:translateX(-50%) translateY(-4px) scale(1.05)}
+.bottom-nav{position:absolute;bottom:0;left:0;right:0;height:76px;background:var(--nav);border-top:1px solid var(--line);
+  display:flex;align-items:center;padding:6px 4px 12px;z-index:7;transition:background .35s ease}
+.nav-it{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--faint);font-size:10.5px;font-weight:700;cursor:pointer;transition:.2s}
+.nav-it svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.nav-it.active{color:var(--purple-soft)}
+.nav-it.active .nav-ic{background:var(--chip-purple);border-radius:12px;padding:4px 12px}
+.nav-ic{display:flex;transition:.2s}
+
+/* ---------- habits extras ---------- */
+.week-strip{display:grid;grid-template-columns:repeat(7,1fr);gap:7px;margin-bottom:14px}
+.wday{text-align:center;padding:10px 0 9px;border-radius:14px;background:var(--card);border:1px solid var(--line);cursor:pointer;transition:.22s}
+.wday small{display:block;font-size:8.5px;font-weight:800;color:var(--faint);letter-spacing:.6px}
+.wday b{display:block;font-size:13.5px;margin-top:4px;font-weight:800}
+.wday .pip{width:5px;height:5px;border-radius:50%;background:var(--green);margin:5px auto 0}
+.wday.sel{background:var(--purple);border-color:transparent;box-shadow:0 8px 20px -8px var(--purple)}
+.wday.sel small{color:rgba(255,255,255,.8)}.wday.sel b{color:#fff}
+.gcell{width:28px;height:28px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:11.5px;cursor:pointer;transition:.16s;flex-shrink:0}
+.g-done{background:var(--chip-green);color:var(--green);border:1px solid transparent}
+.g-todo{background:transparent;border:1.4px dashed var(--line);color:var(--faint)}
+.g-skip{background:var(--chip-amber);color:var(--amber)}
+.gcell:hover{transform:scale(1.14)}
+.check-btn{width:34px;height:34px;border-radius:12px;border:none;cursor:pointer;font-size:14px;flex-shrink:0;transition:.25s cubic-bezier(.34,1.56,.64,1)}
+.cb-done{background:var(--chip-green);color:var(--green)}
+.cb-todo{background:transparent;border:1.6px dashed var(--purple);color:var(--purple-soft)}
+.check-btn:hover{transform:scale(1.1)}
+.prog{height:7px;border-radius:99px;background:var(--line);overflow:hidden;margin-top:10px}
+.prog>i{display:block;height:100%;border-radius:99px;background:var(--purple)}
+
+/* ---------- goals / profile / notif / auth ---------- */
+.goal-card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:16px;margin-bottom:11px}
+.goal-top{display:flex;align-items:center;gap:12px}
+.goal-top b{font-size:15.5px;font-weight:700;display:block}
+.goal-top small{color:var(--muted);font-size:12px;font-weight:500;display:block;margin-top:3px}
+.goal-pct{margin-left:auto;font-size:15px;font-weight:800;color:var(--purple-soft)}
+.mile{display:flex;align-items:center;gap:9px;margin-top:9px;font-size:12.5px;font-weight:600;color:var(--muted)}
+.mile i{width:19px;height:19px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-style:normal;font-size:9.5px;flex-shrink:0}
+.mile.hit i{background:var(--chip-green);color:var(--green)}
+.mile.next i{border:1.5px dashed var(--line);color:var(--faint)}
+.pf-hero{text-align:center;background:var(--card);border:1px solid var(--line);border-radius:22px;padding:24px 16px 20px;margin-bottom:14px}
+.pf-ava{width:78px;height:78px;border-radius:26px;margin:0 auto 11px;display:flex;align-items:center;justify-content:center;
+  font-size:30px;font-weight:800;color:#fff;background:var(--purple);box-shadow:0 14px 30px -10px var(--purple)}
+.pf-hero h2{font-size:19px;font-weight:800}
+.pf-hero small{color:var(--muted);font-size:12.5px;font-weight:500;display:block;margin-top:4px}
+.pf-stats{display:flex;margin-top:16px}
+.pf-stat{flex:1;text-align:center;padding:0 6px}
+.pf-stat b{display:block;font-size:17px;font-weight:800}
+.pf-stat small{font-size:9px;font-weight:800;letter-spacing:.8px;color:var(--faint)}
+.pf-stat+.pf-stat{border-left:1px solid var(--line)}
+.set-row{display:flex;align-items:center;gap:12px;padding:13px 2px;border-bottom:1px solid var(--line);font-size:14px;font-weight:600;cursor:pointer}
+.set-row:last-child{border-bottom:none}
+.set-ico{width:36px;height:36px;border-radius:12px;background:var(--card-2);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.set-arr{margin-left:auto;color:var(--faint)}
+.tgl{margin-left:auto;width:44px;height:25px;border-radius:99px;background:var(--purple);position:relative;cursor:pointer;flex-shrink:0;transition:.25s}
+.tgl::after{content:"";position:absolute;top:3px;right:3px;width:19px;height:19px;border-radius:50%;background:#fff;transition:.25s}
+.tgl.off{background:var(--card-2);border:1px solid var(--line)}
+.tgl.off::after{right:auto;left:2px;opacity:.7}
+.n-unread{width:8px;height:8px;border-radius:50%;background:var(--purple);box-shadow:0 0 8px var(--purple);flex-shrink:0}
+.n-time{font-size:10.5px;color:var(--faint);font-weight:700;margin-left:auto;white-space:nowrap}
+.field{display:flex;align-items:center;gap:11px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:15px;margin-bottom:11px;font-size:13.5px;font-weight:600;color:var(--muted)}
+.btn-p{display:flex;align-items:center;justify-content:center;width:100%;padding:15px;border:none;border-radius:16px;
+  font-size:14.5px;font-weight:800;color:#fff;cursor:pointer;background:var(--purple);box-shadow:0 12px 26px -10px var(--purple);
+  transition:.25s;font-family:inherit;margin-top:4px}
+.btn-p:hover{transform:translateY(-2px)}
+.btn-g{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;padding:14px;border-radius:16px;margin-top:11px;
+  border:1.4px solid var(--line);background:var(--card);color:var(--text);font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit}
+.or-div{display:flex;align-items:center;gap:12px;color:var(--faint);font-size:11px;font-weight:700;margin:16px 0}
+.or-div::before,.or-div::after{content:"";height:1px;flex:1;background:var(--line)}
+
+@media(max-width:520px){.phone{transform:scale(.88);transform-origin:top center;margin-bottom:-95px}}
+</style>
+</head>
+<body>
+
+<div class="chrome">
+  <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+  <b>Track Me · App-Exact Design · Cash Flow first</b>
+  <span class="badge">v3 · Exact Match</span>
+  <button class="mode-btn" id="modeBtn" title="Toggle dark / light">☀️</button>
+</div>
+
+<section class="intro">
+  <h1>Your <em>Cash Flow design, exactly</em> — extended to every screen.</h1>
+  <p>Same flat dark cards, letter avatars, purple FAB and pill nav as your app screenshots — nothing redesigned.
+     The ☀️ button (top-right) switches the whole system to <b>Light Mode</b>. The "3D ON" pill toggles subtle 3D card hover.
+     Design only — no functionality changes.</p>
+</section>
+
+<!-- ================= CASH FLOW (EXACT) ================= -->
+<div class="sec-title"><em>01</em><h2>Cash Flow — exact replica of your screenshots</h2></div>
+<div class="stage">
+
+  <!-- SCREEN A: top half -->
+  <div class="phone-wrap"><div class="phone"><div class="screen"><div class="notch"></div><div class="scroll">
+
+    <div class="cf-head">
+      <div>
+        <h1>Cash Flow</h1>
+        <p>Where your money comes from and where it goes</p>
+      </div>
+      <button class="pill3d" id="pill3d">✨ 3D ON</button>
+    </div>
+
+    <div class="bar-card card3d">
+      <span class="cal">📅</span><b>August 2026</b><span class="chev">⌄</span>
+    </div>
+
+    <div class="grid2">
+      <div class="bal-card card3d">
+        <div class="bal-top"><span class="ico-chip ic-purple">🏦</span><b>Bank</b></div>
+        <div class="amt">₹11,000</div><small>Updates with every entry</small>
+      </div>
+      <div class="bal-card card3d">
+        <div class="bal-top"><span class="ico-chip ic-green">💵</span><b>Cash in hand</b></div>
+        <div class="amt">₹2,300</div><small>Updates with every entry</small>
+      </div>
+      <div class="bal-card card3d">
+        <div class="bal-top"><span class="ico-chip ic-red">💳</span><b>Credit card</b></div>
+        <div class="amt">₹0</div><small>Owed this month</small>
+      </div>
+      <div class="bal-card card3d">
+        <div class="bal-top"><span class="ico-chip ic-green">📈</span><b>Net this month</b></div>
+        <div class="amt">₹800</div><small>Inflow − outflow</small>
+      </div>
+    </div>
+
+    <div class="io-card card3d">
+      <div>
+        <span class="io-lbl">↙ Inflow</span>
+        <span class="io-val green">+₹6,000</span>
+      </div>
+      <div class="right">
+        <span class="io-lbl">Outflow ↗</span>
+        <span class="io-val red">−₹5,200</span>
+      </div>
+    </div>
+
+    <div class="sec">Where money comes from</div>
+    <div class="grid2">
+      <div class="src-card card3d">
+        <span class="src-ava sa-green">E</span>
+        <span class="src-info"><b>Employee</b><small>Salary from a job</small></span>
+        <span class="src-amt green">₹6K</span>
+      </div>
+      <div class="src-card card3d">
+        <span class="src-ava sa-green">S</span>
+        <span class="src-info"><b>Self-Employed</b><small>Freelance &amp; consulting</small></span>
+        <span class="src-amt">₹0</span>
+      </div>
+      <div class="src-card card3d">
+        <span class="src-ava sa-green">B</span>
+        <span class="src-info"><b>Business</b><small>Business ownership inc…</small></span>
+        <span class="src-amt">₹0</span>
+      </div>
+      <div class="src-card card3d">
+        <span class="src-ava sa-green">I</span>
+        <span class="src-info"><b>Investor</b><small>Interest, dividends, retu…</small></span>
+        <span class="src-amt">₹0</span>
+      </div>
+      <div class="src-card card3d">
+        <span class="src-ava sa-green">G</span>
+        <span class="src-info"><b>Gift</b><small>Received, no return exp…</small></span>
+        <span class="src-amt">₹0</span>
+      </div>
+    </div>
+
+    <div class="sec">Where money goes</div>
+    <div class="grid2">
+      <div class="src-card card3d">
+        <span class="src-ava sa-red">E</span>
+        <span class="src-info"><b>Expense</b><small>Day-to-day spending</small></span>
+        <span class="src-amt red">₹5.2K</span>
+      </div>
+      <div class="src-card card3d">
+        <span class="src-ava sa-red">S</span>
+        <span class="src-info"><b>Savings</b><small>Money set aside</small></span>
+        <span class="src-amt">₹0</span>
+      </div>
+      <div class="src-card card3d">
+        <span class="src-ava sa-red">D</span>
+        <span class="src-info"><b>Debt Repayment</b><small>Paying down what you …</small></span>
+        <span class="src-amt">₹0</span>
+      </div>
+      <div class="src-card card3d">
+        <span class="src-ava sa-red">I</span>
+        <span class="src-info"><b>Investing</b><small>Buying assets</small></span>
+        <span class="src-amt">₹0</span>
+      </div>
+      <div class="src-card card3d">
+        <span class="src-ava sa-red">DO</span>
+        <span class="src-info"><b>Donation</b><small>Given, no return expect…</small></span>
+        <span class="src-amt">₹0</span>
+      </div>
+    </div>
+
+    <div class="debt-card card3d" style="margin-top:22px">
+      <span class="src-ava sa-purple">🤝</span>
+      <div>
+        <div class="d-title">Debt Ledger</div>
+        <div class="d-sub">Receive <b class="g">+₹2K</b> &nbsp; Give <b class="r">−₹0</b></div>
+      </div>
+      <span class="arr">›</span>
+    </div>
+
+    <div class="sec">This period</div>
+
+    <div class="tx-card card3d">
+      <span class="src-ava sa-green">E</span>
+      <div class="tx-info"><b>Inflow</b><small>23 Aug · 🏦 Bank · Employee</small></div>
+      <div class="tx-right"><span class="tx-amt green">+₹6,000</span><button class="tx-del">🗑</button></div>
+    </div>
+    <div class="tx-card card3d">
+      <span class="src-ava sa-red">E</span>
+      <div class="tx-info"><b>Briyani</b><small>23 Aug · 💵 Cash · Employee</small></div>
+      <div class="tx-right"><span class="tx-amt red">−₹200</span><button class="tx-del">🗑</button></div>
+    </div>
+    <div class="tx-card card3d">
+      <span class="src-ava sa-red">E</span>
+      <div class="tx-info"><b>Outflow</b><small>23 Aug · 🏦 Bank · Employee</small></div>
+      <div class="tx-right"><span class="tx-amt red">−₹5,000</span><button class="tx-del">🗑</button></div>
+    </div>
+
+  </div>
+  <button class="fab">+</button>
+  <div class="bottom-nav">
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a2 2 0 01-2 2h-4v-7h-6v7H5a2 2 0 01-2-2z"/></svg></span>Home</div>
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg></span>Habits</div>
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><path d="M5 21V4m0 1h13l-2.5 4L18 13H5"/></svg></span>Goals</div>
+    <div class="nav-it active"><span class="nav-ic"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M16 12.5h2M3 10h18"/></svg></span>Cash Flow</div>
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 5-5.5 8-5.5s6.5 1.5 8 5.5"/></svg></span>Profile</div>
+  </div>
+  <div class="homebar"></div>
+  </div></div><br><span class="phone-label"><i></i> Cash Flow — Overview (exact)</span></div>
+
+  <!-- SCREEN B: history + debts + add sheet -->
+  <div class="phone-wrap"><div class="phone"><div class="screen"><div class="notch"></div><div class="scroll">
+
+    <div class="cf-head">
+      <div>
+        <h1>History</h1>
+        <p>Every entry, newest first</p>
+      </div>
+      <button class="pill3d">Aug ▾</button>
+    </div>
+
+    <div class="sec" style="margin-top:6px">23 August</div>
+    <div class="tx-card card3d">
+      <span class="src-ava sa-green">E</span>
+      <div class="tx-info"><b>Inflow</b><small>🏦 Bank · Employee</small></div>
+      <div class="tx-right"><span class="tx-amt green">+₹6,000</span><button class="tx-del">🗑</button></div>
+    </div>
+    <div class="tx-card card3d">
+      <span class="src-ava sa-red">E</span>
+      <div class="tx-info"><b>Briyani</b><small>💵 Cash · Employee</small></div>
+      <div class="tx-right"><span class="tx-amt red">−₹200</span><button class="tx-del">🗑</button></div>
+    </div>
+    <div class="tx-card card3d">
+      <span class="src-ava sa-red">E</span>
+      <div class="tx-info"><b>Outflow</b><small>🏦 Bank · Employee</small></div>
+      <div class="tx-right"><span class="tx-amt red">−₹5,000</span><button class="tx-del">🗑</button></div>
+    </div>
+
+    <div class="sec">22 August</div>
+    <div class="tx-card card3d">
+      <span class="src-ava sa-red">E</span>
+      <div class="tx-info"><b>Groceries</b><small>💳 Credit card · Personal</small></div>
+      <div class="tx-right"><span class="tx-amt red">−₹1,430</span><button class="tx-del">🗑</button></div>
+    </div>
+    <div class="tx-card card3d">
+      <span class="src-ava sa-green">G</span>
+      <div class="tx-info"><b>Birthday gift</b><small>💵 Cash · Gift</small></div>
+      <div class="tx-right"><span class="tx-amt green">+₹1,000</span><button class="tx-del">🗑</button></div>
+    </div>
+
+    <div class="sec">Debt Ledger</div>
+    <div class="tx-card card3d">
+      <span class="src-ava sa-purple">P</span>
+      <div class="tx-info"><b>Priya owes you</b><small>Dinner split · 20 Aug</small></div>
+      <div class="tx-right"><span class="tx-amt green">₹1,150</span><button class="tx-del">✓</button></div>
+    </div>
+    <div class="tx-card card3d">
+      <span class="src-ava sa-purple">A</span>
+      <div class="tx-info"><b>You owe Amit</b><small>Bike repair · 12 Aug</small></div>
+      <div class="tx-right"><span class="tx-amt red">₹2,500</span><button class="tx-del">✓</button></div>
+    </div>
+
+  </div>
+  <button class="fab">+</button>
+  <div class="bottom-nav">
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a2 2 0 01-2 2h-4v-7h-6v7H5a2 2 0 01-2-2z"/></svg></span>Home</div>
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg></span>Habits</div>
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><path d="M5 21V4m0 1h13l-2.5 4L18 13H5"/></svg></span>Goals</div>
+    <div class="nav-it active"><span class="nav-ic"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M16 12.5h2M3 10h18"/></svg></span>Cash Flow</div>
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 5-5.5 8-5.5s6.5 1.5 8 5.5"/></svg></span>Profile</div>
+  </div>
+  <div class="homebar"></div>
+  </div></div><br><span class="phone-label"><i></i> History &amp; Debts</span></div>
+</div>
+
+<!-- ================= HOME / DASHBOARD ================= -->
+<div class="sec-title"><em>02</em><h2>Home — same card language</h2></div>
+<div class="stage">
+
+  <div class="phone-wrap"><div class="phone"><div class="screen"><div class="notch"></div><div class="scroll">
+
+    <div class="cf-head">
+      <div>
+        <h1 style="font-size:26px">Hey Rahim 👋</h1>
+        <p>Tuesday, 23 August</p>
+      </div>
+      <button class="pill3d">🔔 3</button>
+    </div>
+
+    <div class="grid2" style="margin-top:6px">
+      <div class="bal-card card3d">
+        <div class="bal-top"><span class="ico-chip ic-purple">✅</span><b>Today</b></div>
+        <div class="amt">5/8</div><small>Habits completed</small>
+        <div class="prog"><i style="width:62%"></i></div>
+      </div>
+      <div class="bal-card card3d">
+        <div class="bal-top"><span class="ico-chip ic-amber">🔥</span><b>Streak</b></div>
+        <div class="amt">12</div><small>days in a row</small>
+        <div class="prog"><i style="width:50%;background:var(--amber)"></i></div>
+      </div>
+    </div>
+
+    <div class="io-card card3d">
+      <div>
+        <span class="io-lbl">↙ Spent today</span>
+        <span class="io-val red">−₹1,240</span>
+      </div>
+      <div class="right">
+        <span class="io-lbl">Limit ↗</span>
+        <span class="io-val" style="color:var(--silver)">₹2,000</span>
+      </div>
+    </div>
+
+    <div class="sec">Today's habits</div>
+    <div class="tx-card card3d">
+      <span class="src-ava sa-green">🏃</span>
+      <div class="tx-info"><b>Morning Run</b><small>Health · 🔥 21 days</small></div>
+      <button class="check-btn cb-done">✓</button>
+    </div>
+    <div class="tx-card card3d">
+      <span class="src-ava sa-purple">📖</span>
+      <div class="tx-info"><b>Read 20 Pages</b><small>Learning · 🔥 8 days</small></div>
+      <button class="check-btn cb-todo">＋</button>
+    </div>
+    <div class="tx-card card3d">
+      <span class="src-ava sa-amber">🧘</span>
+      <div class="tx-info"><b>Meditate</b><small>Mindfulness · 🔥 12 days</small></div>
+      <button class="check-btn cb-done">✓</button>
+    </div>
+
+    <div class="sec">Active goals</div>
+    <div class="goal-card card3d">
+      <div class="goal-top">
+        <span class="src-ava sa-purple">🎯</span>
+        <div><b>Ship Cash Flow rebuild</b><small>Due Sep 15 · Career</small></div>
+        <span class="goal-pct">68%</span>
+      </div>
+      <div class="prog"><i style="width:68%"></i></div>
+    </div>
+    <div class="goal-card card3d">
+      <div class="goal-top">
+        <span class="src-ava sa-green">💪</span>
+        <div><b>Lose 5 kg</b><small>Due Oct 01 · Fitness</small></div>
+        <span class="goal-pct">42%</span>
+      </div>
+      <div class="prog"><i style="width:42%;background:var(--green)"></i></div>
+    </div>
+
+  </div>
+  <button class="fab">+</button>
+  <div class="bottom-nav">
+    <div class="nav-it active"><span class="nav-ic"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a2 2 0 01-2 2h-4v-7h-6v7H5a2 2 0 01-2-2z"/></svg></span>Home</div>
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg></span>Habits</div>
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><path d="M5 21V4m0 1h13l-2.5 4L18 13H5"/></svg></span>Goals</div>
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M16 12.5h2M3 10h18"/></svg></span>Cash Flow</div>
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 5-5.5 8-5.5s6.5 1.5 8 5.5"/></svg></span>Profile</div>
+  </div>
+  <div class="homebar"></div>
+  </div></div><br><span class="phone-label"><i></i> Home / Dashboard</span></div>
+</div>
+
+<!-- ================= HABITS ================= -->
+<div class="sec-title"><em>03</em><h2>Habits</h2></div>
+<div class="stage">
+  <div class="phone-wrap"><div class="phone"><div class="screen"><div class="notch"></div><div class="scroll">
+
+    <div class="cf-head">
+      <div>
+        <h1>Habits</h1>
+        <p>Last 7 days · tap a day to travel</p>
+      </div>
+      <button class="pill3d">＋ New</button>
+    </div>
+
+    <div class="bar-card card3d">
+      <span class="cal">🔥</span>
+      <div style="flex:1">
+        <b style="display:block;font-size:15px">12 day streak</b>
+        <small style="color:var(--faint);font-size:11.5px;font-weight:500;display:block;margin-top:2px">Longest ever: 24 · don't break the chain</small>
+      </div>
+      <span class="chev">›</span>
+    </div>
+
+    <div class="week-strip">
+      <div class="wday"><small>MON</small><b>17</b><span class="pip"></span></div>
+      <div class="wday"><small>TUE</small><b>18</b><span class="pip"></span></div>
+      <div class="wday"><small>WED</small><b>19</b></div>
+      <div class="wday"><small>THU</small><b>20</b><span class="pip"></span></div>
+      <div class="wday"><small>FRI</small><b>21</b><span class="pip"></span></div>
+      <div class="wday"><small>SAT</small><b>22</b><span class="pip"></span></div>
+      <div class="wday sel"><small>TODAY</small><b>23</b></div>
+    </div>
+
+    <div class="sec">This week</div>
+
+    <div class="tx-card card3d" style="gap:8px">
+      <span class="src-ava sa-green">🏃</span>
+      <div class="grid-cell" style="display:contents"></div>
+      <div class="gcell g-done">✓</div><div class="gcell g-done">✓</div>
+      <div class="gcell g-skip">–</div><div class="gcell g-done">✓</div>
+      <div class="gcell g-done">✓</div><div class="gcell g-done">✓</div>
+      <div class="gcell g-todo"></div>
+    </div>
+    <div class="tx-card card3d" style="gap:8px">
+      <span class="src-ava sa-purple">📖</span>
+      <div class="gcell g-done">✓</div><div class="gcell g-todo"></div>
+      <div class="gcell g-todo"></div><div class="gcell g-done">✓</div>
+      <div class="gcell g-done">✓</div><div class="gcell g-done">✓</div>
+      <div class="gcell g-todo"></div>
+    </div>
+    <div class="tx-card card3d" style="gap:8px">
+      <span class="src-ava sa-amber">🧘</span>
+      <div class="gcell g-done">✓</div><div class="gcell g-done">✓</div>
+      <div class="gcell g-done">✓</div><div class="gcell g-done">✓</div>
+      <div class="gcell g-done">✓</div><div class="gcell g-done">✓</div>
+      <div class="gcell g-done">✓</div>
+    </div>
+    <div class="tx-card card3d" style="gap:8px">
+      <span class="src-ava sa-red">💧</span>
+      <div class="gcell g-done">✓</div><div class="gcell g-done">✓</div>
+      <div class="gcell g-skip">–</div><div class="gcell g-done">✓</div>
+      <div class="gcell g-todo"></div><div class="gcell g-done">✓</div>
+      <div class="gcell g-todo"></div>
+    </div>
+
+    <div class="sec">Completion rate</div>
+    <div class="bal-card card3d">
+      <div class="bal-top"><span class="ico-chip ic-green">📈</span><b>This week</b>
+        <span class="goal-pct" style="margin-left:auto">87%</span></div>
+      <div class="prog" style="margin-top:0"><i style="width:87%;background:var(--green)"></i></div>
+      <small>29 of 32 scheduled check-ins done — best week so far.</small>
+    </div>
+
+  </div>
+  <button class="fab">+</button>
+  <div class="bottom-nav">
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a2 2 0 01-2 2h-4v-7h-6v7H5a2 2 0 01-2-2z"/></svg></span>Home</div>
+    <div class="nav-it active"><span class="nav-ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg></span>Habits</div>
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><path d="M5 21V4m0 1h13l-2.5 4L18 13H5"/></svg></span>Goals</div>
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M16 12.5h2M3 10h18"/></svg></span>Cash Flow</div>
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 5-5.5 8-5.5s6.5 1.5 8 5.5"/></svg></span>Profile</div>
+  </div>
+  <div class="homebar"></div>
+  </div></div><br><span class="phone-label"><i></i> Habits Grid</span></div>
+</div>
+
+<!-- ================= GOALS ================= -->
+<div class="sec-title"><em>04</em><h2>Goals</h2></div>
+<div class="stage">
+  <div class="phone-wrap"><div class="phone"><div class="screen"><div class="notch"></div><div class="scroll">
+
+    <div class="cf-head">
+      <div>
+        <h1>Goals</h1>
+        <p>4 active · 6 achieved</p>
+      </div>
+      <button class="pill3d">＋ New</button>
+    </div>
+
+    <div class="goal-card card3d">
+      <div class="goal-top">
+        <span class="src-ava sa-purple">🎯</span>
+        <div><b>Ship Cash Flow rebuild</b><small>Due Sep 15 · Career</small></div>
+        <span class="goal-pct">68%</span>
+      </div>
+      <div class="prog"><i style="width:68%"></i></div>
+      <div class="mile hit"><i>✓</i>Design confirmed · Backend synced</div>
+      <div class="mile next"><i>→</i>Flutter polish pass</div>
+    </div>
+    <div class="goal-card card3d">
+      <div class="goal-top">
+        <span class="src-ava sa-green">💪</span>
+        <div><b>Lose 5 kg</b><small>Due Oct 01 · Fitness</small></div>
+        <span class="goal-pct">42%</span>
+      </div>
+      <div class="prog"><i style="width:42%;background:var(--green)"></i></div>
+      <div class="mile hit"><i>✓</i>Gym routine locked in</div>
+      <div class="mile next"><i>→</i>Reach 78 kg</div>
+    </div>
+    <div class="goal-card card3d">
+      <div class="goal-top">
+        <span class="src-ava sa-amber">🏦</span>
+        <div><b>Emergency Fund ₹50k</b><small>Due Nov 30 · Finance</small></div>
+        <span class="goal-pct">85%</span>
+      </div>
+      <div class="prog"><i style="width:85%;background:var(--amber)"></i></div>
+      <small style="color:var(--faint);font-size:11.5px;font-weight:500;display:block;margin-top:9px">₹42,500 of ₹50,000 saved · ₹1,060/week keeps you on track</small>
+    </div>
+    <div class="goal-card card3d">
+      <div class="goal-top">
+        <span class="src-ava sa-red">📚</span>
+        <div><b>Read 12 books</b><small>Due Dec 31 · Learning</small></div>
+        <span class="goal-pct">33%</span>
+      </div>
+      <div class="prog"><i style="width:33%;background:var(--red)"></i></div>
+    </div>
+
+  </div>
+  <button class="fab">+</button>
+  <div class="bottom-nav">
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a2 2 0 01-2 2h-4v-7h-6v7H5a2 2 0 01-2-2z"/></svg></span>Home</div>
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg></span>Habits</div>
+    <div class="nav-it active"><span class="nav-ic"><svg viewBox="0 0 24 24"><path d="M5 21V4m0 1h13l-2.5 4L18 13H5"/></svg></span>Goals</div>
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M16 12.5h2M3 10h18"/></svg></span>Cash Flow</div>
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 5-5.5 8-5.5s6.5 1.5 8 5.5"/></svg></span>Profile</div>
+  </div>
+  <div class="homebar"></div>
+  </div></div><br><span class="phone-label"><i></i> Goals</span></div>
+</div>
+
+<!-- ================= PROFILE + NOTIFICATIONS ================= -->
+<div class="sec-title"><em>05</em><h2>Profile · Notifications · Auth</h2></div>
+<div class="stage">
+
+  <!-- Profile -->
+  <div class="phone-wrap"><div class="phone"><div class="screen"><div class="notch"></div><div class="scroll">
+
+    <div class="pf-hero card3d">
+      <div class="pf-ava">R</div>
+      <h2>Rahim</h2>
+      <small>rahim@test.com · Member since 2024</small>
+      <div class="pf-stats">
+        <div class="pf-stat"><b>12</b><small>STREAK</small></div>
+        <div class="pf-stat"><b>248</b><small>DONE</small></div>
+        <div class="pf-stat"><b>6</b><small>GOALS WON</small></div>
+      </div>
+    </div>
+
+    <div class="sec">Settings</div>
+    <div class="bar-card card3d" style="display:block;padding:6px 16px">
+      <div class="set-row"><span class="set-ico">🎨</span>Appearance<span class="tgl" id="themeToggle"></span></div>
+      <div class="set-row"><span class="set-ico">🔔</span>Notifications<span class="tgl"></span></div>
+      <div class="set-row"><span class="set-ico">🌍</span>Language<span style="margin-left:auto;color:var(--faint);font-size:12px;font-weight:700">English ▾</span></div>
+      <div class="set-row"><span class="set-ico">☁️</span>Sync &amp; backup<span class="set-arr">›</span></div>
+      <div class="set-row" style="color:var(--red)"><span class="set-ico" style="background:var(--chip-red)">⏻</span>Log out<span class="set-arr" style="color:var(--red)">›</span></div>
+    </div>
+
+  </div>
+  <button class="fab">+</button>
+  <div class="bottom-nav">
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a2 2 0 01-2 2h-4v-7h-6v7H5a2 2 0 01-2-2z"/></svg></span>Home</div>
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg></span>Habits</div>
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><path d="M5 21V4m0 1h13l-2.5 4L18 13H5"/></svg></span>Goals</div>
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M16 12.5h2M3 10h18"/></svg></span>Cash Flow</div>
+    <div class="nav-it active"><span class="nav-ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 5-5.5 8-5.5s6.5 1.5 8 5.5"/></svg></span>Profile</div>
+  </div>
+  <div class="homebar"></div>
+  </div></div><br><span class="phone-label"><i></i> Profile &amp; Settings</span></div>
+
+  <!-- Notifications -->
+  <div class="phone-wrap"><div class="phone"><div class="screen"><div class="notch"></div><div class="scroll">
+
+    <div class="cf-head">
+      <div>
+        <h1 style="font-size:26px">Notifications</h1>
+        <p>3 unread</p>
+      </div>
+      <button class="pill3d">Mark read</button>
+    </div>
+
+    <div class="tx-card card3d">
+      <span class="src-ava sa-amber">🔥</span>
+      <div class="tx-info"><b>Streak alert!</b><small>Complete Meditate before midnight to keep 12 days alive.</small></div>
+      <span class="n-time">2m</span><span class="n-unread"></span>
+    </div>
+    <div class="tx-card card3d">
+      <span class="src-ava sa-green">💰</span>
+      <div class="tx-info"><b>Under budget today</b><small>₹1,240 of ₹2,000 spent — ₹760 saved.</small></div>
+      <span class="n-time">1h</span><span class="n-unread"></span>
+    </div>
+    <div class="tx-card card3d">
+      <span class="src-ava sa-purple">🎯</span>
+      <div class="tx-info"><b>Goal milestone</b><small>"Emergency Fund" crossed 85%!</small></div>
+      <span class="n-time">3h</span><span class="n-unread"></span>
+    </div>
+    <div class="tx-card card3d">
+      <span class="src-ava sa-green">🌱</span>
+      <div class="tx-info"><b>Reflection complete</b><small>Nice work reflecting on yesterday's misses.</small></div>
+      <span class="n-time">1d</span>
+    </div>
+    <div class="tx-card card3d">
+      <span class="src-ava sa-red">📊</span>
+      <div class="tx-info"><b>Weekly report ready</b><small>Your Aug 17–23 summary is available.</small></div>
+      <span class="n-time">2d</span>
+    </div>
+
+  </div>
+  <button class="fab">+</button>
+  <div class="bottom-nav">
+    <div class="nav-it active"><span class="nav-ic"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a2 2 0 01-2 2h-4v-7h-6v7H5a2 2 0 01-2-2z"/></svg></span>Home</div>
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg></span>Habits</div>
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><path d="M5 21V4m0 1h13l-2.5 4L18 13H5"/></svg></span>Goals</div>
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M16 12.5h2M3 10h18"/></svg></span>Cash Flow</div>
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 5-5.5 8-5.5s6.5 1.5 8 5.5"/></svg></span>Profile</div>
+  </div>
+  <div class="homebar"></div>
+  </div></div><br><span class="phone-label"><i></i> Notifications</span></div>
+
+  <!-- Auth -->
+  <div class="phone-wrap"><div class="phone"><div class="screen"><div class="notch"></div><div class="scroll" style="padding-top:96px">
+
+    <div style="text-align:center;margin-bottom:24px">
+      <div class="pf-ava" style="margin-bottom:13px">⚡</div>
+      <h2 style="font-size:22px;font-weight:800">Welcome back</h2>
+      <small style="color:var(--muted);font-size:12.5px;font-weight:500;display:block;margin-top:5px">Sign in to continue your streak</small>
+    </div>
+
+    <div class="field">📧 Email address</div>
+    <div class="field">🔒 ••••••••</div>
+    <button class="btn-p">Sign In →</button>
+    <div class="or-div">or continue with</div>
+    <button class="btn-g">🔵 Google</button>
+    <button class="btn-g">🍎 Apple</button>
+    <p style="text-align:center;margin-top:18px;color:var(--muted);font-size:12px;font-weight:600">New here? <span style="color:var(--purple-soft);font-weight:800;cursor:pointer">Create account</span></p>
+
+  </div>
+  <div class="homebar"></div>
+  </div></div><br><span class="phone-label"><i></i> Sign In</span></div>
+</div>
+
+<p style="text-align:center;color:var(--muted);font-size:12.5px;padding:36px 20px 110px;font-weight:600">
+  Track Me · App-exact design system · dark + light · confirm and I'll apply it to Flutter ✦
+</p>
+
+<script>
+// ---- dark / light mode ----
+const body=document.body, modeBtn=document.getElementById('modeBtn');
+function applyMode(light){
+  body.classList.toggle('light',light);
+  modeBtn.textContent=light?'🌙':'☀️';
+  localStorage.setItem('tm-mode',light?'light':'dark');
+  const t=document.getElementById('themeToggle'); if(t) t.classList.toggle('off',!light);
+}
+modeBtn.addEventListener('click',()=>applyMode(!body.classList.contains('light')));
+if(localStorage.getItem('tm-mode')==='light') applyMode(true);
+
+// settings appearance toggle mirrors the page theme
+const tt=document.getElementById('themeToggle');
+if(tt) tt.addEventListener('click',()=>applyMode(!body.classList.contains('light')));
+
+// ---- 3D hover toggle ----
+const pill=document.getElementById('pill3d');
+if(pill) pill.addEventListener('click',()=>{
+  body.classList.toggle('d3');
+  pill.textContent=body.classList.contains('d3')?'✨ 3D ON':'✨ 3D OFF';
+});
+body.classList.add('d3');
+
+// ---- micro interactions ----
+document.querySelectorAll('.cb-todo,.g-todo').forEach(b=>b.addEventListener('click',()=>{
+  if(b.classList.contains('cb-todo')){b.className='check-btn cb-done';b.textContent='✓';}
+  else{b.className='gcell g-done';b.textContent='✓';}
+}));
+document.querySelectorAll('.tgl:not(#themeToggle)').forEach(t=>t.addEventListener('click',()=>t.classList.toggle('off')));
+document.querySelectorAll('.wday').forEach(d=>d.addEventListener('click',()=>{
+  d.parentElement.querySelectorAll('.wday').forEach(x=>x.classList.remove('sel'));d.classList.add('sel');}));
+document.querySelectorAll('.fab').forEach(f=>f.addEventListener('click',()=>{
+  f.style.transform='translateX(-50%) translateY(-6px) scale(1.08)';
+  setTimeout(()=>f.style.transform='',300)}));
+document.querySelectorAll('.nav-it').forEach(n=>n.addEventListener('click',()=>{
+  const bar=n.parentElement;
+  bar.querySelectorAll('.nav-it').forEach(x=>x.classList.remove('active'));
+  n.classList.add('active');
+}));
+</script>
+</body>
+</html>

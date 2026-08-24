@@ -19,7 +19,7 @@ class MissedHabitEntry {
 
   MissedHabitEntry({required this.habit, this.reason = ''});
 
-  bool get isValid => reason.trim().length >= 20;
+  bool get isValid => reason.trim().length >= 5;
 }
 
 // ─── Global flag — set by splash, read by dashboard ──────────────────────────

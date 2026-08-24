@@ -35,6 +35,16 @@ function makePrismaMock(now = new Date(2026, 7, 15)) {
     mkPeriod,
     cashFlowPeriod: {
       findFirst: async ({ where }: any) => {
+        if (where.month !== undefined && where.year !== undefined) {
+          return (
+            periods.find(
+              (p) =>
+                p.userId === where.userId &&
+                p.month === where.month &&
+                p.year === where.year,
+            ) ?? null
+          );
+        }
         if (where.id && where.userId) {
           return periods.find((p) => p.id === where.id && p.userId === where.userId) ?? null;
         }
@@ -230,5 +240,77 @@ describe('CashFlowPeriodService — month rollover & carry-forward', () => {
     await expect(svc.deleteTransaction('u1', 'tx')).rejects.toThrow(
       NotFoundException,
     );
+  });
+
+  it('allows initial setup after getCurrentPeriod auto-opened a period', async () => {
+    const prisma = makePrismaMock();
+    const svc = new CashFlowPeriodService(prisma as any, () => FIXED_AUG_2026);
+
+    // First, user loads current period (auto-creates 0-balance period for Aug 2026)
+    const autoCreated = await svc.getCurrentPeriod('u1');
+    expect(autoCreated.openingBank).toBe(0);
+
+    // Then user completes setup sheet for Aug 2026
+    const setup = await svc.createFirstPeriod('u1', {
+      month: 8,
+      year: 2026,
+      openingBank: 5000,
+      openingCash: 1000,
+      openingCreditCard: -500,
+      openingDebt: 0,
+    });
+
+    expect(setup.openingBank).toBe(5000);
+    expect(setup.openingCash).toBe(1000);
+    expect(setup.openingCreditCard).toBe(-500);
+  });
+
+  it('accepts OUTFLOW transactions with category D and DO', async () => {
+    const prisma = makePrismaMock();
+    const svc = new CashFlowPeriodService(prisma as any, () => FIXED_AUG_2026);
+
+    const txnD = await svc.createTransaction('u1', {
+      kind: 'OUTFLOW',
+      category: 'D',
+      amount: 150,
+      date: '2026-08-10',
+    } as any);
+    expect(txnD.category).toBe('D');
+
+    const txnDO = await svc.createTransaction('u1', {
+      kind: 'OUTFLOW',
+      category: 'DO',
+      amount: 50,
+      date: '2026-08-11',
+    } as any);
+    expect(txnDO.category).toBe('DO');
+  });
+
+  it('carries forward previous period transaction totals to subsequent period opening balances', async () => {
+    const prisma = makePrismaMock();
+    const svc = new CashFlowPeriodService(prisma as any, () => FIXED_AUG_2026);
+
+    await svc.createFirstPeriod('u1', {
+      month: 7,
+      year: 2026,
+      openingBank: 1000,
+      openingCash: 500,
+      openingCreditCard: 0,
+      openingDebt: 0,
+    });
+
+    const currentBefore = await svc.getCurrentPeriod('u1');
+    expect(currentBefore.openingBank).toBe(1000);
+
+    await svc.createTransaction('u1', {
+      kind: 'INCOME',
+      category: 'E',
+      account: 'BANK',
+      amount: 5000,
+      date: '2026-07-25',
+    } as any);
+
+    const currentAfter = await svc.getCurrentPeriod('u1');
+    expect(currentAfter.openingBank).toBe(6000);
   });
 });

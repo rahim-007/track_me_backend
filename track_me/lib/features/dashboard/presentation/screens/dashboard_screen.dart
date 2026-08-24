@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../../notifications/presentation/widgets/notification_bell.dart';
 
@@ -16,6 +15,8 @@ import '../../../habits/presentation/widgets/missed_habits_reflection_dialog.dar
 import '../../../habits/presentation/widgets/skip_reason_dialog.dart';
 import '../../../goals/providers/goals_provider.dart';
 import '../../../profile/providers/profile_provider.dart';
+import '../../../cashflow/providers/cashflow_provider.dart';
+import '../../../profile/presentation/screens/profile_screen.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../habits/data/models/habit_model.dart';
 import '../../../goals/data/models/goal_model.dart';
@@ -193,45 +194,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         ],
                       ),
                       child: ClipOval(
-                        child: (user != null &&
-                                user.avatarUrl != null &&
-                                user.avatarUrl!.isNotEmpty)
-                            ? CachedNetworkImage(
-                                imageUrl: user.avatarUrl!,
-                                fit: BoxFit.cover,
-                                placeholder: (context, url) => const Center(
-                                  child: SizedBox(
-                                    width: 15,
-                                    height: 15,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 1.5),
-                                  ),
-                                ),
-                                errorWidget: (context, url, error) => Center(
-                                  child: Text(
-                                    (user.name.isNotEmpty)
-                                        ? user.name[0].toUpperCase()
-                                        : 'U',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF7C3AED),
-                                    ),
-                                  ),
-                                ),
-                              )
-                            : Center(
-                                child: Text(
-                                  (user != null && user.name.isNotEmpty)
-                                      ? user.name[0].toUpperCase()
-                                      : 'U',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF7C3AED),
-                                  ),
-                                ),
-                              ),
+                        child: buildAvatarWidget(
+                          user?.avatarUrl,
+                          name: user?.name ?? 'User',
+                          fontSize: 14,
+                          iconColor: const Color(0xFF7C3AED),
+                        ),
                       ),
                     ),
                     loading: () => const ShimmerBox(
@@ -275,6 +243,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     loading: () => const _ProgressSectionSkeleton(),
                     error: (_, __) => const SizedBox.shrink(),
                   ),
+
+                  const SizedBox(height: 24),
+
+                  // Cash Flow Summary Card
+                  const _CashFlowDashboardSection(),
 
                   const SizedBox(height: 24),
 
@@ -1472,4 +1445,279 @@ class _GoalIllustrationPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// ─── Cash Flow Dashboard Summary Section ─────────────────────────────────────
+
+class _CashFlowDashboardSection extends ConsumerWidget {
+  const _CashFlowDashboardSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cashFlowState = ref.watch(cashFlowProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionHeader(
+          title: 'Cash Flow',
+          onViewAll: () => context.go(AppRoutes.cashflow),
+        ),
+        const SizedBox(height: 12),
+        InkWell(
+          onTap: () => context.go(AppRoutes.cashflow),
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.border),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.isDarkMode
+                      ? Colors.transparent
+                      : Colors.black.withOpacity(0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: cashFlowState.current.when(
+              data: (period) {
+                final net = period.netCashFlow;
+                final isNetPositive = net >= 0;
+                final netFormatted =
+                    '${isNetPositive ? '+' : ''}₹${NumberFormat('#,##0').format(net)}';
+
+                return Column(
+                  children: [
+                    Row(
+                      children: [
+                        // Net cashflow summary tile
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'NET CASH FLOW (${period.label.toUpperCase()})',
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.6,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                netFormatted,
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w900,
+                                  color: isNetPositive
+                                      ? AppColors.success
+                                      : AppColors.error,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: (isNetPositive
+                                    ? AppColors.success
+                                    : AppColors.error)
+                                .withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                isNetPositive
+                                    ? Icons.trending_up_rounded
+                                    : Icons.trending_down_rounded,
+                                size: 16,
+                                color: isNetPositive
+                                    ? AppColors.success
+                                    : AppColors.error,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                isNetPositive ? 'Positive' : 'Deficit',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: isNetPositive
+                                      ? AppColors.success
+                                      : AppColors.error,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Divider(height: 1),
+                    ),
+                    Row(
+                      children: [
+                        // Bank closing balance
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color:
+                                      const Color(0xFF3B82F6).withOpacity(0.12),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.account_balance_rounded,
+                                  size: 16,
+                                  color: Color(0xFF3B82F6),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Bank',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                  Text(
+                                    '₹${NumberFormat.compact().format(period.closingBank)}',
+                                    style: TextStyle(
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Cash closing balance
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color:
+                                      const Color(0xFF10B981).withOpacity(0.12),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.payments_rounded,
+                                  size: 16,
+                                  color: Color(0xFF10B981),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Cash',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                  Text(
+                                    '₹${NumberFormat.compact().format(period.closingCash)}',
+                                    style: TextStyle(
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (cashFlowState.yetToReceive > 0 ||
+                        cashFlowState.yetToGive > 0) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceVariant,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Debt Ledger:',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            Row(
+                              children: [
+                                if (cashFlowState.yetToReceive > 0)
+                                  Text(
+                                    'To Receive: ₹${NumberFormat.compact().format(cashFlowState.yetToReceive)}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.success,
+                                    ),
+                                  ),
+                                if (cashFlowState.yetToReceive > 0 &&
+                                    cashFlowState.yetToGive > 0)
+                                  Text(
+                                    ' • ',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                if (cashFlowState.yetToGive > 0)
+                                  Text(
+                                    'To Give: ₹${NumberFormat.compact().format(cashFlowState.yetToGive)}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.error,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                );
+              },
+              loading: () => const ShimmerBox(height: 120, borderRadius: 16),
+              error: (_, __) => Text(
+                'Tap to view Cash Flow',
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }

@@ -9,7 +9,7 @@ import '../../providers/missed_habits_provider.dart';
 
 /// Full-screen mandatory reflection dialog.
 /// Cannot be dismissed via back button or barrier tap.
-/// User must enter ≥20 chars for every missed habit before continuing.
+/// User must enter ≥5 chars for every missed habit before continuing.
 class MissedHabitsReflectionDialog extends ConsumerStatefulWidget {
   final List<HabitModel> missedHabits;
   final VoidCallback onSubmitted;
@@ -309,7 +309,7 @@ class _HabitReasonCardState extends State<_HabitReasonCard> {
     });
   }
 
-  bool get _isValid => _charCount >= 20;
+  bool get _isValid => _charCount >= 5;
   bool get _isTooLong => _charCount > 250;
 
   @override
@@ -455,8 +455,8 @@ class _HabitReasonCardState extends State<_HabitReasonCard> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  _charCount < 20
-                      ? '${20 - _charCount} more characters needed'
+                  _charCount < 5
+                      ? '${5 - _charCount} more characters needed'
                       : _isTooLong
                           ? 'Too long (max 250)'
                           : '✓ Looks good!',
@@ -521,7 +521,7 @@ class _SubmitButton extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(
-                'Fill in all reasons (min. 20 characters each) to continue',
+                'Fill in all reasons (min. 5 characters each) to continue',
                 style: TextStyle(
                   fontSize: 12,
                   color: AppColors.textSecondary,

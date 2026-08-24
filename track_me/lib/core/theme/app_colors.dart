@@ -1,172 +1,138 @@
 import 'package:flutter/material.dart';
 
+/// Centralized adaptive color system for Spatial 3D Design System (Dark + Light Mode).
 class AppColors {
   AppColors._();
 
-  static bool isDarkMode = false;
+  static bool isDarkMode = true;
 
-  // Primary — Purple
-  static const Color _primaryLight = Color(0xFF7C3AED);
-  static const Color _primaryDark = Color(0xFF9F7AEA);
-  static Color get primary => isDarkMode ? _primaryDark : _primaryLight;
+  // ─── Dark Mode Foundations ───────────────────────────────────────────────────
+  static const Color _darkEnvironment = Color(0xFF09090D);
+  static const Color _darkEnvironmentSecondary = Color(0xFF101117);
+  static const Color _darkSurface = Color(0xFF14161E);
+  static const Color _darkSurfaceElevated = Color(0xFF1B1E27);
+  static const Color _darkSurfaceInset = Color(0xFF0E1016);
 
-  static const Color primaryDark = Color(0xFF5B21B6);
-  static const Color primaryLight = Color(0xFF8B5CF6);
+  static const Color _darkPrimary = Color(0xFF8B7CFF);
+  static const Color _darkPrimaryDark = Color(0xFF6F63D9);
+  static const Color _darkPrimaryLight = Color(0xFFAAA1FF);
 
-  static const Color _primaryContainerLight = Color(0xFFEDE9FE);
-  static const Color _primaryContainerDark = Color(0xFF2D1E54);
-  static Color get primaryContainer => isDarkMode ? _primaryContainerDark : _primaryContainerLight;
+  static const Color _darkTextPrimary = Color(0xFFF4F4F7);
+  static const Color _darkTextSecondary = Color(0xFFA7A9B4);
+  static const Color _darkTextMuted = Color(0xFF686B78);
+  static const Color _darkTextDisabled = Color(0xFF454751);
 
-  static const Color _onPrimaryContainerLight = Color(0xFF4C1D95);
-  static const Color _onPrimaryContainerDark = Color(0xFFE2E8F0);
-  static Color get onPrimaryContainer => isDarkMode ? _onPrimaryContainerDark : _onPrimaryContainerLight;
+  // ─── Light Mode Foundations ──────────────────────────────────────────────────
+  static const Color _lightEnvironment = Color(0xFFF5F5F7);
+  static const Color _lightEnvironmentSecondary = Color(0xFFEBEBF0);
+  static const Color _lightSurface = Color(0xFFFFFFFF);
+  static const Color _lightSurfaceElevated = Color(0xFFFFFFFF);
+  static const Color _lightSurfaceInset = Color(0xFFE9E9EE);
 
-  // Secondary — Cyan
-  static const Color _secondaryLight = Color(0xFF06B6D4);
-  static const Color _secondaryDark = Color(0xFF22D3EE);
-  static Color get secondary => isDarkMode ? _secondaryDark : _secondaryLight;
+  static const Color _lightPrimary = Color(0xFF6858D8);
+  static const Color _lightPrimaryDark = Color(0xFF5244B8);
+  static const Color _lightPrimaryLight = Color(0xFF8174E8);
 
-  static const Color _secondaryContainerLight = Color(0xFFCFFAFE);
-  static const Color _secondaryContainerDark = Color(0xFF083344);
-  static Color get secondaryContainer => isDarkMode ? _secondaryContainerDark : _secondaryContainerLight;
+  static const Color _lightTextPrimary = Color(0xFF17171C);
+  static const Color _lightTextSecondary = Color(0xFF62636C);
+  static const Color _lightTextMuted = Color(0xFF8C8D96);
+  static const Color _lightTextDisabled = Color(0xFFB5B6C0);
 
-  // Accent — Indigo
-  static const Color _accentLight = Color(0xFF6366F1);
-  static const Color _accentDark = Color(0xFF818CF8);
-  static Color get accent => isDarkMode ? _accentDark : _accentLight;
+  // ─── Dynamic Adaptive Getters ────────────────────────────────────────────────
+  static Color get background => isDarkMode ? _darkEnvironment : _lightEnvironment;
+  static Color get environmentSecondary => isDarkMode ? _darkEnvironmentSecondary : _lightEnvironmentSecondary;
+  static Color get surfaceColor => isDarkMode ? _darkSurface : _lightSurface;
+  static Color get surfaceElevatedColor => isDarkMode ? _darkSurfaceElevated : _lightSurfaceElevated;
+  static Color get surfaceInset => isDarkMode ? _darkSurfaceInset : _lightSurfaceInset;
 
-  // Status Colors
-  static const Color _successLight = Color(0xFF10B981);
-  static const Color _successDark = Color(0xFF34D399);
-  static Color get success => isDarkMode ? _successDark : _successLight;
+  static Color get surface => surfaceColor;
+  static Color get surfaceElevated => surfaceElevatedColor;
+  static Color get surfaceVariant => surfaceElevatedColor;
 
-  static const Color successLight = Color(0xFFD1FAE5);
+  static Color get primary => isDarkMode ? _darkPrimary : _lightPrimary;
+  static Color get primaryDark => isDarkMode ? _darkPrimaryDark : _lightPrimaryDark;
+  static Color get primaryLight => isDarkMode ? _darkPrimaryLight : _lightPrimaryLight;
+  static Color get primaryContainer => isDarkMode ? const Color(0x2B8B7CFF) : const Color(0x1F6858D8);
+  static Color get onPrimaryContainer => isDarkMode ? _darkPrimaryLight : _lightPrimary;
 
-  static const Color _warningLight = Color(0xFFF59E0B);
-  static const Color _warningDark = Color(0xFFFBBF24);
-  static Color get warning => isDarkMode ? _warningDark : _warningLight;
+  static Color get secondary => isDarkMode ? _darkPrimaryDark : _lightPrimaryLight;
+  static Color get secondaryContainer => isDarkMode ? const Color(0x1F6F63D9) : const Color(0x1A8174E8);
+  static Color get accent => primary;
 
-  static const Color warningLight = Color(0xFFFEF3C7);
+  // ─── Text Palette ────────────────────────────────────────────────────────────
+  static Color get textPrimaryColor => isDarkMode ? _darkTextPrimary : _lightTextPrimary;
+  static Color get textSecondaryColor => isDarkMode ? _darkTextSecondary : _lightTextSecondary;
+  static Color get textMutedColor => isDarkMode ? _darkTextMuted : _lightTextMuted;
+  static Color get textDisabledColor => isDarkMode ? _darkTextDisabled : _lightTextDisabled;
 
-  static const Color _errorLight = Color(0xFFEF4444);
-  static const Color _errorDark = Color(0xFFF87171);
-  static Color get error => isDarkMode ? _errorDark : _errorLight;
+  static Color get onSurface => textPrimaryColor;
+  static Color get textPrimary => textPrimaryColor;
+  static Color get textSecondary => textSecondaryColor;
+  static Color get textHint => textMutedColor;
+  static Color get textDisabled => textDisabledColor;
 
-  static const Color errorLight = Color(0xFFFEE2E2);
+  // ─── Muted & Premium Semantic Colors ─────────────────────────────────────────
+  static const Color _successDark = Color(0xFF65C98A);
+  static const Color _successLightColor = Color(0xFF2E7D47);
+  static Color get success => isDarkMode ? _successDark : _successLightColor;
+  static Color get successLight => isDarkMode ? const Color(0x2465C98A) : const Color(0x1C2E7D47);
 
-  static const Color _infoLight = Color(0xFF3B82F6);
-  static const Color _infoDark = Color(0xFF60A5FA);
-  static Color get info => isDarkMode ? _infoDark : _infoLight;
+  static const Color _warningDark = Color(0xFFE8B86A);
+  static const Color _warningLightColor = Color(0xFFB8822B);
+  static Color get warning => isDarkMode ? _warningDark : _warningLightColor;
+  static Color get warningLight => isDarkMode ? const Color(0x24E8B86A) : const Color(0x1CB8822B);
 
-  static const Color infoLight = Color(0xFFDBEAFE);
+  static const Color _dangerDark = Color(0xFFE47777);
+  static const Color _dangerLightColor = Color(0xFFC74343);
+  static Color get error => isDarkMode ? _dangerDark : _dangerLightColor;
+  static Color get errorLight => isDarkMode ? const Color(0x24E47777) : const Color(0x1CC74343);
 
-  // Surfaces — app-exact design tokens
-  static const Color _surfaceLight = Color(0xFFFFFFFF);
-  static const Color _surfaceDark = Color(0xFF16161D);
-  static Color get surface => isDarkMode ? _surfaceDark : _surfaceLight;
+  static const Color _infoDark = Color(0xFF79A9E8);
+  static const Color _infoLightColor = Color(0xFF386CB5);
+  static Color get info => isDarkMode ? _infoDark : _infoLightColor;
+  static Color get infoLight => isDarkMode ? const Color(0x2479A9E8) : const Color(0x1C386CB5);
 
-  static const Color _backgroundLight = Color(0xFFF1EFF9);
-  static const Color _backgroundDark = Color(0xFF0B0B10);
-  static Color get background => isDarkMode ? _backgroundDark : _backgroundLight;
+  // ─── Physical Bevels, Borders & Glass ─────────────────────────────────────────
+  static Color get topBevelHighlight => isDarkMode ? const Color(0x1AFFFFFF) : const Color(0x99FFFFFF);
+  static Color get bottomBevelShade => isDarkMode ? const Color(0x66000000) : const Color(0x0F000000);
+  static Color get borderLine => isDarkMode ? const Color(0x1AFFFFFF) : const Color(0x0E000000);
 
-  static const Color _surfaceVariantLight = Color(0xFFECEAF6);
-  static const Color _surfaceVariantDark = Color(0xFF1C1C24);
-  static Color get surfaceVariant => isDarkMode ? _surfaceVariantDark : _surfaceVariantLight;
+  static Color get border => borderLine;
+  static Color get divider => isDarkMode ? const Color(0x14FFFFFF) : const Color(0x0A000000);
 
-  static const Color _surfaceElevatedLight = Color(0xFFFFFFFF);
-  static const Color _surfaceElevatedDark = Color(0xFF1C1C24);
-  static Color get surfaceElevated => isDarkMode ? _surfaceElevatedDark : _surfaceElevatedLight;
-
-  // Text
-  static const Color _onSurfaceLight = Color(0xFF111827);
-  static const Color _onSurfaceDark = Color(0xFFF9FAFB);
-  static Color get onSurface => isDarkMode ? _onSurfaceDark : _onSurfaceLight;
-
-  static Color get textPrimary => onSurface;
-
-  static const Color _textSecondaryLight = Color(0xFF6B7280);
-  static const Color _textSecondaryDark = Color(0xFF9CA3AF);
-  static Color get textSecondary => isDarkMode ? _textSecondaryDark : _textSecondaryLight;
-
-  static const Color _textHintLight = Color(0xFF9CA3AF);
-  static const Color _textHintDark = Color(0xFF6B7280);
-  static Color get textHint => isDarkMode ? _textHintDark : _textHintLight;
-
-  static const Color _textDisabledLight = Color(0xFFD1D5DB);
-  static const Color _textDisabledDark = Color(0xFF4B5563);
-  static Color get textDisabled => isDarkMode ? _textDisabledDark : _textDisabledLight;
-
-  // Borders & Dividers — hairline, app-exact
-  static const Color _borderLight = Color(0xFFE4E2EF);
-  static const Color _borderDark = Color(0xFF26262F);
-  static Color get border => isDarkMode ? _borderDark : _borderLight;
-
-  static const Color _dividerLight = Color(0xFFECEAF6);
-  static const Color _dividerDark = Color(0xFF26262F);
-  static Color get divider => isDarkMode ? _dividerDark : _dividerLight;
-
-  // Pastel card tints (Habits hero cards, light + dark)
-  static List<Color> get progressCardGradient => isDarkMode
-      ? [const Color(0xFF1D1730), const Color(0xFF171226)]
-      : [const Color(0xFFE7E0F8), const Color(0xFFEFEAFB)];
-
-  static List<Color> get streakCardGradient => isDarkMode
-      ? [const Color(0xFF2A2013), const Color(0xFF1E1810)]
-      : [const Color(0xFFFBEDDB), const Color(0xFFFDF4E7)];
-
-  static Color get streakText => isDarkMode
-      ? const Color(0xFFF97316)
-      : const Color(0xFFC2410C);
-
-  static Color get navBackground => isDarkMode
-      ? const Color(0xFF0E0E13)
-      : const Color(0xFFFBFAFE);
-
-  // Habit Category Colors
-  static const Color habitHealth = Color(0xFF10B981);
-  static const Color habitFitness = Color(0xFFF59E0B);
-  static const Color habitLearning = Color(0xFF3B82F6);
-  static const Color habitMindfulness = Color(0xFF8B5CF6);
-  static const Color habitProductivity = Color(0xFF6366F1);
-  static const Color habitSocial = Color(0xFFEC4899);
-  static const Color habitFinance = Color(0xFF059669);
-  static const Color habitOther = Color(0xFF6B7280);
-
-  // Goal Priority Colors
-  static const Color priorityHigh = Color(0xFFEF4444);
-  static const Color priorityMedium = Color(0xFFF59E0B);
-  static const Color priorityLow = Color(0xFF10B981);
-
-  // Gradient presets
-  static List<Color> get primaryGradientColors => isDarkMode 
-      ? [const Color(0xFF9F7AEA), const Color(0xFF818CF8)] 
-      : [const Color(0xFF7C3AED), const Color(0xFF6366F1)];
+  static List<Color> get primaryGradientColors => isDarkMode
+      ? [const Color(0xFF8B7CFF), const Color(0xFF6F63D9)]
+      : [const Color(0xFF6858D8), const Color(0xFF8174E8)];
 
   static LinearGradient get primaryGradient => LinearGradient(
-    colors: primaryGradientColors,
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
+        colors: primaryGradientColors,
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      );
 
-  static List<Color> get cardGradientColors => isDarkMode 
-      ? [const Color(0xFFB57CFF), const Color(0xFF9F7AEA)] 
-      : [const Color(0xFF8B5CF6), const Color(0xFF7C3AED)];
+  static List<Color> get cardGradientColors => isDarkMode
+      ? [const Color(0xFF1B1E27), const Color(0xFF14161E)]
+      : [const Color(0xFFFFFFFF), const Color(0xFFF9F9FB)];
 
-  static LinearGradient get cardGradient => LinearGradient(
-    colors: cardGradientColors,
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
+  static List<Color> get progressCardGradient => isDarkMode
+      ? [const Color(0xFF1B1832), const Color(0xFF131124)]
+      : [const Color(0xFFF0ECFF), const Color(0xFFE8E2FF)];
 
-  static const LinearGradient successGradient = LinearGradient(
-    colors: [Color(0xFF10B981), Color(0xFF059669)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
+  static List<Color> get streakCardGradient => isDarkMode
+      ? [const Color(0xFF261E14), const Color(0xFF1A140C)]
+      : [const Color(0xFFFFF6EB), const Color(0xFFFEEDD8)];
 
-  static const LinearGradient warmGradient = LinearGradient(
-    colors: [Color(0xFFF59E0B), Color(0xFFEF4444)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
+  static Color get streakText => warning;
+  static Color get navBackground => isDarkMode ? const Color(0xE6101117) : const Color(0xE6FFFFFF);
+
+  // Priority Colors (Goals)
+  static Color get priorityHigh => error;
+  static Color get priorityMedium => warning;
+  static Color get priorityLow => success;
+
+  // Habit Category Colors
+  static Color get habitHealth => success;
+  static Color get habitWork => primary;
+  static Color get habitLearning => info;
+  static Color get habitFinance => warning;
 }

@@ -11,6 +11,7 @@ abstract class NotificationsApi {
   Future<void> markRead(String id);
   Future<void> markAllRead();
   Future<void> delete(String id);
+  Future<void> clearAll();
 }
 
 /// Real implementation backed by the Track Me backend.
@@ -55,6 +56,16 @@ class DioNotificationsApi implements NotificationsApi {
   Future<void> delete(String id) async {
     final client = DioClient();
     await client.dio.delete('/notifications/$id');
+  }
+
+  @override
+  Future<void> clearAll() async {
+    final client = DioClient();
+    try {
+      await client.dio.delete('/notifications/clear-all');
+    } catch (_) {
+      await client.dio.delete('/notifications');
+    }
   }
 }
 
@@ -200,6 +211,24 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
       state = state.copyWith(
         items: restored,
         unreadCount: wasUnread ? state.unreadCount + 1 : state.unreadCount,
+      );
+    }
+  }
+
+  /// Clears all notifications for the user (optimistic; restores on failure).
+  Future<void> clearAll() async {
+    if (state.items.isEmpty) return;
+    final previousItems = state.items;
+    final previousUnread = state.unreadCount;
+
+    state = state.copyWith(items: [], unreadCount: 0);
+
+    try {
+      await _api.clearAll();
+    } catch (_) {
+      state = state.copyWith(
+        items: previousItems,
+        unreadCount: previousUnread,
       );
     }
   }

@@ -65,63 +65,83 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
       state = _stateFromCacheJson(cached);
     }
 
-    try {
-      final dio = DioClient().dio;
-      final results = await Future.wait([
-        dio.get('/cashflow/periods/current'),
-        dio.get('/cashflow/periods'),
-        dio.get('/cashflow/debts'),
-        dio.get('/cashflow/debts/summary'),
-      ]);
+    final now = DateTime.now();
+    CashFlowPeriodModel? current;
+    List<CashFlowPeriodModel> periods = [];
+    List<DebtEntryModel> debts = state.debts;
+    double yetToReceive = state.yetToReceive;
+    double yetToGive = state.yetToGive;
 
-      if (_dirtySinceLoad) return;
-      final current = CashFlowPeriodModel.fromJson(
-        results[0].data['data'] as Map<String, dynamic>,
-        isCurrent: true,
-      );
-      final periods = ((results[1].data['data'] ?? results[1].data) as List)
+    final dio = DioClient().dio;
+
+    // 1. Fetch current period (fallback to local month if 500/network error)
+    try {
+      final res = await dio.get('/cashflow/periods/current');
+      final data = (res.data['data'] ?? res.data) as Map<String, dynamic>;
+      current = CashFlowPeriodModel.fromJson(data, isCurrent: true);
+    } catch (_) {
+      current = state.current.valueOrNull ??
+          CashFlowPeriodModel(
+            id: 'local_${now.month}_${now.year}',
+            month: now.month,
+            year: now.year,
+            openingBank: 0,
+            openingCash: 0,
+            openingCreditCard: 0,
+            openingDebt: 0,
+            isCurrent: true,
+          );
+    }
+
+    // 2. Fetch history periods
+    try {
+      final res = await dio.get('/cashflow/periods');
+      final list = ((res.data['data'] ?? res.data) as List);
+      periods = list
           .map((e) => CashFlowPeriodModel.fromJson(
                 e as Map<String, dynamic>,
-                isCurrent:
-                    e['month'] == current.month && e['year'] == current.year,
+                isCurrent: e['month'] == current!.month &&
+                    e['year'] == current.year,
               ))
           .toList();
-      // The current-period read may have just opened the new month; refresh
-      // the list so it includes it even if /periods ran first.
-      if (!periods.any((p) => p.id == current.id)) {
-        periods.add(current);
-      }
-      final debts = ((results[2].data['data'] ?? results[2].data) as List)
+    } catch (_) {
+      periods = state.history.isNotEmpty ? state.history : [current];
+    }
+
+    if (!periods.any((p) => p.id == current!.id)) {
+      periods.add(current);
+    }
+
+    // 3. Fetch debts
+    try {
+      final res = await dio.get('/cashflow/debts');
+      final list = ((res.data['data'] ?? res.data) as List);
+      debts = list
           .map((e) => DebtEntryModel.fromJson(e as Map<String, dynamic>))
           .toList();
-      final summary =
-          (results[3].data['data'] ?? results[3].data) as Map<String, dynamic>;
+    } catch (_) {}
 
-      final next = CashFlowState(
-        current: AsyncValue.data(current),
-        history: periods,
-        transactions: state.transactions,
-        debts: debts,
-        yetToReceive: (summary['yetToReceive'] as num?)?.toDouble() ?? 0,
-        yetToGive: (summary['yetToGive'] as num?)?.toDouble() ?? 0,
-      );
-      state = next;
-      await _persist();
+    // 4. Fetch debt summary
+    try {
+      final res = await dio.get('/cashflow/debts/summary');
+      final summary = (res.data['data'] ?? res.data) as Map<String, dynamic>;
+      yetToReceive = (summary['yetToReceive'] as num?)?.toDouble() ?? yetToReceive;
+      yetToGive = (summary['yetToGive'] as num?)?.toDouble() ?? yetToGive;
+    } catch (_) {}
+
+    if (_dirtySinceLoad) return;
+
+    state = CashFlowState(
+      current: AsyncValue.data(current),
+      history: periods,
+      transactions: state.transactions,
+      debts: debts,
+      yetToReceive: yetToReceive,
+      yetToGive: yetToGive,
+    );
+    await _persist();
+    if (current.id.isNotEmpty && !current.id.startsWith('local_')) {
       await _loadTransactions(current.id);
-    } catch (e) {
-      // Network/parse failure. Cached data (if any) is already applied;
-      // otherwise surface an error so the UI can show a retry button
-      // instead of spinning forever.
-      if (!_dirtySinceLoad && state.current.valueOrNull == null) {
-        state = CashFlowState(
-          current: AsyncValue.error(e, StackTrace.current),
-          history: state.history,
-          transactions: state.transactions,
-          debts: state.debts,
-          yetToReceive: state.yetToReceive,
-          yetToGive: state.yetToGive,
-        );
-      }
     }
   }
 
@@ -163,7 +183,7 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
   }) async {
     _dirtySinceLoad = true;
     final existingCurrent = state.current.valueOrNull;
-    final optimisticPeriod = CashFlowPeriodModel(
+    final initialPeriod = CashFlowPeriodModel(
       id: existingCurrent?.id ?? 'period_${month}_$year',
       month: month,
       year: year,
@@ -172,8 +192,12 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
       openingCreditCard: creditCard,
       openingDebt: debt,
       closingBank: bank,
+      closingCash: cash,
+      closingCreditCard: creditCard,
       isCurrent: true,
     );
+    final optimisticPeriod =
+        _recomputePeriodWithTxns(initialPeriod, state.transactions);
     state = state.copyWith(current: AsyncValue.data(optimisticPeriod));
     await _persist();
 
@@ -213,9 +237,16 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
 
   Future<void> addTransaction(TransactionModel txn) async {
     _dirtySinceLoad = true;
+    final newTxns = [txn, ...state.transactions];
+    final currentPeriod = state.current.valueOrNull;
+    final updatedCurrent = currentPeriod == null
+        ? state.current
+        : AsyncValue.data(_recomputePeriodWithTxns(currentPeriod, newTxns));
+
     // Optimistic insert so the UI reacts instantly, offline included.
     state = state.copyWith(
-      transactions: [txn, ...state.transactions],
+      current: updatedCurrent,
+      transactions: newTxns,
     );
     try {
       final response = await DioClient()
@@ -227,32 +258,111 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
       final updated = state.transactions
           .map((t) => t.id == txn.id ? saved : t)
           .toList();
-      state = state.copyWith(transactions: updated);
+      state = state.copyWith(
+        current: currentPeriod == null
+            ? state.current
+            : AsyncValue.data(_recomputePeriodWithTxns(currentPeriod, updated)),
+        transactions: updated,
+      );
       await _refreshTotals();
       await _persist();
     } catch (_) {
       // Keep the optimistic entry; totals refresh on next successful sync.
       final temp = txn.copyWith(id: txn.id);
-      state = state.copyWith(transactions: [
+      final fallbackTxns = [
         temp,
         ...state.transactions.where((t) => t.id != txn.id),
-      ]);
+      ];
+      final period = state.current.valueOrNull;
+      state = state.copyWith(
+        current: period == null ? state.current : AsyncValue.data(_recomputePeriodWithTxns(period, fallbackTxns)),
+        transactions: fallbackTxns,
+      );
       await _persist();
     }
   }
 
   Future<void> deleteTransaction(String id) async {
     _dirtySinceLoad = true;
-    final before = state.transactions;
+    final beforeTxns = state.transactions;
+    final beforePeriod = state.current.valueOrNull;
+    final updatedTxns = beforeTxns.where((t) => t.id != id).toList();
+
     state = state.copyWith(
-        transactions: before.where((t) => t.id != id).toList());
+      current: beforePeriod == null ? state.current : AsyncValue.data(_recomputePeriodWithTxns(beforePeriod, updatedTxns)),
+      transactions: updatedTxns,
+    );
     try {
       await DioClient().dio.delete('/cashflow/transactions/$id');
       await _refreshTotals();
     } catch (_) {
-      state = state.copyWith(transactions: before);
+      state = state.copyWith(
+        current: beforePeriod == null ? state.current : AsyncValue.data(beforePeriod),
+        transactions: beforeTxns,
+      );
     }
     await _persist();
+  }
+
+  CashFlowPeriodModel _recomputePeriodWithTxns(
+    CashFlowPeriodModel period,
+    List<TransactionModel> txns,
+  ) {
+    double bankDelta = 0;
+    double cashDelta = 0;
+    double creditCardDelta = 0;
+    double totalIncome = 0;
+    double totalOutflow = 0;
+    final Map<String, double> incomeCat = {};
+    final Map<String, double> outflowCat = {};
+
+    for (final t in txns) {
+      if (t.kind == TxnKind.income) {
+        totalIncome += t.amount;
+        incomeCat[t.category] = (incomeCat[t.category] ?? 0) + t.amount;
+        if (t.account == CashFlowAccount.cash) {
+          cashDelta += t.amount;
+        } else {
+          bankDelta += t.amount;
+        }
+      } else if (t.kind == TxnKind.outflow) {
+        totalOutflow += t.amount;
+        outflowCat[t.category] = (outflowCat[t.category] ?? 0) + t.amount;
+        if (t.account == CashFlowAccount.cash) {
+          cashDelta -= t.amount;
+        } else if (t.account == CashFlowAccount.creditCard) {
+          creditCardDelta += t.amount; // debt increases
+        } else {
+          bankDelta -= t.amount;
+        }
+
+        // Debt Repayment (category D) paid from Bank or Cash reduces Credit Card debt owed
+        if (t.category == 'D' && t.account != CashFlowAccount.creditCard) {
+          creditCardDelta -= t.amount;
+        }
+      }
+    }
+
+    final net = totalIncome - totalOutflow;
+
+    return CashFlowPeriodModel(
+      id: period.id,
+      month: period.month,
+      year: period.year,
+      openingBank: period.openingBank,
+      openingCash: period.openingCash,
+      openingCreditCard: period.openingCreditCard,
+      openingDebt: period.openingDebt,
+      totalIncome: totalIncome,
+      totalOutflow: totalOutflow,
+      netCashFlow: net,
+      closingBank: period.openingBank + bankDelta,
+      closingCash: period.openingCash + cashDelta,
+      closingCreditCard: period.openingCreditCard + creditCardDelta,
+      incomeByCategory: incomeCat,
+      outflowByCategory: outflowCat,
+      isCurrent: period.isCurrent,
+    );
   }
 
   Future<void> addDebt(DebtEntryModel entry) async {
@@ -321,17 +431,29 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
 
   Future<void> _refreshTotals() async {
     try {
-      final response = await DioClient().dio.get('/cashflow/periods/current');
-      final fresh = CashFlowPeriodModel.fromJson(
-        response.data['data'] as Map<String, dynamic>,
+      final dio = DioClient().dio;
+      final results = await Future.wait([
+        dio.get('/cashflow/periods/current'),
+        dio.get('/cashflow/periods'),
+      ]);
+      final currentData =
+          (results[0].data['data'] ?? results[0].data) as Map<String, dynamic>;
+      final freshCurrent = CashFlowPeriodModel.fromJson(
+        currentData,
         isCurrent: true,
       );
+      final periods = ((results[1].data['data'] ?? results[1].data) as List)
+          .map((e) => CashFlowPeriodModel.fromJson(
+                e as Map<String, dynamic>,
+                isCurrent: e['month'] == freshCurrent.month &&
+                    e['year'] == freshCurrent.year,
+              ))
+          .toList();
       state = state.copyWith(
-        current: AsyncValue.data(fresh),
-        history: state.history
-            .map((p) => p.isCurrent ? fresh : p)
-            .toList(),
+        current: AsyncValue.data(freshCurrent),
+        history: periods,
       );
+      await _persist();
     } catch (_) {}
   }
 
@@ -404,6 +526,7 @@ extension on TransactionModel {
         amount: amount,
         note: note,
         date: date,
+        account: account,
       );
 
   Map<String, dynamic> toJson() => {
@@ -413,6 +536,7 @@ extension on TransactionModel {
         'amount': amount,
         'note': note,
         'date': date,
+        'account': account.apiValue,
       };
 }
 

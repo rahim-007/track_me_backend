@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Track Me — Habits UI (Exact) · Light + Dark</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   TRACK ME · HABITS SCREEN — EXACT replica of screenshot
+   Pastel progress cards · week pills · striped habit rows
+   Default = LIGHT (as screenshot) · toggleable DARK
+   ============================================================ */
+:root{
+  --bg:#F1EFF9;
+  --card:#FFFFFF;
+  --card-purple:#E7E0F8;
+  --card-peach:#FBEDDB;
+  --line:rgba(23,23,35,.06);
+  --text:#191922;
+  --muted:#70707E;
+  --faint:#9C9CAA;
+  --purple:#7C4DE0;
+  --purple-deep:#6D3FD4;
+  --lavender-text:#7C5CE0;
+  --peach-text:#E08A00;
+  --amber:#F5A623;
+  --amber-bar:#F09A10;
+  --amber-track:#F7ECDA;
+  --green:#16A34A;
+  --green-bg:#F2FBF4;
+  --chip-streak:#FBEDD8;
+  --nav:#FBFAFE;
+  --shadow:0 14px 30px -18px rgba(60,50,120,.25);
+  --ring-track:rgba(124,77,224,.18);
+}
+body.dark{
+  --bg:#0B0B10;
+  --card:#16161D;
+  --card-purple:rgba(139,124,246,.15);
+  --card-peach:rgba(245,166,35,.12);
+  --line:rgba(255,255,255,.055);
+  --text:#F2F2F5;
+  --muted:#8A8A96;
+  --faint:#67676F;
+  --purple:#8B5CF6;
+  --purple-deep:#7C4DE0;
+  --lavender-text:#A99EFF;
+  --peach-text:#FBBF24;
+  --amber:#FBBF24;
+  --amber-bar:#F59E0B;
+  --amber-track:rgba(251,191,36,.14);
+  --green:#34D399;
+  --green-bg:rgba(52,211,153,.10);
+  --chip-streak:rgba(245,166,35,.14);
+  --nav:#0E0E13;
+  --shadow:none;
+  --ring-track:rgba(139,92,246,.22);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:#DDDCE8;color:var(--text);
+  transition:background .3s}
+body.dark{background:#08080C}
+
+.chrome{position:sticky;top:0;z-index:60;display:flex;align-items:center;gap:13px;
+  padding:13px 22px;border-bottom:1px solid var(--line);background:var(--bg)}
+.dot{width:10px;height:10px;border-radius:50%}
+.dot:nth-child(1){background:#FF5F57}.dot:nth-child(2){background:#FEBC2E}.dot:nth-child(3){background:#28C840}
+.chrome b{font-size:12.5px;color:var(--muted)}
+.badge{margin-left:auto;font-size:10.5px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;
+  color:var(--purple);border:1.5px solid var(--purple);padding:6px 13px;border-radius:999px}
+.mode-btn{width:44px;height:44px;border-radius:14px;border:1px solid var(--line);cursor:pointer;
+  background:var(--card);color:var(--text);font-size:18px;transition:.25s}
+.mode-btn:hover{transform:translateY(-2px)}
+
+.intro{max-width:1000px;margin:32px auto 0;padding:0 24px;color:var(--muted);font-size:14.5px;line-height:1.65;text-align:center}
+.intro h1{color:var(--text);font-size:clamp(22px,3vw,30px);margin-bottom:8px}
+.intro em{font-style:normal;color:var(--purple)}
+
+.stage{display:flex;flex-wrap:wrap;justify-content:center;align-items:flex-start;gap:46px;padding:30px 20px 90px}
+.phone-wrap{text-align:center}
+.phone-label{margin-top:18px;display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;
+  background:var(--card);border:1px solid var(--line);border-radius:999px;padding:8px 16px}
+.phone-label i{width:7px;height:7px;border-radius:50%;background:var(--purple)}
+
+.phone{width:380px;height:800px;border-radius:52px;position:relative;background:#000;padding:11px;
+  border:1px solid #2b2b34;box-shadow:0 0 0 2px #101018,0 44px 90px -28px rgba(0,0,0,.8)}
+.screen{width:100%;height:100%;border-radius:42px;overflow:hidden;position:relative;background:var(--bg);
+  display:flex;flex-direction:column;transition:background .35s ease}
+.notch{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:110px;height:26px;background:#000;border-radius:999px;z-index:9}
+.scroll{flex:1;overflow-y:auto;padding:54px 18px 130px;scroll-behavior:smooth}
+.scroll::-webkit-scrollbar{width:0}
+.homebar{position:absolute;bottom:6px;left:50%;transform:translateX(-50%);width:118px;height:4px;border-radius:99px;
+  background:rgba(128,128,140,.45);z-index:10}
+
+/* ---------- habits screen components (exact) ---------- */
+.h-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px}
+.h-head h1{font-size:30px;font-weight:800;letter-spacing:.2px}
+.h-head p{color:var(--muted);font-size:13.5px;margin-top:6px;font-weight:500}
+.bell{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:17px;color:var(--text);background:transparent;border:none;cursor:pointer;transition:.2s}
+.bell:hover{background:var(--card)}
+
+.hero-grid{display:grid;grid-template-columns:1.15fr 1fr;gap:12px;margin-bottom:20px}
+.pastel{border-radius:24px;padding:16px 15px;position:relative;overflow:hidden;
+  transition:transform .3s cubic-bezier(.34,1.4,.64,1),box-shadow .3s}
+.pastel:hover{transform:translateY(-3px);box-shadow:var(--shadow)}
+.pastel.lav{background:var(--card-purple)}
+.pastel.peach{background:var(--card-peach)}
+.pastel .p-lbl{font-size:14px;font-weight:700;color:var(--lavender-text)}
+.pastel.peach .p-lbl{font-size:16.5px;color:var(--peach-text);display:flex;align-items:center;gap:8px}
+.pastel b.big{display:block;font-size:16.5px;font-weight:800;margin-top:9px;color:var(--text)}
+.pastel small{display:block;color:var(--muted);font-size:12.5px;margin-top:4px;font-weight:500}
+.ring-wrap{position:absolute;top:50%;right:13px;transform:translateY(-50%)}
+.ring{--p:100;width:62px;height:62px;border-radius:50%;
+  background:conic-gradient(var(--purple) calc(var(--p)*1%),var(--ring-track) 0);
+  display:flex;align-items:center;justify-content:center;transition:.3s}
+.ring::before{content:"";position:absolute;width:52px;height:52px;border-radius:50%;background:var(--card-purple)}
+body.dark .ring::before{background:#141220}
+.ring b{position:relative;z-index:1;font-size:11px;font-weight:800;color:var(--lavender-text)}
+
+.week-nav{display:flex;align-items:center;justify-content:space-between;padding:2px 6px 12px}
+.week-nav b{font-size:15.5px;font-weight:800}
+.wk-arr{background:none;border:none;color:var(--purple);font-size:19px;cursor:pointer;padding:6px 10px;transition:.2s;font-family:inherit}
+.wk-arr:hover{transform:scale(1.25)}
+
+.week-card{background:var(--card);border-radius:26px;padding:18px 8px;display:flex;justify-content:space-between;
+  box-shadow:var(--shadow);margin-bottom:22px}
+.wday{flex:1;text-align:center;cursor:pointer;transition:.2s;border-radius:999px;padding:2px 0}
+.wday small{display:block;font-size:12px;font-weight:700;color:var(--faint)}
+.wday b{display:flex;align-items:center;justify-content:center;width:38px;height:38px;margin:8px auto 0;
+  border-radius:50%;font-size:15px;font-weight:700;color:var(--text);transition:.25s cubic-bezier(.34,1.56,.64,1)}
+.wday:hover b{background:rgba(124,77,224,.10)}
+.wday.sel small{color:var(--purple);font-weight:800}
+.wday.sel b{background:var(--purple);color:#fff;box-shadow:0 10px 22px -8px var(--purple);transform:scale(1.06)}
+.wday.today small{color:var(--purple)}
+
+/* habit row — exact */
+.habit-row{background:var(--card);border-radius:22px;padding:17px 16px;display:flex;gap:13px;align-items:flex-start;
+  position:relative;margin-bottom:14px;box-shadow:var(--shadow);
+  transition:transform .28s cubic-bezier(.34,1.4,.64,1),box-shadow .3s}
+.habit-row::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:5px;border-radius:99px;background:var(--stripe,#F09A10)}
+.habit-row:hover{transform:translateX(4px);box-shadow:0 18px 36px -18px rgba(60,50,120,.35)}
+.h-emoji{width:58px;height:58px;border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:27px;
+  background:var(--emoji-bg,#F7ECDA);flex-shrink:0}
+.h-body{flex:1;min-width:0}
+.h-title-row{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.h-body h3{font-size:19px;font-weight:800;letter-spacing:.1px}
+.streak-chip{font-size:12px;font-weight:800;color:var(--peach-text);background:var(--chip-streak);
+  padding:5px 11px;border-radius:999px;white-space:nowrap}
+.h-cat{font-size:14px;font-weight:600;color:var(--amber);margin-top:3px}
+.done-btn{margin-left:auto;flex-shrink:0;display:inline-flex;align-items:center;gap:7px;
+  padding:11px 18px;border-radius:999px;border:1.6px solid var(--green);background:var(--green-bg);
+  color:var(--green);font-size:14.5px;font-weight:800;cursor:pointer;transition:.25s cubic-bezier(.34,1.56,.64,1);font-family:inherit}
+.done-btn.todo{border-color:var(--line);background:transparent;color:var(--muted)}
+.done-btn:hover{transform:scale(1.06)}
+.done-btn.todo:hover{border-color:var(--green);color:var(--green)}
+.h-progress{display:flex;align-items:center;gap:11px;margin-top:13px}
+.h-track{flex:1;height:9px;border-radius:99px;background:var(--amber-track);overflow:hidden}
+.h-track>i{display:block;height:100%;border-radius:99px;background:var(--stripe,#F09A10);width:86%;transition:width .5s ease}
+.h-pct{font-size:14.5px;font-weight:800;color:var(--stripe,#F09A10)}
+
+/* reflection + add sheet hints */
+.sheet-card{background:var(--card);border-radius:26px;padding:20px;box-shadow:var(--shadow)}
+.sheet-card h4{font-size:16px;font-weight:800;display:flex;align-items:center;gap:9px}
+.sheet-card p{color:var(--muted);font-size:13px;line-height:1.55;margin-top:7px;font-weight:500}
+.reason-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:13px}
+.reason-chips span{font-size:12.5px;font-weight:700;padding:9px 14px;border-radius:999px;background:var(--bg);
+  border:1.4px solid var(--line);cursor:pointer;transition:.2s;color:var(--muted)}
+.reason-chips span:hover{border-color:var(--purple);color:var(--purple)}
+
+/* fab + nav (same as app) */
+.fab{position:absolute;bottom:96px;left:50%;transform:translateX(-50%);width:66px;height:66px;border-radius:50%;
+  border:none;background:var(--purple-deep);color:#fff;font-size:29px;font-weight:500;cursor:pointer;z-index:8;
+  box-shadow:0 14px 30px -8px var(--purple);transition:.28s cubic-bezier(.34,1.56,.64,1)}
+.fab:hover{transform:translateX(-50%) translateY(-4px) scale(1.05)}
+.bottom-nav{position:absolute;bottom:0;left:0;right:0;height:80px;background:var(--nav);border-top:1px solid var(--line);
+  display:flex;align-items:center;padding:8px 4px 14px;z-index:7;transition:background .35s ease}
+.nav-it{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--faint);font-size:11px;font-weight:700;cursor:pointer;transition:.2s}
+.nav-it svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.nav-it.active{color:var(--purple)}
+.nav-it.active .nav-ic{background:var(--card-purple);border-radius:999px;padding:5px 16px}
+.nav-ic{display:flex;transition:.2s}
+
+@media(max-width:520px){.phone{transform:scale(.88);transform-origin:top center;margin-bottom:-95px}}
+</style>
+</head>
+<body>
+
+<div class="chrome">
+  <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+  <b>Track Me · Habits UI — exact replica</b>
+  <span class="badge">v4 · Habits Exact</span>
+  <button class="mode-btn" id="modeBtn" title="Toggle light / dark">🌙</button>
+</div>
+
+<section class="intro">
+  <h1>Habits screen, <em>exactly like your screenshot</em> — light by default.</h1>
+  <p>Pastel lavender progress card with ring, peach streak card, week navigator pills,
+     striped habit rows with emoji avatar, streak chip and green Done button.
+     The 🌙 button shows the same UI in dark mode using our app-exact dark tokens.</p>
+</section>
+
+<div class="stage">
+
+  <!-- ============ HABITS (EXACT LIGHT) ============ -->
+  <div class="phone-wrap"><div class="phone"><div class="screen"><div class="notch"></div><div class="scroll">
+
+    <div class="h-head">
+      <div>
+        <h1>Good Evening 👋</h1>
+        <p>Consistency today. Success tomorrow.</p>
+      </div>
+      <button class="bell">🔔</button>
+    </div>
+
+    <div class="hero-grid">
+      <div class="pastel lav">
+        <span class="p-lbl">Today's Progress</span>
+        <b class="big">1/1 Completed</b>
+        <small>Almost there!</small>
+        <div class="ring-wrap"><div class="ring" style="--p:100"><b>100%</b></div></div>
+      </div>
+      <div class="pastel peach">
+        <span class="p-lbl">🔥 6 Day Streak</span>
+        <b class="big">Current Streak</b>
+        <small>Keep it up!</small>
+      </div>
+    </div>
+
+    <div class="week-nav">
+      <button class="wk-arr">‹</button>
+      <b>Aug 17 – Aug 23</b>
+      <button class="wk-arr">›</button>
+    </div>
+
+    <div class="week-card">
+      <div class="wday"><small>M</small><b>17</b></div>
+      <div class="wday"><small>T</small><b>18</b></div>
+      <div class="wday"><small>W</small><b>19</b></div>
+      <div class="wday"><small>T</small><b>20</b></div>
+      <div class="wday"><small>F</small><b>21</b></div>
+      <div class="wday sel"><small>S</small><b>22</b></div>
+      <div class="wday"><small>S</small><b>23</b></div>
+    </div>
+
+    <!-- habit rows -->
+    <div class="habit-row" style="--stripe:#F09A10;--emoji-bg:#F7ECDA">
+      <div class="h-emoji">📚</div>
+      <div class="h-body">
+        <div class="h-title-row"><h3>read book</h3><span class="streak-chip">🔥 6 Day</span></div>
+        <div class="h-cat">Health</div>
+        <div class="h-progress"><div class="h-track"><i style="width:86%"></i></div><span class="h-pct">86%</span></div>
+      </div>
+      <button class="done-btn done">✅ Done</button>
+    </div>
+
+    <div class="habit-row" style="--stripe:#7C4DE0;--emoji-bg:#EDE7FA">
+      <div class="h-emoji">🏃</div>
+      <div class="h-body">
+        <div class="h-title-row"><h3>Morning Run</h3><span class="streak-chip">🔥 21 Day</span></div>
+        <div class="h-cat" style="color:var(--purple)">Fitness</div>
+        <div class="h-progress"><div class="h-track" style="--stripe:#7C4DE0"><i style="width:100%;background:#7C4DE0"></i></div><span class="h-pct" style="color:var(--purple)">100%</span></div>
+      </div>
+      <button class="done-btn done">✅ Done</button>
+    </div>
+
+    <div class="habit-row" style="--stripe:#16A34A;--emoji-bg:#E4F6EA">
+      <div class="h-emoji">🧘</div>
+      <div class="h-body">
+        <div class="h-title-row"><h3>Meditate</h3><span class="streak-chip">🔥 12 Day</span></div>
+        <div class="h-cat" style="color:var(--green)">Mindfulness</div>
+        <div class="h-progress"><div class="h-track"><i style="width:57%;background:#16A34A"></i></div><span class="h-pct" style="color:var(--green)">57%</span></div>
+      </div>
+      <button class="done-btn todo">＋ Mark</button>
+    </div>
+
+    <div class="habit-row" style="--stripe:#3B82F6;--emoji-bg:#E3EEFC">
+      <div class="h-emoji">💧</div>
+      <div class="h-body">
+        <div class="h-title-row"><h3>Drink Water</h3><span class="streak-chip">🔥 9 Day</span></div>
+        <div class="h-cat" style="color:#3B82F6">Health</div>
+        <div class="h-progress"><div class="h-track"><i style="width:72%;background:#3B82F6"></i></div><span class="h-pct" style="color:#3B82F6">72%</span></div>
+      </div>
+      <button class="done-btn todo">＋ Mark</button>
+    </div>
+
+    <!-- skip reason dialog hint -->
+    <div class="sheet-card">
+      <h4>🌱 Missed a day?</h4>
+      <p>Reflect on missed habits with a quick reason — it keeps your streak honest.</p>
+      <div class="reason-chips"><span>Feeling Sick</span><span>Too Busy</span><span>Traveling</span><span>Forgot</span><span>No Motivation</span></div>
+    </div>
+
+  </div>
+  <button class="fab">+</button>
+  <div class="bottom-nav">
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a2 2 0 01-2 2h-4v-7h-6v7H5a2 2 0 01-2-2z"/></svg></span>Home</div>
+    <div class="nav-it active"><span class="nav-ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg></span>Habits</div>
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><path d="M5 21V4m0 1h13l-2.5 4L18 13H5"/></svg></span>Goals</div>
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M16 12.5h2M3 10h18"/></svg></span>Cash Flow</div>
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 5-5.5 8-5.5s6.5 1.5 8 5.5"/></svg></span>Profile</div>
+  </div>
+  <div class="homebar"></div>
+  </div></div><br><span class="phone-label"><i></i> Habits — exact replica</span></div>
+
+  <!-- ============ HOME REBUILT WITH SAME LANGUAGE ============ -->
+  <div class="phone-wrap"><div class="phone"><div class="screen"><div class="notch"></div><div class="scroll">
+
+    <div class="h-head">
+      <div>
+        <h1>Good Evening 👋</h1>
+        <p>Tuesday, 23 August</p>
+      </div>
+      <button class="bell">🔔</button>
+    </div>
+
+    <div class="hero-grid">
+      <div class="pastel lav">
+        <span class="p-lbl">Today's Progress</span>
+        <b class="big">5/8 Habits</b>
+        <small>Almost there!</small>
+        <div class="ring-wrap"><div class="ring" style="--p:62"><b>62%</b></div></div>
+      </div>
+      <div class="pastel peach">
+        <span class="p-lbl">🔥 12 Day Streak</span>
+        <b class="big">Current Streak</b>
+        <small>Longest: 24 days</small>
+      </div>
+    </div>
+
+    <div class="week-nav"><b style="margin:0 auto">This Week</b></div>
+    <div class="week-card">
+      <div class="wday"><small>M</small><b>17</b></div>
+      <div class="wday"><small>T</small><b>18</b></div>
+      <div class="wday sel"><small>W</small><b>19</b></div>
+      <div class="wday"><small>T</small><b>20</b></div>
+      <div class="wday"><small>F</small><b>21</b></div>
+      <div class="wday"><small>S</small><b>22</b></div>
+      <div class="wday"><small>S</small><b>23</b></div>
+    </div>
+
+    <div class="habit-row" style="--stripe:#16A34A;--emoji-bg:#E4F6EA">
+      <div class="h-emoji">🏃</div>
+      <div class="h-body">
+        <div class="h-title-row"><h3>Morning Run</h3><span class="streak-chip">🔥 21 Day</span></div>
+        <div class="h-cat" style="color:var(--green)">Fitness</div>
+      </div>
+      <button class="done-btn done">✅ Done</button>
+    </div>
+    <div class="habit-row" style="--stripe:#7C4DE0;--emoji-bg:#EDE7FA">
+      <div class="h-emoji">📖</div>
+      <div class="h-body">
+        <div class="h-title-row"><h3>Read 20 Pages</h3><span class="streak-chip">🔥 8 Day</span></div>
+        <div class="h-cat" style="color:var(--purple)">Learning</div>
+      </div>
+      <button class="done-btn todo">＋ Mark</button>
+    </div>
+
+    <div class="sheet-card">
+      <h4>🎯 Active Goal</h4>
+      <p>Ship Cash Flow rebuild · due Sep 15</p>
+      <div class="h-progress" style="margin-top:11px"><div class="h-track"><i style="width:68%;background:#7C4DE0"></i></div><span class="h-pct" style="color:var(--purple)">68%</span></div>
+    </div>
+
+  </div>
+  <button class="fab">+</button>
+  <div class="bottom-nav">
+    <div class="nav-it active"><span class="nav-ic"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a2 2 0 01-2 2h-4v-7h-6v7H5a2 2 0 01-2-2z"/></svg></span>Home</div>
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg></span>Habits</div>
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><path d="M5 21V4m0 1h13l-2.5 4L18 13H5"/></svg></span>Goals</div>
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M16 12.5h2M3 10h18"/></svg></span>Cash Flow</div>
+    <div class="nav-it"><span class="nav-ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 5-5.5 8-5.5s6.5 1.5 8 5.5"/></svg></span>Profile</div>
+  </div>
+  <div class="homebar"></div>
+  </div></div><br><span class="phone-label"><i></i> Home — same language</span></div>
+</div>
+
+<script>
+const body=document.body,modeBtn=document.getElementById('modeBtn');
+function applyMode(dark){
+  body.classList.toggle('dark',dark);
+  modeBtn.textContent=dark?'☀️':'🌙';
+  localStorage.setItem('tm-habits-mode',dark?'dark':'light');
+}
+modeBtn.addEventListener('click',()=>applyMode(!body.classList.contains('dark')));
+if(localStorage.getItem('tm-habits-mode')==='dark') applyMode(true);
+
+document.querySelectorAll('.done-btn').forEach(b=>b.addEventListener('click',()=>{
+  const done=b.classList.toggle('done');b.classList.toggle('todo',!done);
+  b.textContent=done?'✅ Done':'＋ Mark';}));
+document.querySelectorAll('.wday').forEach(d=>d.addEventListener('click',()=>{
+  const s=d.classList.contains('sel');
+  d.parentElement.querySelectorAll('.wday').forEach(x=>x.classList.remove('sel'));
+  if(!s)d.classList.add('sel');}));
+document.querySelectorAll('.reason-chips span').forEach(c=>c.addEventListener('click',()=>{
+  c.style.borderColor='var(--purple)';c.style.color='var(--purple)';setTimeout(()=>{c.style.borderColor='';c.style.color=''},900)}));
+document.querySelectorAll('.fab').forEach(f=>f.addEventListener('click',()=>{
+  f.style.transform='translateX(-50%) translateY(-6px) scale(1.08)';
+  setTimeout(()=>f.style.transform='',300)}));
+</script>
+</body>
+</html>

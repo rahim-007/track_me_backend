@@ -13,6 +13,11 @@ import '../../data/models/cashflow_models.dart';
 ///  - Income: E Employee, S Self-Employed, B Business, I Investor, G Gift
 ///  - Outflow: E Expense, S Savings, D Debt Repayment, I Investing, DO Donation
 ///  - Debt: direction (I owe / they owe me) + person + amount
+///
+/// Account selection:
+///  - Inflow  → "Deposit to"  [Bank | Cash]          (default: Bank)
+///  - Outflow → "Pay from"    [Bank | Cash | Credit Card] (default: Bank)
+///  - Debt    → no account selector (existing debt ledger behaviour unchanged)
 class AddEntrySheet extends ConsumerStatefulWidget {
   const AddEntrySheet({super.key});
 
@@ -35,6 +40,7 @@ class _AddEntrySheetState extends ConsumerState<AddEntrySheet> {
   int _kindIndex = 0; // 0 income, 1 outflow, 2 debt
   String? _category;
   bool _theyOweMe = true;
+  CashFlowAccount _account = CashFlowAccount.bank;
   final _amountCtrl = TextEditingController();
   final _noteCtrl = TextEditingController();
   final _personCtrl = TextEditingController();
@@ -42,6 +48,16 @@ class _AddEntrySheetState extends ConsumerState<AddEntrySheet> {
   bool _saving = false;
 
   bool get _isDebt => _kindIndex == 2;
+  bool get _isInflow => _kindIndex == 0;
+
+  /// Allowed accounts for the currently selected entry type.
+  List<CashFlowAccount> get _accountOptions {
+    if (_isInflow) {
+      return [CashFlowAccount.bank, CashFlowAccount.cash];
+    }
+    // Outflow
+    return [CashFlowAccount.bank, CashFlowAccount.cash, CashFlowAccount.creditCard];
+  }
 
   List<(String, String, String)> get _categories {
     if (_kindIndex == 0) {
@@ -89,6 +105,7 @@ class _AddEntrySheetState extends ConsumerState<AddEntrySheet> {
           amount: amount,
           note: _noteCtrl.text.trim(),
           date: DateFormat('yyyy-MM-dd').format(_date),
+          account: _account,
         ));
       }
       if (mounted) Navigator.of(context).pop(true);
@@ -155,6 +172,8 @@ class _AddEntrySheetState extends ConsumerState<AddEntrySheet> {
                 onSelectionChanged: (s) => setState(() {
                   _kindIndex = s.first;
                   _category = null;
+                  // Reset account to Bank when switching type.
+                  _account = CashFlowAccount.bank;
                 }),
               ),
               const SizedBox(height: 20),
@@ -176,6 +195,15 @@ class _AddEntrySheetState extends ConsumerState<AddEntrySheet> {
                   ),
                 ),
               ] else ...[
+                // ── Account selector (Deposit to / Pay from) ─────────────────
+                _AccountSelector(
+                  label: _isInflow ? 'Deposit to' : 'Pay from',
+                  selected: _account,
+                  options: _accountOptions,
+                  onChanged: (a) => setState(() => _account = a),
+                ),
+                const SizedBox(height: 16),
+                // ── Category list ─────────────────────────────────────────────
                 ..._categories.map((c) {
                   final selected = _category == c.$1;
                   return Padding(
@@ -343,6 +371,129 @@ class _AddEntrySheetState extends ConsumerState<AddEntrySheet> {
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Account selector — "Deposit to" or "Pay from"
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _AccountSelector extends StatelessWidget {
+  final String label;
+  final CashFlowAccount selected;
+  final List<CashFlowAccount> options;
+  final ValueChanged<CashFlowAccount> onChanged;
+
+  const _AccountSelector({
+    required this.label,
+    required this.selected,
+    required this.options,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: options.map((acct) {
+            final isSelected = selected == acct;
+            final color = _accountColor(acct);
+            return Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  right: acct != options.last ? 8 : 0,
+                ),
+                child: GestureDetector(
+                  onTap: () => onChanged(acct),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? color.withOpacity(0.1)
+                          : AppColors.surfaceVariant,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected ? color : AppColors.border,
+                        width: isSelected ? 1.5 : 1,
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _accountEmoji(acct),
+                          style: const TextStyle(fontSize: 18),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          _accountShortLabel(acct),
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: isSelected ? color : AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Color _accountColor(CashFlowAccount acct) {
+    switch (acct) {
+      case CashFlowAccount.bank:
+        return AppColors.primary;
+      case CashFlowAccount.cash:
+        return AppColors.success;
+      case CashFlowAccount.creditCard:
+        return AppColors.error;
+    }
+  }
+
+  String _accountEmoji(CashFlowAccount acct) {
+    switch (acct) {
+      case CashFlowAccount.bank:
+        return '🏦';
+      case CashFlowAccount.cash:
+        return '💵';
+      case CashFlowAccount.creditCard:
+        return '💳';
+    }
+  }
+
+  String _accountShortLabel(CashFlowAccount acct) {
+    switch (acct) {
+      case CashFlowAccount.bank:
+        return 'Bank';
+      case CashFlowAccount.cash:
+        return 'Cash';
+      case CashFlowAccount.creditCard:
+        return 'Credit Card';
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Debt direction toggle (unchanged)
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _DirectionToggle extends StatelessWidget {
   final bool theyOweMe;

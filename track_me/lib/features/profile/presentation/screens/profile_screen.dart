@@ -1,9 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -13,6 +15,77 @@ import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../providers/profile_provider.dart';
 import '../../../auth/providers/auth_provider.dart';
+
+/// Renders base64 data URLs, network URLs, or initial avatar fallback cleanly.
+Widget buildAvatarWidget(
+  String? avatarUrl, {
+  String name = 'User',
+  double fontSize = 32,
+  Color iconColor = Colors.white,
+}) {
+  if (avatarUrl == null || avatarUrl.trim().isEmpty) {
+    return Center(
+      child: Text(
+        name.isNotEmpty ? name[0].toUpperCase() : 'U',
+        style: TextStyle(
+          fontSize: fontSize,
+          fontWeight: FontWeight.w700,
+          color: iconColor,
+        ),
+      ),
+    );
+  }
+  final url = avatarUrl.trim();
+  if (url.startsWith('data:image/')) {
+    try {
+      final base64Data = url.split(',').last;
+      final bytes = base64Decode(base64Data);
+      return Image.memory(
+        bytes,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Center(
+          child: Text(
+            name.isNotEmpty ? name[0].toUpperCase() : 'U',
+            style: TextStyle(
+              fontSize: fontSize,
+              fontWeight: FontWeight.w700,
+              color: iconColor,
+            ),
+          ),
+        ),
+      );
+    } catch (_) {
+      return Center(
+        child: Text(
+          name.isNotEmpty ? name[0].toUpperCase() : 'U',
+          style: TextStyle(
+            fontSize: fontSize,
+            fontWeight: FontWeight.w700,
+            color: iconColor,
+          ),
+        ),
+      );
+    }
+  }
+
+  return CachedNetworkImage(
+    imageUrl: url,
+    fit: BoxFit.cover,
+    placeholder: (context, url) => const Center(
+      child: CircularProgressIndicator(strokeWidth: 2),
+    ),
+    errorWidget: (context, url, error) => Center(
+      child: Text(
+        name.isNotEmpty ? name[0].toUpperCase() : 'U',
+        style: TextStyle(
+          fontSize: fontSize,
+          fontWeight: FontWeight.w700,
+          color: iconColor,
+        ),
+      ),
+    ),
+  );
+}
 
 final appVersionProvider = FutureProvider<String>((ref) async {
   try {
@@ -70,39 +143,13 @@ class ProfileScreen extends ConsumerWidget {
                               width: 2,
                             ),
                           ),
-                           child: ClipOval(
-                            child: (user != null && user.avatarUrl != null && user.avatarUrl!.isNotEmpty)
-                                ? CachedNetworkImage(
-                                    imageUrl: user.avatarUrl!,
-                                    fit: BoxFit.cover,
-                                    placeholder: (context, url) => const Center(
-                                      child: CircularProgressIndicator(color: Colors.white),
-                                    ),
-                                    errorWidget: (context, url, error) => Center(
-                                      child: Text(
-                                        (user.name.isNotEmpty)
-                                            ? user.name[0].toUpperCase()
-                                            : 'U',
-                                        style: const TextStyle(
-                                          fontSize: 32,
-                                          fontWeight: FontWeight.w700,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ),
-                                  )
-                                : Center(
-                                    child: Text(
-                                      (user != null && user.name.isNotEmpty)
-                                          ? user.name[0].toUpperCase()
-                                          : 'U',
-                                      style: const TextStyle(
-                                        fontSize: 32,
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
+                          child: ClipOval(
+                            child: buildAvatarWidget(
+                              user?.avatarUrl,
+                              name: user?.name ?? 'User',
+                              fontSize: 32,
+                              iconColor: Colors.white,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -426,6 +473,107 @@ class _EditProfileDialogState extends ConsumerState<EditProfileDialog> {
     super.dispose();
   }
 
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final XFile? pickedFile = await picker.pickImage(
+        source: source,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 75,
+      );
+      if (pickedFile != null) {
+        final bytes = await pickedFile.readAsBytes();
+        final mimeType =
+            pickedFile.path.endsWith('.png') ? 'image/png' : 'image/jpeg';
+        final base64String = 'data:$mimeType;base64,${base64Encode(bytes)}';
+        setState(() {
+          _selectedAvatarUrl = base64String;
+          _avatarController.text = base64String;
+          _errorMessage = null;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Could not select image. Please try again.';
+      });
+    }
+  }
+
+  void _showImageSourceSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Change Profile Photo',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryContainer,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.photo_library_rounded,
+                      color: AppColors.primary),
+                ),
+                title: const Text('Choose from Gallery',
+                    style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: const Text('Select a photo from your gallery'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage(ImageSource.gallery);
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryContainer,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.camera_alt_rounded,
+                      color: AppColors.primary),
+                ),
+                title: const Text('Take a Photo',
+                    style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: const Text('Use camera to take a new picture'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage(ImageSource.camera);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() {
@@ -436,7 +584,9 @@ class _EditProfileDialogState extends ConsumerState<EditProfileDialog> {
     try {
       await ref.read(profileProvider.notifier).updateProfile(
             name: _nameController.text.trim(),
-            avatarUrl: _selectedAvatarUrl?.isNotEmpty == true ? _selectedAvatarUrl : null,
+            avatarUrl: _selectedAvatarUrl?.isNotEmpty == true
+                ? _selectedAvatarUrl
+                : null,
           );
       if (mounted) {
         Navigator.pop(context);
@@ -492,12 +642,14 @@ class _EditProfileDialogState extends ConsumerState<EditProfileDialog> {
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.error_outline_rounded, color: AppColors.error),
+                        Icon(Icons.error_outline_rounded,
+                            color: AppColors.error),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
                             _errorMessage!,
-                            style: TextStyle(color: AppColors.error, fontSize: 13),
+                            style: TextStyle(
+                                color: AppColors.error, fontSize: 13),
                           ),
                         ),
                       ],
@@ -505,54 +657,111 @@ class _EditProfileDialogState extends ConsumerState<EditProfileDialog> {
                   ),
                   const SizedBox(height: 16),
                 ],
-                // Avatar preview
+                // Avatar preview with camera tap target
                 Center(
-                  child: Container(
-                    width: 90,
-                    height: 90,
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryContainer,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.primary, width: 2),
-                    ),
-                    child: ClipOval(
-                      child: _selectedAvatarUrl?.isNotEmpty == true
-                          ? CachedNetworkImage(
-                              imageUrl: _selectedAvatarUrl!,
-                              fit: BoxFit.cover,
-                              placeholder: (context, url) => const Center(
-                                child: CircularProgressIndicator(),
-                              ),
-                              errorWidget: (context, url, error) => Icon(
-                                Icons.person_rounded,
-                                size: 50,
-                                color: AppColors.primary,
-                              ),
-                            )
-                          : Center(
-                              child: Text(
-                                _nameController.text.isNotEmpty
-                                    ? _nameController.text[0].toUpperCase()
-                                    : 'U',
-                                style: TextStyle(
-                                  fontSize: 36,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.primary,
+                  child: Stack(
+                    children: [
+                      Container(
+                        width: 96,
+                        height: 96,
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryContainer,
+                          shape: BoxShape.circle,
+                          border:
+                              Border.all(color: AppColors.primary, width: 2.5),
+                        ),
+                        child: ClipOval(
+                          child: buildAvatarWidget(
+                            _selectedAvatarUrl,
+                            name: _nameController.text,
+                            fontSize: 36,
+                            iconColor: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: GestureDetector(
+                          onTap: () => _showImageSourceSheet(context),
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.2),
+                                  blurRadius: 6,
                                 ),
-                              ),
+                              ],
                             ),
-                    ),
+                            child: const Icon(
+                              Icons.camera_alt_rounded,
+                              size: 16,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                // Gallery / Camera Button Bar
+                Center(
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.center,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () => _pickImage(ImageSource.gallery),
+                        icon: const Icon(Icons.photo_library_rounded, size: 16),
+                        label: const Text(
+                          'Choose Photo',
+                          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          side: BorderSide(color: AppColors.primary),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                        ),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () => _pickImage(ImageSource.camera),
+                        icon: const Icon(Icons.camera_alt_rounded, size: 16),
+                        label: const Text(
+                          'Camera',
+                          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          side: BorderSide(color: AppColors.primary.withOpacity(0.5)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 20),
                 // Predefined Avatars Grid
                 const Text(
-                  'Select Avatar Preset',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                  'Or Select Avatar Preset',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 10),
                 SizedBox(
-                  height: 60,
+                  height: 56,
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
                     itemCount: _presetAvatars.length,
@@ -568,12 +777,14 @@ class _EditProfileDialogState extends ConsumerState<EditProfileDialog> {
                         },
                         child: Container(
                           margin: const EdgeInsets.only(right: 10),
-                          width: 50,
-                          height: 50,
+                          width: 48,
+                          height: 48,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: isSelected ? AppColors.primary : Colors.transparent,
+                              color: isSelected
+                                  ? AppColors.primary
+                                  : Colors.transparent,
                               width: 2.5,
                             ),
                           ),
@@ -593,8 +804,9 @@ class _EditProfileDialogState extends ConsumerState<EditProfileDialog> {
                   label: 'Name',
                   hint: 'Enter your name',
                   controller: _nameController,
-                  validator: (value) =>
-                      value == null || value.trim().isEmpty ? 'Name is required' : null,
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Name is required'
+                      : null,
                   prefixIcon: Icons.person_outline_rounded,
                   onChanged: (val) {
                     setState(() {});
@@ -602,7 +814,7 @@ class _EditProfileDialogState extends ConsumerState<EditProfileDialog> {
                 ),
                 const SizedBox(height: 16),
                 AppTextField(
-                  label: 'Custom Avatar URL',
+                  label: 'Custom Avatar URL (Optional)',
                   hint: 'Enter image URL',
                   controller: _avatarController,
                   prefixIcon: Icons.link_rounded,

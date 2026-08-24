@@ -60,41 +60,85 @@ export class CashFlowPeriodService {
    */
   async getCurrentPeriod(userId: string) {
     const period = await this.ensureCurrentPeriod(userId);
+    await this.recalculateFuturePeriods(userId);
+    const fresh = await this.prisma.cashFlowPeriod.findFirst({
+      where: { id: period.id },
+    });
+    return this.serialize(fresh ?? period);
+  }
+
+  /** Manual first-month setup or initial balance configuration. */
+  async createFirstPeriod(userId: string, dto: CreatePeriodDto) {
+    const openingCash = dto.openingCash ?? 0;
+    const existingForMonth = await this.prisma.cashFlowPeriod.findFirst({
+      where: { userId, month: dto.month, year: dto.year },
+    });
+
+    let period: PeriodRow;
+    if (existingForMonth) {
+      period = await this.prisma.cashFlowPeriod.update({
+        where: { id: existingForMonth.id },
+        data: {
+          openingBank: dto.openingBank,
+          openingCash,
+          openingCreditCard: dto.openingCreditCard,
+          openingDebt: dto.openingDebt,
+        },
+      });
+    } else {
+      period = await this.prisma.cashFlowPeriod.create({
+        data: {
+          userId,
+          month: dto.month,
+          year: dto.year,
+          openingBank: dto.openingBank,
+          openingCash,
+          openingCreditCard: dto.openingCreditCard,
+          openingDebt: dto.openingDebt,
+        },
+      });
+    }
+
+    await this.recalculateFuturePeriods(userId, dto.month, dto.year);
     return this.serialize(period);
   }
 
-  /** Manual first-month setup. Only allowed when no period exists yet. */
-  async createFirstPeriod(userId: string, dto: CreatePeriodDto) {
-    const existing = await this.prisma.cashFlowPeriod.findFirst({
+  private async recalculateFuturePeriods(userId: string, fromMonth?: number, fromYear?: number) {
+    const periods = await this.prisma.cashFlowPeriod.findMany({
       where: { userId },
+      orderBy: [{ year: 'asc' }, { month: 'asc' }],
     });
-    if (existing) {
-      throw new BadRequestException(
-        'A period already exists — subsequent periods open automatically at month rollover',
-      );
+
+    for (let i = 1; i < periods.length; i++) {
+      const prev = periods[i - 1];
+      const curr = periods[i];
+
+      if (fromMonth !== undefined && fromYear !== undefined) {
+        if (curr.year < fromYear || (curr.year === fromYear && curr.month <= fromMonth)) {
+          continue;
+        }
+      }
+
+      const closing = await this.computeClosing(userId, prev);
+
+      if (
+        curr.openingBank !== closing.closingBank ||
+        curr.openingCash !== closing.closingCash ||
+        curr.openingCreditCard !== closing.closingCreditCard ||
+        curr.openingDebt !== closing.closingDebt
+      ) {
+        const updated = await this.prisma.cashFlowPeriod.update({
+          where: { id: curr.id },
+          data: {
+            openingBank: closing.closingBank,
+            openingCash: closing.closingCash,
+            openingCreditCard: closing.closingCreditCard,
+            openingDebt: closing.closingDebt,
+          },
+        });
+        periods[i] = updated;
+      }
     }
-    const period = await this.prisma.cashFlowPeriod.create({
-      data: {
-        userId,
-        month: dto.month,
-        year: dto.year,
-        openingBank: dto.openingBank,
-        openingCash: 0,
-        openingCreditCard: dto.openingCreditCard,
-        openingDebt: dto.openingDebt,
-      },
-    });
-    // Normalize cash so a first entry can't be lost: v1 posts everything to
-    // bank, but keep whatever cash value the user entered via openingCash.
-    if (dto.openingCash !== undefined) {
-      return this.serialize(
-        await this.prisma.cashFlowPeriod.update({
-          where: { id: period.id },
-          data: { openingCash: dto.openingCash },
-        }),
-      );
-    }
-    return this.serialize(period);
   }
 
   /** Edit the current period's opening balances. Past periods are immutable. */
@@ -118,6 +162,7 @@ export class CashFlowPeriodService {
         ...(dto.openingDebt !== undefined && { openingDebt: dto.openingDebt }),
       },
     });
+    await this.recalculateFuturePeriods(userId, updated.month, updated.year);
     return this.serialize(updated);
   }
 
@@ -131,16 +176,45 @@ export class CashFlowPeriodService {
   }
 
   async createTransaction(userId: string, dto: CreateTransactionDto) {
-    const period = await this.ensureCurrentPeriod(userId);
-    const date = new Date(dto.date);
-    if (
-      date.getMonth() + 1 !== period.month ||
-      date.getFullYear() !== period.year
-    ) {
+    if (dto.kind === 'INCOME' && !['E', 'S', 'B', 'I', 'G'].includes(dto.category)) {
+      throw new BadRequestException(`Invalid category '${dto.category}' for INCOME entry`);
+    }
+    if (dto.kind === 'OUTFLOW' && !['E', 'S', 'D', 'I', 'DO'].includes(dto.category)) {
+      throw new BadRequestException(`Invalid category '${dto.category}' for OUTFLOW entry`);
+    }
+
+    // INCOME cannot post to a credit card — that doesn't make financial sense
+    // and would corrupt the credit-card balance calculation.
+    if (dto.kind === 'INCOME' && dto.account === 'CREDIT_CARD') {
       throw new BadRequestException(
-        `Entry date must fall inside the current period (${period.month}/${period.year})`,
+        'INCOME transactions cannot post to CREDIT_CARD. Use BANK or CASH.',
       );
     }
+
+    const dateParts = dto.date.split('T')[0].split('-').map((p) => parseInt(p, 10));
+    const year = dateParts[0];
+    const month = dateParts[1];
+    const day = dateParts[2] || 1;
+
+    let period = await this.prisma.cashFlowPeriod.findFirst({
+      where: { userId, month, year },
+    });
+
+    if (!period) {
+      const current = await this.ensureCurrentPeriod(userId);
+      if (current.month === month && current.year === year) {
+        period = current;
+      } else {
+        throw new BadRequestException(
+          `Entry date must fall inside a valid period (${current.month}/${current.year})`,
+        );
+      }
+    }
+
+    // Resolve the effective account (default BANK keeps legacy behaviour).
+    const account = dto.account ?? 'BANK';
+
+    const date = new Date(Date.UTC(year, month - 1, day));
     const txn = await this.prisma.cashFlowTransaction.create({
       data: {
         periodId: period.id,
@@ -149,8 +223,13 @@ export class CashFlowPeriodService {
         amount: dto.amount,
         note: dto.note ?? null,
         date,
+        account,
       },
     });
+
+    // Recalculate opening/closing balance chain so subsequent periods update automatically
+    await this.recalculateFuturePeriods(userId, period.month, period.year);
+
     return this.serializeTxn(txn);
   }
 
@@ -159,7 +238,17 @@ export class CashFlowPeriodService {
       where: { id: txnId, period: { userId } },
     });
     if (!existing) throw new NotFoundException('Transaction not found');
+
+    const period = await this.prisma.cashFlowPeriod.findFirst({
+      where: { id: existing.periodId },
+    });
+
     await this.prisma.cashFlowTransaction.delete({ where: { id: txnId } });
+
+    if (period) {
+      await this.recalculateFuturePeriods(userId, period.month, period.year);
+    }
+
     return { deleted: true };
   }
 
@@ -244,7 +333,8 @@ export class CashFlowPeriodService {
   private async computeClosing(userId: string, period: PeriodRow) {
     const txns = await this.prisma.cashFlowTransaction.findMany({
       where: { periodId: period.id },
-      select: { kind: true, amount: true },
+      // Include `category` and `account` so per-pocket math is correct.
+      select: { kind: true, amount: true, category: true, account: true },
     });
     const opening: OpeningBalances = {
       openingBank: period.openingBank,
@@ -267,7 +357,7 @@ export class CashFlowPeriodService {
   private async serialize(period: PeriodRow) {
     const txns = await this.prisma.cashFlowTransaction.findMany({
       where: { periodId: period.id },
-      select: { kind: true, amount: true, category: true },
+      select: { kind: true, amount: true, category: true, account: true },
     });
     const opening: OpeningBalances = {
       openingBank: period.openingBank,
@@ -311,8 +401,14 @@ export class CashFlowPeriodService {
     amount: number;
     note: string | null;
     date: Date;
+    account: string | null;
     createdAt: Date;
   }) {
-    return { ...t, date: t.date.toISOString().slice(0, 10) };
+    return {
+      ...t,
+      date: t.date.toISOString().slice(0, 10),
+      // Normalise null → 'BANK' so clients always receive an explicit value.
+      account: t.account ?? 'BANK',
+    };
   }
 }

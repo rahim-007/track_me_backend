@@ -63,10 +63,16 @@ void main() {
       expect(calculateHabitStreak(h, from: DateTime(2026, 8, 12)), 2);
     });
 
-    test('daily habit breaks on a missing day (Test 6)', () {
-      // Mon ✅, Tue ✅, Wed ❌ → breaks on Wed.
+    test('daily habit keeps streak alive on incomplete today (grace period)', () {
+      // Mon ✅, Tue ✅, Wed (today, incomplete) → streak stays 2 from Mon+Tue.
       final h = makeHabit(completedDates: ['2026-08-10', '2026-08-11']);
-      expect(calculateHabitStreak(h, from: DateTime(2026, 8, 12)), 0);
+      expect(calculateHabitStreak(h, from: DateTime(2026, 8, 12)), 2);
+    });
+
+    test('daily habit breaks on a missing past day', () {
+      // Mon ✅, Tue ✅, Wed (missing past day), Thu (today, incomplete) → breaks on Wed (0).
+      final h = makeHabit(completedDates: ['2026-08-10', '2026-08-11']);
+      expect(calculateHabitStreak(h, from: DateTime(2026, 8, 13)), 0);
     });
 
     test('no repeat day selected is treated as daily', () {
@@ -74,7 +80,8 @@ void main() {
         repeatDays: List.filled(7, false),
         completedDates: ['2026-08-10', '2026-08-11'],
       );
-      expect(calculateHabitStreak(h, from: DateTime(2026, 8, 12)), 0);
+      // On Thu Aug 13 (after missing Wed Aug 12), streak is 0.
+      expect(calculateHabitStreak(h, from: DateTime(2026, 8, 13)), 0);
     });
 
     test('Mon/Fri with both completed → 2 scheduled-day streak', () {
