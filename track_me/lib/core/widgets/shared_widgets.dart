@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_shadows.dart';
 
-/// Quote card with motivational text
+/// Quote card with motivational text — clay hero surface
 class QuoteCard extends StatelessWidget {
   final String quote;
   final String? author;
@@ -23,14 +24,8 @@ class QuoteCard extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: gradient ?? AppColors.primaryGradient,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withOpacity(0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: AppShadows.elevated,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -40,8 +35,8 @@ class QuoteCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(10),
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
                   Icons.format_quote_rounded,
@@ -56,8 +51,8 @@ class QuoteCard extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(10),
+                      color: Colors.white.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
                       Icons.refresh_rounded,
@@ -86,7 +81,7 @@ class QuoteCard extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w400,
-                color: Colors.white.withOpacity(0.75),
+                color: Colors.white.withOpacity(0.70),
               ),
             ),
           ],
@@ -96,7 +91,7 @@ class QuoteCard extends StatelessWidget {
   }
 }
 
-/// Circular progress ring
+/// Circular progress ring with clay palette
 class ProgressRing extends StatelessWidget {
   final double progress; // 0.0 to 1.0
   final double size;
@@ -115,6 +110,7 @@ class ProgressRing extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final trackColor = (color ?? AppColors.primary).withOpacity(0.12);
     return SizedBox(
       width: size,
       height: size,
@@ -124,7 +120,7 @@ class ProgressRing extends StatelessWidget {
           CircularProgressIndicator(
             value: progress.clamp(0.0, 1.0),
             strokeWidth: strokeWidth,
-            backgroundColor: (color ?? AppColors.primary).withOpacity(0.15),
+            backgroundColor: trackColor,
             valueColor: AlwaysStoppedAnimation<Color>(
               color ?? AppColors.primary,
             ),
@@ -137,7 +133,7 @@ class ProgressRing extends StatelessWidget {
   }
 }
 
-/// Empty state widget
+/// Empty state widget with clay styling
 class EmptyStateWidget extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -167,6 +163,7 @@ class EmptyStateWidget extends StatelessWidget {
               decoration: BoxDecoration(
                 color: AppColors.primaryContainer,
                 shape: BoxShape.circle,
+                boxShadow: AppShadows.soft,
               ),
               child: Icon(
                 icon,
@@ -192,9 +189,15 @@ class EmptyStateWidget extends StatelessWidget {
             ),
             if (actionLabel != null && onAction != null) ...[
               const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: onAction,
-                child: Text(actionLabel!),
+              Container(
+                decoration: BoxDecoration(
+                  boxShadow: AppShadows.raised,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: ElevatedButton(
+                  onPressed: onAction,
+                  child: Text(actionLabel!),
+                ),
               ),
             ],
           ],
@@ -221,10 +224,10 @@ class LoadingOverlay extends StatelessWidget {
       children: [
         child,
         if (isLoading)
-          const Positioned.fill(
+          Positioned.fill(
             child: ColoredBox(
-              color: Colors.black26,
-              child: Center(
+              color: AppColors.background.withOpacity(0.5),
+              child: const Center(
                 child: CircularProgressIndicator(),
               ),
             ),
@@ -234,7 +237,7 @@ class LoadingOverlay extends StatelessWidget {
   }
 }
 
-/// Shimmer loading placeholder
+/// Shimmer loading placeholder with clay surface color
 class ShimmerBox extends StatelessWidget {
   final double width;
   final double height;
@@ -244,7 +247,7 @@ class ShimmerBox extends StatelessWidget {
     super.key,
     this.width = double.infinity,
     this.height = 16,
-    this.borderRadius = 8,
+    this.borderRadius = 10,
   });
 
   @override
@@ -253,7 +256,7 @@ class ShimmerBox extends StatelessWidget {
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: AppColors.surfaceVariant,
+        color: AppColors.surfaceElevated,
         borderRadius: BorderRadius.circular(borderRadius),
       ),
     );

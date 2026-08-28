@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/local/isar_service.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_shadows.dart';
 import '../../data/models/onboarding_pref_model.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -23,7 +24,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       description:
           'Create healthy habits, track your streaks, and build lasting consistency with simple daily tracking.',
       icon: Icons.task_alt_rounded,
-      gradientColors: [Color(0xFF7C3AED), Color(0xFF6366F1)],
+      gradientColors: AppColors.primaryGradientColors,
     ),
     _OnboardingPage(
       title: 'Track Your Progress',
@@ -222,13 +223,7 @@ class _OnboardingPageView extends StatelessWidget {
                           end: Alignment.bottomRight,
                         ),
                         shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: page.gradientColors.first.withOpacity(0.35),
-                            blurRadius: 40,
-                            offset: const Offset(0, 16),
-                          ),
-                        ],
+                        boxShadow: AppShadows.elevated,
                       ),
                       child: Center(
                         child: Icon(

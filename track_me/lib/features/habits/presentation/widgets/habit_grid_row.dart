@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_shadows.dart';
 import '../../data/models/habit_model.dart';
 import '../../providers/habits_provider.dart';
 import '../screens/habits_screen.dart';
@@ -38,7 +39,7 @@ class HabitGridRow extends ConsumerWidget {
     if (cat.contains('peace')) return const Color(0xFF06B6D4); // Peace
     if (cat.contains('person')) return const Color(0xFFEC4899); // Personal
     if (cat.contains('fin')) return const Color(0xFF059669); // Finance
-    return const Color(0xFF7C3AED); // Default purple
+    return AppColors.primary;
   }
 
   double get _weeklyCompletionRate {
@@ -91,42 +92,17 @@ class HabitGridRow extends ConsumerWidget {
         height: 120,
         decoration: BoxDecoration(
           color: AppColors.surface,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: categoryColor.withOpacity(0.04),
-              blurRadius: 16,
-              offset: const Offset(0, 4),
-            ),
-            BoxShadow(
-              color: AppColors.isDarkMode ? Colors.transparent : Colors.black.withOpacity(0.02),
-              blurRadius: 4,
-              offset: const Offset(0, 1),
-            ),
-          ],
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: AppShadows.raised,
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(24),
           child: Stack(
             children: [
-              // Left category color vertical indicator bar
-              Positioned(
-                top: 10,
-                bottom: 10,
-                left: 0,
-                width: 5,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: categoryColor,
-                    borderRadius: BorderRadius.circular(99),
-                  ),
-                ),
-              ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: Row(
                   children: [
-                    const SizedBox(width: 8),
                     // 1. Icon Container
                     Container(
                       width: 48,
@@ -181,13 +157,24 @@ class HabitGridRow extends ConsumerWidget {
                                 ),
                             ],
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            habit.category,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: categoryColor.withOpacity(0.85),
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: categoryColor.withOpacity(AppColors.isDarkMode ? 0.16 : 0.10),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: categoryColor.withOpacity(0.30),
+                                width: 1,
+                              ),
+                            ),
+                            child: Text(
+                              habit.category,
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                color: categoryColor,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 10),
@@ -197,21 +184,28 @@ class HabitGridRow extends ConsumerWidget {
                               Expanded(
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(4),
-                                  child: LinearProgressIndicator(
-                                    value: weeklyProgress,
-                                    minHeight: 6,
-                                    backgroundColor: categoryColor.withOpacity(0.12),
-                                    valueColor: AlwaysStoppedAnimation<Color>(categoryColor),
+                                  child: TweenAnimationBuilder<double>(
+                                    duration: const Duration(milliseconds: 400),
+                                    curve: Curves.easeOutCubic,
+                                    tween: Tween<double>(begin: 0, end: weeklyProgress),
+                                    builder: (context, animVal, _) {
+                                      return LinearProgressIndicator(
+                                        value: animVal,
+                                        minHeight: 6,
+                                        backgroundColor: AppColors.primaryContainer,
+                                        valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+                                      );
+                                    },
                                   ),
                                 ),
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                '$percentage%',
-                                style: TextStyle(
+                                '${(weeklyProgress * 100).round()}%',
+                                style: const TextStyle(
                                   fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: categoryColor,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.primary,
                                 ),
                               ),
                             ],
@@ -220,6 +214,7 @@ class HabitGridRow extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(width: 16),
+                    // 3. Tactile 3D Action Circle
                     Consumer(
                       builder: (context, ref, child) {
                         final is3d = ref.watch(isHabit3dFxEnabledProvider);
@@ -230,9 +225,6 @@ class HabitGridRow extends ConsumerWidget {
                               ? () {}
                               : () => onComplete(selectedDate),
                           child: GestureDetector(
-                            // A skipped habit stays skipped — tapping its status
-                            // button must never flip it to Completed. Completed can
-                            // still be tapped to undo (existing behavior).
                             onTap: isFuture || isSkipped
                                 ? null
                                 : () => onComplete(selectedDate),
@@ -245,105 +237,68 @@ class HabitGridRow extends ConsumerWidget {
                         duration: const Duration(milliseconds: 150),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 250),
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          height: 38,
+                          width: 46,
+                          height: 46,
                           decoration: BoxDecoration(
-                            color: isFuture
-                                ? AppColors.surfaceVariant
+                            shape: BoxShape.circle,
+                            gradient: isDone && !isFuture
+                                ? AppColors.primaryGradient
+                                : null,
+                            color: isDone && !isFuture
+                                ? null
                                 : (isSkipped
-                                    ? AppColors.surfaceVariant
-                                    : (isDone ? (AppColors.isDarkMode ? const Color(0xFF1B3B2B) : const Color(0xFFE8F5E9)) : AppColors.surface)),
-                            borderRadius: BorderRadius.circular(24),
+                                    ? const Color(0xFFF59E0B).withOpacity(0.16)
+                                    : (isFuture
+                                        ? AppColors.surfaceVariant
+                                        : AppColors.surface)),
                             border: Border.all(
-                              color: isFuture || isSkipped
-                                  ? AppColors.border
-                                  : (isDone ? (AppColors.isDarkMode ? const Color(0xFF2E7D32) : const Color(0xFF81C784)) : categoryColor),
-                              width: 1.5,
+                              color: isDone && !isFuture
+                                  ? Colors.transparent
+                                  : (isSkipped
+                                      ? const Color(0xFFF59E0B)
+                                      : (isFuture
+                                          ? AppColors.border
+                                          : categoryColor.withOpacity(0.60))),
+                              width: isDone ? 0 : 2,
                             ),
-                            boxShadow: isDone || isFuture
-                                ? []
-                                : [
+                            boxShadow: isDone && !isFuture
+                                ? [
                                     BoxShadow(
-                                      color: categoryColor.withOpacity(0.1),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 2),
+                                      color: AppColors.primary.withOpacity(0.35),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 4),
                                     ),
-                                  ],
+                                  ]
+                                : AppShadows.soft,
                           ),
                           child: Center(
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  isFuture
-                                      ? Icons.lock_outline_rounded
-                                      : (isSkipped
-                                          ? Icons.block
-                                          : (isDone ? Icons.check_circle : Icons.radio_button_unchecked)),
-                                  size: 16,
-                                  color: isFuture || isSkipped
-                                      ? AppColors.textSecondary
-                                      : (isDone ? (AppColors.isDarkMode ? const Color(0xFF81C784) : const Color(0xFF2E7D32)) : categoryColor),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  isFuture
-                                      ? 'Locked'
-                                      : (isSkipped
-                                          ? 'Skipped'
-                                          : (isDone ? 'Done' : 'Mark')),
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w800,
-                                    color: isFuture || isSkipped
-                                        ? AppColors.textSecondary
-                                        : (isDone ? (AppColors.isDarkMode ? const Color(0xFF81C784) : const Color(0xFF2E7D32)) : categoryColor),
-                                  ),
-                                ),
-                              ],
-                            ),
+                            child: isFuture
+                                ? Icon(
+                                    Icons.lock_rounded,
+                                    color: AppColors.textSecondary,
+                                    size: 20,
+                                  )
+                                : (isDone
+                                    ? const Icon(
+                                        Icons.check_rounded,
+                                        color: Colors.white,
+                                        size: 24,
+                                      )
+                                    : (isSkipped
+                                        ? const Icon(
+                                            Icons.skip_next_rounded,
+                                            color: Color(0xFFF59E0B),
+                                            size: 20,
+                                          )
+                                        : Icon(
+                                            Icons.circle_outlined,
+                                            color: categoryColor.withOpacity(0.40),
+                                            size: 20,
+                                          ))),
                           ),
                         ),
                       ),
                     ),
-                    if (!isDone && !isSkipped && !isFuture) ...[
-                      const SizedBox(width: 8),
-                      GestureDetector(
-                        onTap: () {
-                          onSkip(selectedDate);
-                        },
-                        child: Container(
-                          height: 38,
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                          decoration: BoxDecoration(
-                            color: AppColors.isDarkMode ? const Color(0xFF3B2A1A) : const Color(0xFFFFF7ED),
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(
-                              color: const Color(0xFFF59E0B),
-                              width: 1.5,
-                            ),
-                          ),
-                          child: const Row(
-                            children: [
-                              Icon(
-                                Icons.skip_next_rounded,
-                                size: 16,
-                                color: Color(0xFFF59E0B),
-                              ),
-                              SizedBox(width: 3),
-                              Text(
-                                'Skip',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xFFF59E0B),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -465,7 +420,7 @@ class HabitGridRow extends ConsumerWidget {
                               : (isDone ? const Color(0xFFE8F5E9) : const Color(0xFFEDE7F6))),
                       textColor: isSkipped
                           ? AppColors.textSecondary
-                          : (isDone ? (isDark ? const Color(0xFF81C784) : const Color(0xFF2E7D32)) : AppColors.primary),
+                          : (isDone ? (isDark ? const Color(0xFF4ADE80) : const Color(0xFF10B981)) : AppColors.primary),
                     ),
                   ),
                 ],
@@ -498,7 +453,7 @@ class HabitGridRow extends ConsumerWidget {
                         ),
                         Text(
                           '$percentage%',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: categoryColor),
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.primary),
                         ),
                       ],
                     ),
@@ -508,8 +463,8 @@ class HabitGridRow extends ConsumerWidget {
                       child: LinearProgressIndicator(
                         value: weeklyProgress,
                         minHeight: 8,
-                        backgroundColor: categoryColor.withOpacity(0.12),
-                        valueColor: AlwaysStoppedAnimation<Color>(categoryColor),
+                        backgroundColor: AppColors.primaryContainer,
+                        valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
                       ),
                     ),
                   ],
@@ -558,8 +513,8 @@ class HabitGridRow extends ConsumerWidget {
                     builder: (_) => AddHabitDialog(initialHabit: habit),
                   );
                 },
-                icon: Icon(Icons.edit_outlined, color: AppColors.primary),
-                label: Text(
+                icon: const Icon(Icons.edit_outlined, color: AppColors.primary),
+                label: const Text(
                   'Edit Habit',
                   style: TextStyle(
                     color: AppColors.primary,
@@ -568,7 +523,7 @@ class HabitGridRow extends ConsumerWidget {
                 ),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  side: BorderSide(color: AppColors.primary),
+                  side: const BorderSide(color: AppColors.primary),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),
@@ -653,6 +608,7 @@ class HabitGridRow extends ConsumerWidget {
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(20),
+        boxShadow: AppShadows.soft,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

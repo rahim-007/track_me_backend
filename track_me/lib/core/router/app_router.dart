@@ -15,6 +15,7 @@ import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../../features/splash/presentation/screens/splash_screen.dart';
 import '../../features/notifications/presentation/screens/notifications_screen.dart';
+import '../../features/subscription/presentation/screens/premium_screen.dart';
 import '../shell/main_shell.dart';
 
 part 'app_router.g.dart';
@@ -131,6 +132,17 @@ GoRouter appRouter(Ref ref) {
           transitionsBuilder: _slideTransition,
         ),
       ),
+
+      // Premium Subscription Screen (full-screen, with back button)
+      GoRoute(
+        path: AppRoutes.premium,
+        name: 'premium',
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const PremiumScreen(),
+          transitionsBuilder: _slideTransition,
+        ),
+      ),
     ],
     errorBuilder: (context, state) => Scaffold(
       body: Center(
@@ -192,4 +204,5 @@ class AppRoutes {
 
   static const String profile = '/profile';
   static const String notifications = '/notifications';
+  static const String premium = '/premium';
 }

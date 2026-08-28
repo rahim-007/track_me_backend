@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_shadows.dart';
 
-/// Premium reusable button component
+/// Premium clay button component.
+///
+/// Uses clay shadow for depth and removes Material elevation.
 class AppButton extends StatelessWidget {
   final String label;
   final VoidCallback? onPressed;
@@ -41,24 +44,47 @@ class AppButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (isOutlined) {
-      return SizedBox(
+      return Container(
         width: width ?? double.infinity,
         height: height,
+        decoration: BoxDecoration(
+          boxShadow: AppShadows.soft,
+          borderRadius: BorderRadius.circular(16),
+        ),
         child: OutlinedButton(
           onPressed: isLoading ? null : onPressed,
+          style: OutlinedButton.styleFrom(
+            backgroundColor: AppColors.surface,
+            side: BorderSide(
+              color: AppColors.primary.withOpacity(0.35),
+              width: 1.5,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
           child: _buildChild(),
         ),
       );
     }
 
-    return SizedBox(
+    return Container(
       width: width ?? double.infinity,
       height: height,
+      decoration: BoxDecoration(
+        boxShadow: AppShadows.raised,
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: ElevatedButton(
         onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: backgroundColor ?? AppColors.primary,
           foregroundColor: foregroundColor ?? Colors.white,
+          elevation: 0,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
         ),
         child: _buildChild(),
       ),
@@ -92,7 +118,7 @@ class AppButton extends StatelessWidget {
   }
 }
 
-/// Social auth button (Google, Apple)
+/// Social auth button (Google, Apple) with clay surface
 class SocialAuthButton extends StatelessWidget {
   final String label;
   final String? iconPath;
@@ -111,17 +137,22 @@ class SocialAuthButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    return Container(
       width: double.infinity,
       height: 52,
+      decoration: BoxDecoration(
+        boxShadow: AppShadows.soft,
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: OutlinedButton(
         onPressed: isLoading ? null : onPressed,
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.onSurface,
-          side: BorderSide(color: AppColors.border, width: 1.5),
+          side: BorderSide(color: AppColors.border, width: 1),
           backgroundColor: AppColors.surface,
+          elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
           ),
         ),
         child: isLoading

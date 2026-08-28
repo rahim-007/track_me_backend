@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_shadows.dart';
 import '../../data/models/habit_model.dart';
 import '../../providers/missed_habits_provider.dart';
 
@@ -212,8 +213,8 @@ class _Header extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: isDark
-              ? [const Color(0xFF2D1E54), const Color(0xFF1F1D2B)]
-              : [const Color(0xFFF3E8FF), const Color(0xFFEDE9FE)],
+              ? [AppColors.surfaceElevated, AppColors.surface]
+              : [AppColors.primaryContainer, AppColors.surface],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -227,13 +228,7 @@ class _Header extends StatelessWidget {
             decoration: BoxDecoration(
               color: AppColors.surface,
               shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primary.withOpacity(0.15),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
-                ),
-              ],
+              boxShadow: AppShadows.soft,
             ),
             child: const Center(
               child: Text('📝', style: TextStyle(fontSize: 36)),
@@ -245,7 +240,7 @@ class _Header extends StatelessWidget {
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w800,
-              color: isDark ? const Color(0xFFDDD6FE) : const Color(0xFF4C1D95),
+              color: isDark ? AppColors.onPrimaryContainer : AppColors.primary,
               letterSpacing: -0.3,
             ),
             textAlign: TextAlign.center,
@@ -316,7 +311,6 @@ class _HabitReasonCardState extends State<_HabitReasonCard> {
   Widget build(BuildContext context) {
     final habit = widget.entry.habit;
     final emoji = habit.emoji ?? '📋';
-    final isDark = AppColors.isDarkMode;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -329,13 +323,7 @@ class _HabitReasonCardState extends State<_HabitReasonCard> {
               : AppColors.border,
           width: _isValid ? 1.5 : 1,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.25 : 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        boxShadow: AppShadows.raised,
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -501,18 +489,11 @@ class _SubmitButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = AppColors.isDarkMode;
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.3 : 0.06),
-            blurRadius: 12,
-            offset: const Offset(0, -4),
-          ),
-        ],
+        boxShadow: AppShadows.soft,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -539,7 +520,7 @@ class _SubmitButton extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: allValid
                       ? AppColors.primary
-                      : (isDark ? const Color(0xFF2D2A3A) : const Color(0xFFD1D5DB)),
+                      : (AppColors.isDarkMode ? const Color(0xFF2D2A3A) : const Color(0xFFD1D5DB)),
                   foregroundColor: Colors.white,
                   elevation: allValid ? 4 : 0,
                   shape: RoundedRectangleBorder(

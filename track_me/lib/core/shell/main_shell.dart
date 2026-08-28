@@ -21,7 +21,7 @@ class MainShell extends ConsumerWidget {
 
     return Scaffold(
       body: child,
-      bottomNavigationBar: _BottomNavBar(
+      bottomNavigationBar: _ClayBottomNavBar(
         selectedIndex: selectedIndex,
         onTap: (index) => _onNavTap(context, index),
       ),
@@ -57,11 +57,13 @@ class MainShell extends ConsumerWidget {
   }
 }
 
-class _BottomNavBar extends StatelessWidget {
+// ─── Premium Clay Bottom Navigation ──────────────────────────────────────────
+
+class _ClayBottomNavBar extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onTap;
 
-  const _BottomNavBar({
+  const _ClayBottomNavBar({
     required this.selectedIndex,
     required this.onTap,
   });
@@ -73,67 +75,53 @@ class _BottomNavBar extends StatelessWidget {
         color: AppColors.surface,
         boxShadow: [
           BoxShadow(
-            color: AppColors.isDarkMode ? Colors.transparent : Colors.black.withOpacity(0.04),
-            blurRadius: 20,
+            color: AppColors.isDarkMode
+                ? Colors.black.withOpacity(0.40)
+                : Colors.black.withOpacity(0.05),
+            blurRadius: 16,
             offset: const Offset(0, -4),
           ),
         ],
-        border: Border(
-          top: BorderSide(
-            color: AppColors.border,
-            width: 1,
-          ),
-        ),
       ),
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
           child: Row(
             children: [
-              Expanded(
-                child: _NavItem(
-                  icon: Icons.home_rounded,
-                  unselectedIcon: Icons.home_outlined,
-                  label: 'Home',
-                  isSelected: selectedIndex == 0,
-                  onTap: () => onTap(0),
-                ),
+              _ClayNavItem(
+                icon: Icons.home_rounded,
+                unselectedIcon: Icons.home_outlined,
+                label: 'Home',
+                isSelected: selectedIndex == 0,
+                onTap: () => onTap(0),
               ),
-              Expanded(
-                child: _NavItem(
-                  icon: Icons.track_changes_rounded,
-                  unselectedIcon: Icons.track_changes_outlined,
-                  label: 'Habits',
-                  isSelected: selectedIndex == 1,
-                  onTap: () => onTap(1),
-                ),
+              _ClayNavItem(
+                icon: Icons.track_changes_rounded,
+                unselectedIcon: Icons.track_changes_outlined,
+                label: 'Habits',
+                isSelected: selectedIndex == 1,
+                onTap: () => onTap(1),
               ),
-              Expanded(
-                child: _NavItem(
-                  icon: Icons.flag_rounded,
-                  unselectedIcon: Icons.flag_outlined,
-                  label: 'Goals',
-                  isSelected: selectedIndex == 2,
-                  onTap: () => onTap(2),
-                ),
+              _ClayNavItem(
+                icon: Icons.flag_rounded,
+                unselectedIcon: Icons.flag_outlined,
+                label: 'Goals',
+                isSelected: selectedIndex == 2,
+                onTap: () => onTap(2),
               ),
-              Expanded(
-                child: _NavItem(
-                  icon: Icons.account_balance_wallet_rounded,
-                  unselectedIcon: Icons.account_balance_wallet_outlined,
-                  label: 'Cash Flow',
-                  isSelected: selectedIndex == 3,
-                  onTap: () => onTap(3),
-                ),
+              _ClayNavItem(
+                icon: Icons.account_balance_wallet_rounded,
+                unselectedIcon: Icons.account_balance_wallet_outlined,
+                label: 'Cash Flow',
+                isSelected: selectedIndex == 3,
+                onTap: () => onTap(3),
               ),
-              Expanded(
-                child: _NavItem(
-                  icon: Icons.person_rounded,
-                  unselectedIcon: Icons.person_outline_rounded,
-                  label: 'Profile',
-                  isSelected: selectedIndex == 4,
-                  onTap: () => onTap(4),
-                ),
+              _ClayNavItem(
+                icon: Icons.person_rounded,
+                unselectedIcon: Icons.person_outline_rounded,
+                label: 'Profile',
+                isSelected: selectedIndex == 4,
+                onTap: () => onTap(4),
               ),
             ],
           ),
@@ -143,14 +131,14 @@ class _BottomNavBar extends StatelessWidget {
   }
 }
 
-class _NavItem extends StatelessWidget {
+class _ClayNavItem extends StatelessWidget {
   final IconData icon;
   final IconData unselectedIcon;
   final String label;
   final bool isSelected;
   final VoidCallback onTap;
 
-  const _NavItem({
+  const _ClayNavItem({
     required this.icon,
     required this.unselectedIcon,
     required this.label,
@@ -160,43 +148,44 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activeColor = AppColors.primary;
-    final inactiveColor = AppColors.textSecondary;
+    final activeColor = const Color(0xFF5334EA);
+    final inactiveColor = const Color(0xFF718096);
 
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 250),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-            decoration: BoxDecoration(
-              color: isSelected
-                  ? activeColor.withOpacity(AppColors.isDarkMode ? 0.16 : 0.11)
-                  : Colors.transparent,
-              borderRadius: BorderRadius.circular(12),
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOutCubic,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? const Color(0xFFEEECFE)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(
+                isSelected ? icon : unselectedIcon,
+                color: isSelected ? activeColor : inactiveColor,
+                size: 22,
+              ),
             ),
-            child: Icon(
-              isSelected ? icon : unselectedIcon,
-              color: isSelected ? activeColor : inactiveColor,
-              size: 22,
+            const SizedBox(height: 3),
+            AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 200),
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected ? activeColor : inactiveColor,
+              ),
+              child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 9.5,
-              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-              color: isSelected ? activeColor : inactiveColor,
-              letterSpacing: 0.05,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -30,9 +30,9 @@ class CategoryGrid extends StatelessWidget {
           crossAxisCount: 2,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 11,
-          crossAxisSpacing: 11,
-          childAspectRatio: 2.35,
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+          childAspectRatio: 2.25,
           children: tiles,
         ),
       ],
@@ -46,7 +46,7 @@ class CategoryGrid extends StatelessWidget {
       label: c.label,
       description: c.description,
       total: total,
-      color: income ? AppColors.success : AppColors.error,
+      color: income ? const Color(0xFF10B981) : const Color(0xFFF0445F),
     );
   }
 }
@@ -68,42 +68,47 @@ class _CategoryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = AppColors.isDarkMode;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.border),
-        boxShadow: AppColors.isDarkMode
-            ? null
-            : [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.03),
-                  blurRadius: 12,
-                  offset: const Offset(0, 3),
-                ),
-              ],
+        color: isDark ? const Color(0xFF1B162C) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2A2244) : const Color(0xFFEAE8F5),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isDark
+                ? Colors.black.withOpacity(0.3)
+                : const Color(0xFF5B35F5).withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: 42,
+            height: 42,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.13),
-              borderRadius: BorderRadius.circular(13),
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(14),
             ),
             child: Text(
               letter,
               style: TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 14,
+                fontWeight: FontWeight.w900,
+                fontSize: 15,
                 color: color,
               ),
             ),
           ),
-          const SizedBox(width: 11),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -114,30 +119,23 @@ class _CategoryTile extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w800,
                     fontSize: 13.5,
                     color: AppColors.textPrimary,
                   ),
                 ),
+                const SizedBox(height: 2),
                 Text(
-                  description,
+                  '₹${NumberFormat.compact().format(total)}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 10.5,
-                    color: AppColors.textSecondary,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                    color: color,
                   ),
                 ),
               ],
-            ),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            '₹${NumberFormat.compact().format(total)}',
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              fontSize: 13,
-              color: total > 0 ? color : AppColors.textHint,
             ),
           ),
         ],

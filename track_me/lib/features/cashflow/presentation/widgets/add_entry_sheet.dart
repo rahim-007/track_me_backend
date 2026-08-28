@@ -19,15 +19,20 @@ import '../../data/models/cashflow_models.dart';
 ///  - Outflow → "Pay from"    [Bank | Cash | Credit Card] (default: Bank)
 ///  - Debt    → no account selector (existing debt ledger behaviour unchanged)
 class AddEntrySheet extends ConsumerStatefulWidget {
-  const AddEntrySheet({super.key});
+  final int initialKindIndex;
+
+  const AddEntrySheet({
+    super.key,
+    this.initialKindIndex = 0,
+  });
 
   /// Returns true if something was added.
-  static Future<bool> show(BuildContext context) async {
+  static Future<bool> show(BuildContext context, {int initialKindIndex = 0}) async {
     final result = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => const AddEntrySheet(),
+      builder: (_) => AddEntrySheet(initialKindIndex: initialKindIndex),
     );
     return result ?? false;
   }
@@ -37,7 +42,13 @@ class AddEntrySheet extends ConsumerStatefulWidget {
 }
 
 class _AddEntrySheetState extends ConsumerState<AddEntrySheet> {
-  int _kindIndex = 0; // 0 income, 1 outflow, 2 debt
+  late int _kindIndex; // 0 income, 1 outflow, 2 debt
+
+  @override
+  void initState() {
+    super.initState();
+    _kindIndex = widget.initialKindIndex;
+  }
   String? _category;
   bool _theyOweMe = true;
   CashFlowAccount _account = CashFlowAccount.bank;

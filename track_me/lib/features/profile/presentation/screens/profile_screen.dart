@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_shadows.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_button.dart';
@@ -307,6 +308,12 @@ class ProfileScreen extends ConsumerWidget {
                 const SizedBox(height: 12),
                 _SettingsList(
                   items: [
+                    _SettingsItem(
+                      icon: Icons.star_rounded,
+                      title: 'Track Me Premium',
+                      subtitle: 'Unlock unlimited habits, AI & insights',
+                      onTap: () => context.push(AppRoutes.premium),
+                    ),
                     _SettingsItem(
                       icon: Icons.person_outline_rounded,
                       title: 'Edit Profile',
@@ -690,12 +697,7 @@ class _EditProfileDialogState extends ConsumerState<EditProfileDialog> {
                               color: AppColors.primary,
                               shape: BoxShape.circle,
                               border: Border.all(color: Colors.white, width: 2),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.2),
-                                  blurRadius: 6,
-                                ),
-                              ],
+                              boxShadow: AppShadows.soft,
                             ),
                             child: const Icon(
                               Icons.camera_alt_rounded,
@@ -906,13 +908,7 @@ class _AchievementBadge extends StatelessWidget {
             color: isUnlocked ? AppColors.primary.withOpacity(0.2) : Colors.transparent,
             width: 1.5,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          boxShadow: AppShadows.soft,
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

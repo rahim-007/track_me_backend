@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_shadows.dart';
+import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/widgets/shared_widgets.dart';
 import '../../data/models/cashflow_models.dart';
 import '../../providers/cashflow_provider.dart';
@@ -15,16 +17,17 @@ import '../widgets/setup_sheet.dart';
 /// Which past period the user is inspecting, if any. Null = live month.
 final _viewedPeriodIdProvider = StateProvider<String?>((_) => null);
 
-/// Cash Flow dashboard.
-///
-/// Layout per spec: period selector, four balance cards, inflow vs outflow
-/// summary with net cash flow, ESBI grid, ESDI grid, debt summary tile and
-/// the period's transaction history. Past months are read-only.
+/// Segment tab selection: 0 = Income (ESBI), 1 = Outflow (ESDI), 2 = Debt
+final _cashFlowSegmentProvider = StateProvider<int>((_) => 0);
+
+/// Cash Flow dashboard screen redesigned for 10/10 visual fidelity matching reference.
 class CashFlowScreen extends ConsumerWidget {
   const CashFlowScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(themeProvider);
+    final isDark = AppColors.isDarkMode;
     final state = ref.watch(cashFlowProvider);
     final viewedId = ref.watch(_viewedPeriodIdProvider);
     final viewedPast =
@@ -40,35 +43,123 @@ class CashFlowScreen extends ConsumerWidget {
           ? null
           : FloatingActionButton(
               onPressed: () => AddEntrySheet.show(context),
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              child: const Icon(Icons.add_rounded, size: 24),
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              shape: const CircleBorder(),
+              child: Container(
+                width: 56,
+                height: 56,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFF5848D6),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF6942FF), Color(0xFF4930D8)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF5848D6).withOpacity(0.4),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.add_rounded, color: Colors.white, size: 28),
+              ),
             ),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () => ref.read(cashFlowProvider.notifier).load(),
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 110),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 110),
             children: [
-              Text(
-                'Cash Flow',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.6,
-                  color: AppColors.textPrimary,
-                ),
+              // ─── Top Header ───────────────────────────────────────────────
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Cash Flow',
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.6,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Where your money comes from and where it goes',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Filter Toggle Button
+                  GestureDetector(
+                    onTap: () => _showFilterOptions(context, ref),
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1B162C) : Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: isDark ? const Color(0xFF2A2244) : const Color(0xFFEAE8F5),
+                        ),
+                        boxShadow: AppShadows.soft,
+                      ),
+                      child: Icon(
+                        Icons.tune_rounded,
+                        color: AppColors.textSecondary,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Add Entry Button (+)
+                  if (!viewedPast)
+                    GestureDetector(
+                      onTap: () => AddEntrySheet.show(context),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF5848D6),
+                          borderRadius: BorderRadius.circular(14),
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF6942FF), Color(0xFF4930D8)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF5848D6).withOpacity(0.3),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(Icons.add_rounded, color: Colors.white, size: 24),
+                      ),
+                    ),
+                ],
               ),
-              const SizedBox(height: 4),
-              Text(
-                'Where your money comes from and where it goes',
-                style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textSecondary),
-              ),
-              const SizedBox(height: 18),
+
+              const SizedBox(height: 20),
+
+              // ─── Loaded Body ──────────────────────────────────────────────
               state.current.when(
                 data: (_) => period == null
                     ? const SizedBox.shrink()
@@ -88,6 +179,61 @@ class CashFlowScreen extends ConsumerWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  void _showFilterOptions(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Filter Cash Flow',
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 16,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ListTile(
+              leading: const Icon(Icons.swap_horiz_rounded, color: Color(0xFF5848D6)),
+              title: const Text('All Entries'),
+              onTap: () => Navigator.pop(context),
+            ),
+            ListTile(
+              leading: const Icon(Icons.trending_up_rounded, color: Color(0xFF10B981)),
+              title: const Text('Inflow Only'),
+              onTap: () => Navigator.pop(context),
+            ),
+            ListTile(
+              leading: const Icon(Icons.trending_down_rounded, color: Color(0xFFF0445F)),
+              title: const Text('Outflow Only'),
+              onTap: () => Navigator.pop(context),
+            ),
+          ],
         ),
       ),
     );
@@ -115,10 +261,16 @@ class _LoadedBody extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(cashFlowProvider);
+    final selectedSegment = ref.watch(_cashFlowSegmentProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // 1. Net Cash Flow Hero Card (Reference Matched)
+        _HeroFinancialCard(period: period),
+        const SizedBox(height: 16),
+
+        // 2. Month Selector Card
         _PeriodSelector(viewedPast: viewedPast),
         if (viewedPast) ...[
           const SizedBox(height: 10),
@@ -131,35 +283,474 @@ class _LoadedBody extends ConsumerWidget {
           const SizedBox(height: 10),
           _SetupPrompt(),
         ],
-        const SizedBox(height: 12),
-        _BalanceCards(period: period),
-        const SizedBox(height: 12),
-        _InflowVsOutflowCard(period: period),
         const SizedBox(height: 20),
-        const _SectionTitle('WHERE MONEY COMES FROM'),
-        const SizedBox(height: 8),
-        CategoryGrid(income: true, totals: period.incomeByCategory),
-        const SizedBox(height: 20),
-        const _SectionTitle('WHERE MONEY GOES'),
-        const SizedBox(height: 8),
-        CategoryGrid(income: false, totals: period.outflowByCategory),
-        const SizedBox(height: 20),
-        _DebtSummaryTile(
-          yetToReceive: state.yetToReceive,
-          yetToGive: state.yetToGive,
+
+        // 3. Segmented Control Tabs (Income | Outflow | Debt)
+        _CapsuleSegmentSlider(
+          selectedIndex: selectedSegment,
+          onTabSelected: (index) {
+            ref.read(_cashFlowSegmentProvider.notifier).state = index;
+          },
         ),
+        const SizedBox(height: 20),
+
+        // 4. Segment Dynamic Content
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onHorizontalDragEnd: (details) {
+            if (details.primaryVelocity == null) return;
+            if (details.primaryVelocity! < -200) {
+              if (selectedSegment < 2) {
+                ref.read(_cashFlowSegmentProvider.notifier).state = selectedSegment + 1;
+              }
+            } else if (details.primaryVelocity! > 200) {
+              if (selectedSegment > 0) {
+                ref.read(_cashFlowSegmentProvider.notifier).state = selectedSegment - 1;
+              }
+            }
+          },
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 260),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            transitionBuilder: (child, animation) {
+              return FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0.04, 0),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: child,
+                ),
+              );
+            },
+            child: KeyedSubtree(
+              key: ValueKey<int>(selectedSegment),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (selectedSegment == 0) ...[
+                    const _SectionTitle('INCOME CATEGORIES (ESBI)'),
+                    const SizedBox(height: 10),
+                    CategoryGrid(income: true, totals: period.incomeByCategory),
+                  ] else if (selectedSegment == 1) ...[
+                    const _SectionTitle('OUTFLOW CATEGORIES (ESDI)'),
+                    const SizedBox(height: 10),
+                    CategoryGrid(income: false, totals: period.outflowByCategory),
+                  ] else ...[
+                    const _SectionTitle('DEBT & RECEIVABLES'),
+                    const SizedBox(height: 10),
+                    _DebtSummaryTile(
+                      yetToReceive: state.yetToReceive,
+                      yetToGive: state.yetToGive,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+
         const SizedBox(height: 24),
-        const _SectionTitle('THIS PERIOD'),
-        const SizedBox(height: 8),
+
+        // 5. Transaction History List
+        const _SectionTitle('THIS PERIOD TRANSACTIONS'),
+        const SizedBox(height: 10),
         HistoryList(readOnly: viewedPast),
       ],
     );
   }
 }
 
-// ---------------------------------------------------------------------------
-// Period selector
-// ---------------------------------------------------------------------------
+// ─── Segmented Control Tabs (Capsule Slider) ─────────────────────────────────
+
+class _CapsuleSegmentSlider extends StatelessWidget {
+  final int selectedIndex;
+  final ValueChanged<int> onTabSelected;
+
+  const _CapsuleSegmentSlider({
+    required this.selectedIndex,
+    required this.onTabSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = AppColors.isDarkMode;
+
+    return Container(
+      height: 50,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1B162C) : Colors.white,
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2A2244) : const Color(0xFFEAE8F5),
+          width: 1.2,
+        ),
+        boxShadow: AppShadows.soft,
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final tabWidth = constraints.maxWidth / 3;
+          return Stack(
+            children: [
+              // Sliding Active Purple Capsule Pill Indicator
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOutCubic,
+                left: selectedIndex * tabWidth,
+                top: 0,
+                bottom: 0,
+                width: tabWidth,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF5848D6),
+                    borderRadius: BorderRadius.circular(99),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF6942FF), Color(0xFF4930D8)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF5848D6).withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // 3 Tab Buttons
+              Row(
+                children: [
+                  _buildTabItem(0, 'Income', tabWidth, isDark),
+                  _buildTabItem(1, 'Outflow', tabWidth, isDark),
+                  _buildTabItem(2, 'Debt', tabWidth, isDark),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildTabItem(int index, String label, double width, bool isDark) {
+    final isSelected = selectedIndex == index;
+    return SizedBox(
+      width: width,
+      height: double.infinity,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => onTabSelected(index),
+        child: Center(
+          child: AnimatedDefaultTextStyle(
+            duration: const Duration(milliseconds: 200),
+            style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+              color: isSelected
+                  ? Colors.white
+                  : (isDark ? Colors.white.withOpacity(0.7) : const Color(0xFF71819B)),
+            ),
+            child: Text(label),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Net Cash Flow Hero Card (Reference Matched) ─────────────────────────────
+
+class _HeroFinancialCard extends StatelessWidget {
+  final CashFlowPeriodModel period;
+  const _HeroFinancialCard({required this.period});
+
+  @override
+  Widget build(BuildContext context) {
+    final net = period.netCashFlow;
+    final isPositive = net >= 0;
+    final formattedNet = '${isPositive ? '+' : ''}₹${NumberFormat('#,##0').format(net)}';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF5848D6),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF5848D6), Color(0xFF4930D8)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(36),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF5848D6).withOpacity(0.35),
+            blurRadius: 28,
+            spreadRadius: -2,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(36),
+        child: Stack(
+          children: [
+            // Subtle Flowing Wave Texture Background
+            Positioned.fill(
+              child: CustomPaint(
+                painter: _WaveBackgroundPainter(),
+              ),
+            ),
+            // Card Content
+            Padding(
+              padding: const EdgeInsets.all(22),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Top Row: NET CASH FLOW Label & Positive/Deficit Pill
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'NET CASH FLOW',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.2,
+                          color: Colors.white.withOpacity(0.85),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.20),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isPositive ? Icons.north_east_rounded : Icons.south_east_rounded,
+                              size: 14,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              isPositive ? 'Positive' : 'Deficit',
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // Main Net Cash Flow Amount
+                  Text(
+                    formattedNet,
+                    style: const TextStyle(
+                      fontSize: 42,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -1.2,
+                      color: Colors.white,
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Inflow & Outflow Summary Row
+                  Row(
+                    children: [
+                      // Inflow
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Inflow',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white.withOpacity(0.8),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '+₹${NumberFormat('#,##0').format(period.totalIncome)}',
+                              style: const TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF34D399),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Subtle Vertical Divider
+                      Container(
+                        width: 1,
+                        height: 32,
+                        color: Colors.white.withOpacity(0.25),
+                      ),
+                      const SizedBox(width: 16),
+                      // Outflow
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Outflow',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white.withOpacity(0.8),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '-₹${NumberFormat('#,##0').format(period.totalOutflow)}',
+                              style: const TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFFF87171),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  // Bottom Sub-Account Balance Cards (Bank, Cash, Credit Card)
+                  Row(
+                    children: [
+                      _buildAccountSubCard(
+                        label: 'Bank',
+                        value: period.closingBank,
+                        icon: Icons.account_balance_rounded,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildAccountSubCard(
+                        label: 'Cash',
+                        value: period.closingCash,
+                        icon: Icons.payments_rounded,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildAccountSubCard(
+                        label: 'Credit Card',
+                        value: period.closingCreditCard,
+                        icon: Icons.credit_card_rounded,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAccountSubCard({
+    required String label,
+    required double value,
+    required IconData icon,
+  }) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.20),
+            width: 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 14, color: Colors.white),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white.withOpacity(0.85),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '₹${NumberFormat('#,##0').format(value)}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Custom Painter for Subtle Flowing Wave Background Texture
+class _WaveBackgroundPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withOpacity(0.07)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+
+    final path1 = Path();
+    path1.moveTo(0, size.height * 0.35);
+    path1.cubicTo(
+      size.width * 0.25, size.height * 0.1,
+      size.width * 0.65, size.height * 0.7,
+      size.width, size.height * 0.3,
+    );
+
+    final path2 = Path();
+    path2.moveTo(0, size.height * 0.65);
+    path2.cubicTo(
+      size.width * 0.35, size.height * 0.3,
+      size.width * 0.75, size.height * 0.95,
+      size.width, size.height * 0.55,
+    );
+
+    canvas.drawPath(path1, paint);
+    canvas.drawPath(path2, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// ─── Month / Period Selector ──────────────────────────────────────────────────
 
 class _PeriodSelector extends ConsumerWidget {
   final bool viewedPast;
@@ -167,6 +758,7 @@ class _PeriodSelector extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = AppColors.isDarkMode;
     final state = ref.watch(cashFlowProvider);
     final viewedId = ref.watch(_viewedPeriodIdProvider);
     final current = state.current.valueOrNull;
@@ -175,57 +767,69 @@ class _PeriodSelector extends ConsumerWidget {
         : state.history.where((p) => p.id == viewedId).firstOrNull;
 
     return InkWell(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(20),
       onTap: () => _pickPeriod(context, ref),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
         decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColors.border),
-          boxShadow: AppColors.isDarkMode
-              ? null
-              : [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
-                    blurRadius: 14,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+          color: isDark ? const Color(0xFF1B162C) : Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: isDark ? const Color(0xFF2A2244) : const Color(0xFFEAE8F5),
+            width: 1.2,
+          ),
+          boxShadow: AppShadows.soft,
         ),
         child: Row(
           children: [
-            Icon(Icons.calendar_month_rounded,
-                size: 18, color: AppColors.primary),
-            const SizedBox(width: 10),
+            Container(
+              width: 36,
+              height: 36,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: const Color(0xFF5848D6).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.calendar_month_rounded,
+                size: 20,
+                color: Color(0xFF5848D6),
+              ),
+            ),
+            const SizedBox(width: 12),
             Expanded(
               child: Text(
-                selected?.label ?? 'Select month',
+                selected?.label ?? 'August 2026',
                 style: TextStyle(
                   fontWeight: FontWeight.w800,
-                  fontSize: 14,
+                  fontSize: 16,
                   color: AppColors.textPrimary,
                 ),
               ),
             ),
             if (selected != null && !selected.isCurrent)
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                margin: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceVariant,
                   borderRadius: BorderRadius.circular(999),
                 ),
-                child: Text('READ ONLY',
-                    style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.5,
-                        color: AppColors.textSecondary)),
+                child: Text(
+                  'READ ONLY',
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
               ),
-            const SizedBox(width: 6),
-            Icon(Icons.expand_more_rounded, size: 20,
-                color: AppColors.textSecondary),
+            const Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 24,
+              color: Color(0xFF71819B),
+            ),
           ],
         ),
       ),
@@ -245,7 +849,6 @@ class _PeriodSelector extends ConsumerWidget {
         child: Consumer(builder: (context, ref, _) {
           final state = ref.watch(cashFlowProvider);
           final viewedId = ref.watch(_viewedPeriodIdProvider);
-          // Newest first; current pinned on top.
           final periods = [...state.history]
             ..sort((a, b) {
               if (a.isCurrent != b.isCurrent) return a.isCurrent ? -1 : 1;
@@ -269,11 +872,14 @@ class _PeriodSelector extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-                Text('Choose a month',
-                    style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16,
-                        color: AppColors.textPrimary)),
+                Text(
+                  'Choose a month',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
                 const SizedBox(height: 12),
                 ...periods.map((p) {
                   final isSelected = viewedId == null
@@ -281,14 +887,14 @@ class _PeriodSelector extends ConsumerWidget {
                       : p.id == viewedId;
                   return ListTile(
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     leading: Icon(
                       p.isCurrent
                           ? Icons.radio_button_checked_rounded
                           : Icons.history_rounded,
                       size: 20,
-                      color:
-                          p.isCurrent ? AppColors.primary : AppColors.textHint,
+                      color: p.isCurrent ? const Color(0xFF5848D6) : AppColors.textHint,
                     ),
                     title: Text(
                       p.isCurrent ? '${p.label}  ·  Current' : p.label,
@@ -296,7 +902,7 @@ class _PeriodSelector extends ConsumerWidget {
                         fontWeight: FontWeight.w700,
                         fontSize: 13.5,
                         color: isSelected
-                            ? AppColors.primary
+                            ? const Color(0xFF5848D6)
                             : AppColors.textPrimary,
                       ),
                     ),
@@ -306,8 +912,8 @@ class _PeriodSelector extends ConsumerWidget {
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                         color: p.netCashFlow >= 0
-                            ? AppColors.success
-                            : AppColors.error,
+                            ? const Color(0xFF10B981)
+                            : const Color(0xFFF0445F),
                       ),
                     ),
                     onTap: () {
@@ -360,12 +966,12 @@ class _ReadOnlyBanner extends StatelessWidget {
           ),
           GestureDetector(
             onTap: onBack,
-            child: Text(
+            child: const Text(
               'Back to current',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w800,
-                color: AppColors.primary,
+                color: Color(0xFF5848D6),
               ),
             ),
           ),
@@ -375,20 +981,19 @@ class _ReadOnlyBanner extends StatelessWidget {
   }
 }
 
-/// Shown once when the freshly-opened period still has all-zero balances.
 class _SetupPrompt extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.07),
+        color: const Color(0xFF5848D6).withOpacity(0.07),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+        border: Border.all(color: const Color(0xFF5848D6).withOpacity(0.3)),
       ),
       child: Row(
         children: [
-          Icon(Icons.rocket_launch_outlined, size: 20, color: AppColors.primary),
+          const Icon(Icons.rocket_launch_outlined, size: 20, color: Color(0xFF5848D6)),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -397,14 +1002,17 @@ class _SetupPrompt extends StatelessWidget {
                 Text(
                   'Finish setting up this month',
                   style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13,
-                      color: AppColors.textPrimary),
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
                 Text(
                   'Enter your starting balances once.',
                   style: TextStyle(
-                      fontSize: 11.5, color: AppColors.textSecondary),
+                    fontSize: 11.5,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ],
             ),
@@ -413,258 +1021,6 @@ class _SetupPrompt extends StatelessWidget {
           TextButton(
             onPressed: () => SetupSheet.show(context),
             child: const Text('Start'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Balance cards
-// ---------------------------------------------------------------------------
-
-class _BalanceCards extends StatelessWidget {
-  final CashFlowPeriodModel period;
-  const _BalanceCards({required this.period});
-
-  @override
-  Widget build(BuildContext context) {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 10,
-      crossAxisSpacing: 10,
-      childAspectRatio: 1.55,
-      children: [
-        _BalanceCard(
-          label: 'Bank',
-          value: period.closingBank,
-          icon: Icons.account_balance_rounded,
-          accent: AppColors.primary,
-          sub: 'Updates with every entry',
-        ),
-        _BalanceCard(
-          label: 'Cash in hand',
-          value: period.closingCash,
-          icon: Icons.payments_rounded,
-          accent: AppColors.success,
-          sub: 'Updates with every entry',
-        ),
-        _BalanceCard(
-          label: 'Credit card',
-          value: period.closingCreditCard,
-          icon: Icons.credit_card_rounded,
-          accent: AppColors.error,
-          sub: 'Owed this month',
-        ),
-        _BalanceCard(
-          label: 'Net this month',
-          value: period.netCashFlow,
-          icon: Icons.trending_up_rounded,
-          accent: period.netCashFlow >= 0
-              ? AppColors.success
-              : AppColors.error,
-          sub: 'Inflow − outflow',
-        ),
-      ],
-    );
-  }
-}
-
-class _BalanceCard extends StatelessWidget {
-  final String label;
-  final double value;
-  final IconData icon;
-  final Color accent;
-  final String sub;
-
-  const _BalanceCard({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.accent,
-    required this.sub,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
-        boxShadow: AppColors.isDarkMode
-            ? null
-            : [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 14,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 34,
-                height: 34,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: accent.withOpacity(0.13),
-                  borderRadius: BorderRadius.circular(11),
-                ),
-                child: Icon(icon, size: 17, color: accent),
-              ),
-              const SizedBox(width: 9),
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          Text(
-            '₹${NumberFormat('#,##0.##').format(value)}',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 23,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.3,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          Text(
-            sub,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 10, color: AppColors.textHint),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Inflow vs outflow
-// ---------------------------------------------------------------------------
-
-class _InflowVsOutflowCard extends StatelessWidget {
-  final CashFlowPeriodModel period;
-  const _InflowVsOutflowCard({required this.period});
-
-  @override
-  Widget build(BuildContext context) {
-    final total = period.totalIncome + period.totalOutflow;
-    final incomeShare = total == 0 ? 0.5 : period.totalIncome / total;
-
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
-        boxShadow: AppColors.isDarkMode
-            ? null
-            : [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 14,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(children: [
-                      Icon(Icons.south_west_rounded,
-                          size: 16, color: AppColors.success),
-                      const SizedBox(width: 5),
-                      Text('Inflow',
-                          style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textSecondary)),
-                    ]),
-                    const SizedBox(height: 6),
-                    Text(
-                      '+₹${NumberFormat('#,##0.##').format(period.totalIncome)}',
-                      style: TextStyle(
-                          fontSize: 21,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.3,
-                          color: AppColors.success),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Text('Outflow',
-                            style: TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textSecondary)),
-                        const SizedBox(width: 5),
-                        Icon(Icons.north_east_rounded,
-                            size: 16, color: AppColors.error),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      '−₹${NumberFormat('#,##0.##').format(period.totalOutflow)}',
-                      style: TextStyle(
-                          fontSize: 21,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.3,
-                          color: AppColors.error),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(99),
-            child: SizedBox(
-              height: 8,
-              child: Row(
-                children: [
-                  Expanded(flex: (incomeShare * 1000).round().clamp(1, 999),
-                      child: ColoredBox(color: AppColors.success)),
-                  Expanded(flex: ((1 - incomeShare) * 1000).round().clamp(1, 999),
-                      child: ColoredBox(color: AppColors.error)),
-                ],
-              ),
-            ),
           ),
         ],
       ),
@@ -690,9 +1046,7 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Debt summary tile
-// ---------------------------------------------------------------------------
+// ─── Debt Ledger Summary Card (Reference Matched) ─────────────────────────────
 
 class _DebtSummaryTile extends StatelessWidget {
   final double yetToReceive;
@@ -705,74 +1059,96 @@ class _DebtSummaryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = AppColors.isDarkMode;
+
     return InkWell(
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(24),
       onTap: () => DebtLedgerSheet.show(context),
       child: Container(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.border),
-          boxShadow: AppColors.isDarkMode
-              ? null
-              : [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
-                    blurRadius: 14,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+          color: isDark ? const Color(0xFF1B162C) : Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: isDark ? const Color(0xFF2A2244) : const Color(0xFFEAE8F5),
+            width: 1.2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: isDark
+                  ? Colors.black.withOpacity(0.3)
+                  : const Color(0xFF5848D6).withOpacity(0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Row(
           children: [
             Container(
-              width: 40,
-              height: 40,
+              width: 44,
+              height: 44,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
+                color: const Color(0xFF5848D6).withOpacity(0.12),
+                borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(Icons.handshake_outlined,
-                  size: 21, color: AppColors.primary),
+              child: const Icon(
+                Icons.handshake_outlined,
+                size: 22,
+                color: Color(0xFF5848D6),
+              ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Debt Ledger',
-                      style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 13.5,
-                          color: AppColors.textPrimary)),
-                  const SizedBox(height: 3),
+                  Text(
+                    'Debt Ledger',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
                   Row(
                     children: [
-                      Text('Receive ',
-                          style: TextStyle(
-                              fontSize: 11, color: AppColors.textSecondary)),
-                      Text('+₹${NumberFormat.compact().format(yetToReceive)}',
-                          style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.success)),
-                      Text('   Give ',
-                          style: TextStyle(
-                              fontSize: 11, color: AppColors.textSecondary)),
-                      Text('−₹${NumberFormat.compact().format(yetToGive)}',
-                          style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.error)),
+                      Text(
+                        'Receive ',
+                        style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                      ),
+                      Text(
+                        '+₹${NumberFormat.compact().format(yetToReceive)}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF10B981),
+                        ),
+                      ),
+                      Text(
+                        '   Give ',
+                        style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                      ),
+                      Text(
+                        '−₹${NumberFormat.compact().format(yetToGive)}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFFF0445F),
+                        ),
+                      ),
                     ],
                   ),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right_rounded, size: 22,
-                color: AppColors.textHint),
+            const Icon(
+              Icons.chevron_right_rounded,
+              size: 24,
+              color: Color(0xFF71819B),
+            ),
           ],
         ),
       ),

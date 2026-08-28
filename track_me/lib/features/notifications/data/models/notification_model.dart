@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_colors.dart';
 
 /// Category of an in-app notification, used for icon/color styling and to
 /// decide which screen a tap navigates to.
@@ -173,7 +174,7 @@ class NotificationStyle {
   static Color colorFor(NotificationCategory category) {
     switch (category) {
       case NotificationCategory.habit:
-        return const Color(0xFF7C3AED); // purple
+        return AppColors.primary;
       case NotificationCategory.goals:
         return const Color(0xFF10B981); // green
       case NotificationCategory.cashflow:

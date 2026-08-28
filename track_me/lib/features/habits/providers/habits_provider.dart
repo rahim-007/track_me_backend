@@ -180,6 +180,24 @@ class HabitsNotifier extends StateNotifier<HabitsState> {
     state = AsyncValue.data(updated);
     await _cacheHabits(updated);
 
+    // Cancel or restore the local device-side reminder:
+    // If just completed TODAY → cancel the reminder so it won't fire again.
+    // If un-completed TODAY → reschedule so the user gets reminded again.
+    final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    if (dateStr == todayStr) {
+      if (!isCompleted) {
+        // Just marked completed → cancel today's local notification
+        await NotificationService.cancelHabitReminder(habit.id);
+      } else {
+        // Just un-completed → reschedule the reminder
+        final updatedHabit = updated.firstWhere(
+          (h) => h.id == habit.id,
+          orElse: () => currentHabit,
+        );
+        await _scheduleReminder(updatedHabit);
+      }
+    }
+
     if (!habit.id.startsWith('temp_')) {
       try {
         final client = DioClient();
@@ -253,8 +271,16 @@ class HabitsNotifier extends StateNotifier<HabitsState> {
   // ─── Device-side reminders (local fallback for the backend FCM push) ────────
 
   /// (Re)arm local reminders for every habit that has a reminderTime.
+  /// Skips habits already completed today — no point reminding about something
+  /// the user has already done.
   Future<void> _rescheduleAllReminders(List<HabitModel> habits) async {
+    final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
     for (final habit in habits) {
+      if (habit.completedDates.contains(todayStr)) {
+        // Already done today — cancel any lingering local notification
+        await NotificationService.cancelHabitReminder(habit.id);
+        continue;
+      }
       await _scheduleReminder(habit);
     }
   }

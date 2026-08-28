@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_shadows.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/shared_widgets.dart';
 import '../../providers/ai_provider.dart';
@@ -166,13 +167,7 @@ class _ProductivityScoreCard extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: AppColors.primaryGradient,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withOpacity(0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        boxShadow: AppShadows.elevated,
       ),
       child: Row(
         children: [

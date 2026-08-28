@@ -288,20 +288,27 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
     final beforePeriod = state.current.valueOrNull;
     final updatedTxns = beforeTxns.where((t) => t.id != id).toList();
 
+    // 1. Optimistic delete locally so UI updates instantly
     state = state.copyWith(
-      current: beforePeriod == null ? state.current : AsyncValue.data(_recomputePeriodWithTxns(beforePeriod, updatedTxns)),
+      current: beforePeriod == null
+          ? state.current
+          : AsyncValue.data(_recomputePeriodWithTxns(beforePeriod, updatedTxns)),
       transactions: updatedTxns,
     );
-    try {
-      await DioClient().dio.delete('/cashflow/transactions/$id');
-      await _refreshTotals();
-    } catch (_) {
-      state = state.copyWith(
-        current: beforePeriod == null ? state.current : AsyncValue.data(beforePeriod),
-        transactions: beforeTxns,
-      );
-    }
     await _persist();
+
+    // 2. If it's a local/temporary ID, it doesn't exist on backend
+    final isBackendId = id.length == 24 && !id.startsWith('local_') && !id.startsWith('temp_');
+
+    try {
+      if (isBackendId) {
+        await DioClient().dio.delete('/cashflow/transactions/$id');
+      }
+      await _refreshTotals();
+    } catch (e) {
+      // 404 means it's already deleted on server, keep local delete
+      await _refreshTotals();
+    }
   }
 
   CashFlowPeriodModel _recomputePeriodWithTxns(
@@ -420,13 +427,16 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
     _dirtySinceLoad = true;
     final before = state.debts;
     state = state.copyWith(debts: before.where((d) => d.id != id).toList());
+    await _persist();
+    final isBackendId = id.length == 24 && !id.startsWith('local_') && !id.startsWith('temp_');
     try {
-      await DioClient().dio.delete('/cashflow/debts/$id');
+      if (isBackendId) {
+        await DioClient().dio.delete('/cashflow/debts/$id');
+      }
       await _refreshDebtSummary();
     } catch (_) {
-      state = state.copyWith(debts: before);
+      await _refreshDebtSummary();
     }
-    await _persist();
   }
 
   Future<void> _refreshTotals() async {

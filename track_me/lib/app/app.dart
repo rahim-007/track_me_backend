@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/router/app_router.dart';
@@ -14,18 +15,27 @@ class TrackMeApp extends ConsumerWidget {
     final router = ref.watch(appRouterProvider);
     final isDarkMode = ref.watch(themeProvider);
 
-    return MaterialApp.router(
-      // Rebuilding the whole tree on theme change forces every widget that
-      // reads the static AppColors.* palette to re-evaluate — otherwise cards,
-      // buttons and text that don't depend on Theme.of() stay light after
-      // switching to dark mode.
-      key: ValueKey(isDarkMode),
-      title: 'Track Me',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
-      routerConfig: router,
+    final systemOverlayStyle = SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: isDarkMode ? Brightness.light : Brightness.dark,
+      statusBarBrightness: isDarkMode ? Brightness.dark : Brightness.light,
+    );
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: systemOverlayStyle,
+      child: MaterialApp.router(
+        // Rebuilding the whole tree on theme change forces every widget that
+        // reads the static AppColors.* palette to re-evaluate — otherwise cards,
+        // buttons and text that don't depend on Theme.of() stay light after
+        // switching to dark mode.
+        key: ValueKey(isDarkMode),
+        title: 'Track Me',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
+        routerConfig: router,
+      ),
     );
   }
 }
