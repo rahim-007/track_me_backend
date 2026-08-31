@@ -40,14 +40,23 @@ export class FcmService {
     }
 
     try {
-      // The private key arrives from .env with literal \n sequences; normalize
-      // them so the PEM block is valid.
-      const normalizedKey = privateKey.replace(/\n/g, '\n');
+      // Normalize private key:
+      // 1. Strip surrounding quotes if the user pasted them from JSON or .env
+      let cleanedKey = privateKey.trim();
+      if (
+        (cleanedKey.startsWith('"') && cleanedKey.endsWith('"')) ||
+        (cleanedKey.startsWith("'") && cleanedKey.endsWith("'"))
+      ) {
+        cleanedKey = cleanedKey.slice(1, -1);
+      }
+      // 2. Replace literal \n two-character sequences with real newlines
+      const normalizedKey = cleanedKey.replace(/\\n/g, '\n');
+
       if (getApps().length === 0) {
         initializeApp({
           credential: cert({
-            projectId,
-            clientEmail,
+            projectId: projectId.trim(),
+            clientEmail: clientEmail.trim(),
             privateKey: normalizedKey,
           }),
         });
@@ -55,7 +64,7 @@ export class FcmService {
         getApp();
       }
       this.initialized = true;
-      this.logger.log('Firebase Admin initialized for FCM');
+      this.logger.log('Firebase Admin initialized successfully for FCM');
       return true;
     } catch (e) {
       this.logger.error(`Firebase Admin init failed: ${(e as Error).message}`);

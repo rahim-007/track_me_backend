@@ -45,6 +45,12 @@ export class NotificationsController {
     );
   }
 
+  @Post('test-push')
+  @ApiOperation({ summary: 'Send an immediate test push notification to the authenticated user\'s device' })
+  sendTestPush(@Request() req: any) {
+    return this.notificationsService.sendTestPush(req.user.id);
+  }
+
   @Delete('device-token')
   @ApiOperation({ summary: 'Clear the registered FCM device token' })
   clearDeviceToken(@Request() req: any) {

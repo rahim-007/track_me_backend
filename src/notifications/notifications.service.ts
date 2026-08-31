@@ -114,6 +114,54 @@ export class NotificationsService {
     return { registered: false };
   }
 
+  /** Send an immediate test push to the authenticated user's device for diagnostics. */
+  async sendTestPush(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, name: true, fcmToken: true },
+    });
+
+    if (!user) {
+      return { success: false, message: 'User not found' };
+    }
+
+    if (!user.fcmToken) {
+      return {
+        success: false,
+        message: 'No FCM device token registered for this user yet. Open the app on your phone to register your token.',
+      };
+    }
+
+    const title = '🎉 Test Notification';
+    const body = `Hi ${user.name || 'there'}! Push notifications are working perfectly on your device.`;
+
+    const delivered = await this.fcm.sendPush({
+      token: user.fcmToken,
+      title,
+      body,
+      data: { type: 'test', category: 'general' },
+    });
+
+    // Also write an in-app notification row
+    await this.prisma.notification.create({
+      data: {
+        userId,
+        type: 'MOTIVATION',
+        title,
+        body,
+        data: { type: 'test' },
+      },
+    });
+
+    return {
+      success: delivered,
+      deliveredToFCM: delivered,
+      message: delivered
+        ? 'Test push notification sent successfully to your device!'
+        : 'FCM push could not be delivered. Check backend Firebase credentials or FCM token validity.',
+    };
+  }
+
   /** FCM data payload values must be strings — coerce primitives/JSON. */
   private flattenData(data: object): Record<string, string> {
     const flat: Record<string, string> = {};
