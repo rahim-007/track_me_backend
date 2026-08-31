@@ -8,7 +8,6 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
-import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../prisma/prisma.service';
 import { getJwtRefreshExpiresInDays } from '../common/config/jwt.config';
 import { RegisterDto } from './dto/register.dto';
@@ -246,12 +245,25 @@ export class AuthService {
     return { message: 'Logged out successfully' };
   }
 
+  /**
+   * Delete expired refresh tokens from the database.
+   * Utilizes the @@index([expiresAt]) index on refresh_tokens.
+   */
+  async cleanupExpiredTokens(): Promise<number> {
+    const result = await this.prisma.refreshToken.deleteMany({
+      where: {
+        expiresAt: { lt: new Date() },
+      },
+    });
+    return result.count;
+  }
+
   private async generateTokens(userId: string, email: string) {
     const payload = { sub: userId, email };
 
     const accessToken = this.jwtService.sign(payload);
 
-    const refreshTokenValue = uuidv4();
+    const refreshTokenValue = crypto.randomUUID();
     const refreshDays = getJwtRefreshExpiresInDays(this.config);
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + refreshDays);
@@ -391,15 +403,15 @@ export class AuthService {
         body: JSON.stringify({
           from: this.config.get<string>(
             'RESEND_FROM_EMAIL',
-            'Track Me <noreply@trackme.app>',
+            'UrDAY <noreply@urday.app>',
           ),
           to: [to],
-          subject: 'Reset your Track Me password',
+          subject: 'Reset your UrDAY password',
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
               <h2>Reset your password</h2>
               <p>Hi ${name ?? 'there'},</p>
-              <p>We received a request to reset your Track Me password. This link is valid for 1 hour:</p>
+              <p>We received a request to reset your UrDAY password. This link is valid for 1 hour:</p>
               <p><a href="${resetUrl}" style="display:inline-block;padding:12px 20px;background:#4F46E5;color:#fff;text-decoration:none;border-radius:8px;">Reset password</a></p>
               <p>If you didn't request this, you can safely ignore this email.</p>
             </div>

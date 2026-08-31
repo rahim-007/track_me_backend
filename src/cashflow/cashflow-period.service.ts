@@ -1,4 +1,9 @@
-import { Injectable, Optional, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Optional,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   computeClosingBalances,
@@ -7,19 +12,17 @@ import {
   OpeningBalances,
 } from './cashflow-balance.util';
 import { CreatePeriodDto, UpdateBalancesDto } from './dto/cashflow-period.dto';
-import {
-  CreateTransactionDto,
-} from './dto/create-transaction.dto';
+import { CreateTransactionDto } from './dto/create-transaction.dto';
 
 type PeriodRow = {
   id: string;
   userId: string;
   month: number;
   year: number;
-  openingBank: number;
-  openingCash: number;
-  openingCreditCard: number;
-  openingDebt: number;
+  openingBank: number | any;
+  openingCash: number | any;
+  openingCreditCard: number | any;
+  openingDebt: number | any;
   createdAt: Date;
 };
 
@@ -103,7 +106,11 @@ export class CashFlowPeriodService {
     return this.serialize(period);
   }
 
-  private async recalculateFuturePeriods(userId: string, fromMonth?: number, fromYear?: number) {
+  private async recalculateFuturePeriods(
+    userId: string,
+    fromMonth?: number,
+    fromYear?: number,
+  ) {
     const periods = await this.prisma.cashFlowPeriod.findMany({
       where: { userId },
       orderBy: [{ year: 'asc' }, { month: 'asc' }],
@@ -114,7 +121,10 @@ export class CashFlowPeriodService {
       const curr = periods[i];
 
       if (fromMonth !== undefined && fromYear !== undefined) {
-        if (curr.year < fromYear || (curr.year === fromYear && curr.month <= fromMonth)) {
+        if (
+          curr.year < fromYear ||
+          (curr.year === fromYear && curr.month <= fromMonth)
+        ) {
           continue;
         }
       }
@@ -122,10 +132,10 @@ export class CashFlowPeriodService {
       const closing = await this.computeClosing(userId, prev);
 
       if (
-        curr.openingBank !== closing.closingBank ||
-        curr.openingCash !== closing.closingCash ||
-        curr.openingCreditCard !== closing.closingCreditCard ||
-        curr.openingDebt !== closing.closingDebt
+        Number(curr.openingBank) !== closing.closingBank ||
+        Number(curr.openingCash) !== closing.closingCash ||
+        Number(curr.openingCreditCard) !== closing.closingCreditCard ||
+        Number(curr.openingDebt) !== closing.closingDebt
       ) {
         const updated = await this.prisma.cashFlowPeriod.update({
           where: { id: curr.id },
@@ -176,11 +186,21 @@ export class CashFlowPeriodService {
   }
 
   async createTransaction(userId: string, dto: CreateTransactionDto) {
-    if (dto.kind === 'INCOME' && !['E', 'S', 'B', 'I', 'G'].includes(dto.category)) {
-      throw new BadRequestException(`Invalid category '${dto.category}' for INCOME entry`);
+    if (
+      dto.kind === 'INCOME' &&
+      !['E', 'S', 'B', 'I', 'G'].includes(dto.category)
+    ) {
+      throw new BadRequestException(
+        `Invalid category '${dto.category}' for INCOME entry`,
+      );
     }
-    if (dto.kind === 'OUTFLOW' && !['E', 'S', 'D', 'I', 'DO'].includes(dto.category)) {
-      throw new BadRequestException(`Invalid category '${dto.category}' for OUTFLOW entry`);
+    if (
+      dto.kind === 'OUTFLOW' &&
+      !['E', 'S', 'D', 'I', 'DO'].includes(dto.category)
+    ) {
+      throw new BadRequestException(
+        `Invalid category '${dto.category}' for OUTFLOW entry`,
+      );
     }
 
     // INCOME cannot post to a credit card — that doesn't make financial sense
@@ -191,7 +211,10 @@ export class CashFlowPeriodService {
       );
     }
 
-    const dateParts = dto.date.split('T')[0].split('-').map((p) => parseInt(p, 10));
+    const dateParts = dto.date
+      .split('T')[0]
+      .split('-')
+      .map((p) => parseInt(p, 10));
     const year = dateParts[0];
     const month = dateParts[1];
     const day = dateParts[2] || 1;
@@ -300,7 +323,7 @@ export class CashFlowPeriodService {
         latest = await this.latestPeriod(userId);
       }
     }
-    return latest!;
+    return latest;
   }
 
   private async latestPeriod(userId: string): Promise<PeriodRow | null> {
@@ -337,12 +360,18 @@ export class CashFlowPeriodService {
       select: { kind: true, amount: true, category: true, account: true },
     });
     const opening: OpeningBalances = {
-      openingBank: period.openingBank,
-      openingCash: period.openingCash,
-      openingCreditCard: period.openingCreditCard,
-      openingDebt: period.openingDebt,
+      openingBank: Number(period.openingBank),
+      openingCash: Number(period.openingCash),
+      openingCreditCard: Number(period.openingCreditCard),
+      openingDebt: Number(period.openingDebt),
     };
-    return computeClosingBalances(opening, txns);
+    const txnsMapped = txns.map((t) => ({
+      kind: t.kind,
+      category: t.category,
+      amount: Number(t.amount),
+      account: t.account,
+    }));
+    return computeClosingBalances(opening, txnsMapped);
   }
 
   private async getOwnedPeriod(userId: string, periodId: string) {
@@ -360,27 +389,40 @@ export class CashFlowPeriodService {
       select: { kind: true, amount: true, category: true, account: true },
     });
     const opening: OpeningBalances = {
-      openingBank: period.openingBank,
-      openingCash: period.openingCash,
-      openingCreditCard: period.openingCreditCard,
-      openingDebt: period.openingDebt,
+      openingBank: Number(period.openingBank),
+      openingCash: Number(period.openingCash),
+      openingCreditCard: Number(period.openingCreditCard),
+      openingDebt: Number(period.openingDebt),
     };
-    const totals = computeClosingBalances(opening, txns);
+    const txnsMapped = txns.map((t) => ({
+      kind: t.kind,
+      category: t.category,
+      amount: Number(t.amount),
+      account: t.account,
+    }));
+    const totals = computeClosingBalances(opening, txnsMapped);
 
     const incomeByCategory: Record<string, number> = {};
     const outflowByCategory: Record<string, number> = {};
     for (const t of txns) {
+      const amount = Number(t.amount);
       if (t.kind === 'INCOME') {
         incomeByCategory[t.category] =
-          Math.round(((incomeByCategory[t.category] ?? 0) + t.amount) * 100) / 100;
+          Math.round(((incomeByCategory[t.category] ?? 0) + amount) * 100) /
+          100;
       } else {
         outflowByCategory[t.category] =
-          Math.round(((outflowByCategory[t.category] ?? 0) + t.amount) * 100) / 100;
+          Math.round(((outflowByCategory[t.category] ?? 0) + amount) * 100) /
+          100;
       }
     }
 
     return {
       ...period,
+      openingBank: Number(period.openingBank),
+      openingCash: Number(period.openingCash),
+      openingCreditCard: Number(period.openingCreditCard),
+      openingDebt: Number(period.openingDebt),
       totalIncome: totals.totalIncome,
       totalOutflow: totals.totalOutflow,
       netCashFlow: totals.netCashFlow,
@@ -398,7 +440,7 @@ export class CashFlowPeriodService {
     periodId: string;
     kind: string;
     category: string;
-    amount: number;
+    amount: number | any;
     note: string | null;
     date: Date;
     account: string | null;
@@ -406,6 +448,7 @@ export class CashFlowPeriodService {
   }) {
     return {
       ...t,
+      amount: Number(t.amount),
       date: t.date.toISOString().slice(0, 10),
       // Normalise null → 'BANK' so clients always receive an explicit value.
       account: t.account ?? 'BANK',

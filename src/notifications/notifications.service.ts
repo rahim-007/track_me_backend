@@ -71,9 +71,10 @@ export class NotificationsService {
   }
 
   /**
-   * Send a push notification to the user's registered device (if any).
+   * Send a push notification to all the user's registered devices (if any).
+   * Automatically prunes unregistered/dead tokens.
    * Public so other modules can push without creating an in-app row (e.g.
-   * habit reminders fired directly). Returns true when delivered.
+   * habit reminders fired directly). Returns true when at least one device was reached.
    */
   async sendPush(
     userId: string,
@@ -81,40 +82,107 @@ export class NotificationsService {
     body: string,
     data?: object,
   ): Promise<boolean> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
+    const devices = await this.prisma.device.findMany({
+      where: { userId },
       select: { fcmToken: true },
     });
-    if (!user?.fcmToken) return false;
 
-    const delivered = await this.fcm.sendPush({
-      token: user.fcmToken,
-      title,
-      body,
-      data: data ? this.flattenData(data) : undefined,
-    });
-    return delivered;
+    let tokens = devices.map((d) => d.fcmToken);
+
+    if (tokens.length === 0) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { fcmToken: true },
+      });
+      if (user?.fcmToken) {
+        tokens = [user.fcmToken];
+      }
+    }
+
+    if (tokens.length === 0) return false;
+
+    const payload = data ? this.flattenData(data) : undefined;
+    const sendResults = await Promise.all(
+      tokens.map(async (token) => {
+        const res = await this.fcm.sendPush({
+          token,
+          title,
+          body,
+          data: payload,
+        });
+
+        const success = typeof res === 'boolean' ? res : res.success;
+        const isUnregistered = typeof res === 'object' && res.isUnregistered;
+
+        if (isUnregistered) {
+          // Auto-prune dead token from Device table and User.fcmToken
+          await this.prisma.device.deleteMany({
+            where: { fcmToken: token },
+          });
+          await this.prisma.user.updateMany({
+            where: { id: userId, fcmToken: token },
+            data: { fcmToken: null },
+          });
+        }
+
+        return success;
+      }),
+    );
+
+    return sendResults.some((s) => s === true);
   }
 
   /** Register (or refresh) the device token for the current user. */
-  async registerDeviceToken(userId: string, fcmToken: string) {
+  async registerDeviceToken(
+    userId: string,
+    fcmToken: string,
+    platform = 'android',
+  ) {
+    await this.prisma.device.upsert({
+      where: { fcmToken },
+      create: {
+        userId,
+        fcmToken,
+        platform: platform || 'android',
+      },
+      update: {
+        userId,
+        platform: platform || 'android',
+      },
+    });
+
     await this.prisma.user.update({
       where: { id: userId },
       data: { fcmToken },
     });
+
     return { registered: true };
   }
 
-  /** Clear the registered device token (e.g. after logout). */
-  async clearDeviceToken(userId: string) {
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { fcmToken: null },
-    });
+  /** Clear the registered device token(s) (e.g. after logout). */
+  async clearDeviceToken(userId: string, fcmToken?: string) {
+    if (fcmToken) {
+      await this.prisma.device.deleteMany({
+        where: { userId, fcmToken },
+      });
+      await this.prisma.user.updateMany({
+        where: { id: userId, fcmToken },
+        data: { fcmToken: null },
+      });
+    } else {
+      await this.prisma.device.deleteMany({
+        where: { userId },
+      });
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { fcmToken: null },
+      });
+    }
+
     return { registered: false };
   }
 
-  /** Send an immediate test push to the authenticated user's device for diagnostics. */
+  /** Send an immediate test push to the authenticated user's device(s) for diagnostics. */
   async sendTestPush(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -125,21 +193,30 @@ export class NotificationsService {
       return { success: false, message: 'User not found' };
     }
 
-    if (!user.fcmToken) {
+    const devices = await this.prisma.device.findMany({
+      where: { userId },
+      select: { fcmToken: true },
+    });
+
+    let tokens = devices.map((d) => d.fcmToken);
+    if (tokens.length === 0 && user.fcmToken) {
+      tokens = [user.fcmToken];
+    }
+
+    if (tokens.length === 0) {
       return {
         success: false,
-        message: 'No FCM device token registered for this user yet. Open the app on your phone to register your token.',
+        message:
+          'No FCM device token registered for this user yet. Open the app on your phone to register your token.',
       };
     }
 
     const title = '🎉 Test Notification';
     const body = `Hi ${user.name || 'there'}! Push notifications are working perfectly on your device.`;
 
-    const delivered = await this.fcm.sendPush({
-      token: user.fcmToken,
-      title,
-      body,
-      data: { type: 'test', category: 'general' },
+    const delivered = await this.sendPush(userId, title, body, {
+      type: 'test',
+      category: 'general',
     });
 
     // Also write an in-app notification row
@@ -156,8 +233,9 @@ export class NotificationsService {
     return {
       success: delivered,
       deliveredToFCM: delivered,
+      deviceCount: tokens.length,
       message: delivered
-        ? 'Test push notification sent successfully to your device!'
+        ? `Test push notification sent successfully to ${tokens.length} device(s)!`
         : 'FCM push could not be delivered. Check backend Firebase credentials or FCM token validity.',
     };
   }

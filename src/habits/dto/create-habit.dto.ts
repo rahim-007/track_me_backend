@@ -1,5 +1,9 @@
 import {
-  IsString, IsOptional, IsBoolean, IsArray, MaxLength
+  IsString,
+  IsOptional,
+  IsBoolean,
+  IsArray,
+  MaxLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -28,7 +32,9 @@ export class CreateHabitDto {
   @IsOptional()
   color?: string;
 
-  @ApiPropertyOptional({ example: [true, true, true, true, true, false, false] })
+  @ApiPropertyOptional({
+    example: [true, true, true, true, true, false, false],
+  })
   @IsArray()
   @IsOptional()
   repeatDays?: boolean[];

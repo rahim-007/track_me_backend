@@ -119,7 +119,8 @@ export function computeOverallStreaks(
   // long-time users instead of walking every day since the first habit.
   const windowStart = new Date(now);
   windowStart.setUTCDate(windowStart.getUTCDate() - MAX_SCAN_DAYS);
-  const scanStart = earliestHabitDate < windowStart ? windowStart : earliestHabitDate;
+  const scanStart =
+    earliestHabitDate < windowStart ? windowStart : earliestHabitDate;
 
   // Group logs by date string (yyyy-MM-dd).
   const logsByDate = new Map<string, StreakLogInput[]>();
@@ -151,7 +152,9 @@ export function computeOverallStreaks(
     const repeatIndex = weekdayIndexFromDateStr(dateStr);
 
     const scheduledHabits = habits.filter(
-      (h) => isScheduled(h.repeatDays, repeatIndex) && toDateStr(h.createdAt) <= dateStr,
+      (h) =>
+        isScheduled(h.repeatDays, repeatIndex) &&
+        toDateStr(h.createdAt) <= dateStr,
     );
 
     if (scheduledHabits.length === 0) {

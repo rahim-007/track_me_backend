@@ -10,7 +10,9 @@ function makePrismaMock(now = new Date(2026, 7, 15)) {
   const periods: any[] = [];
   const txns: any[] = [];
 
-  const mkPeriod = (p: Partial<any> & { userId: string; month: number; year: number }) => {
+  const mkPeriod = (
+    p: Partial<any> & { userId: string; month: number; year: number },
+  ) => {
     const row = {
       id: `p${++seq}`,
       openingBank: 0,
@@ -46,7 +48,11 @@ function makePrismaMock(now = new Date(2026, 7, 15)) {
           );
         }
         if (where.id && where.userId) {
-          return periods.find((p) => p.id === where.id && p.userId === where.userId) ?? null;
+          return (
+            periods.find(
+              (p) => p.id === where.id && p.userId === where.userId,
+            ) ?? null
+          );
         }
         if (where.id !== undefined && where.userId === undefined) {
           return periods.find((p) => p.id === where.id) ?? null;
@@ -61,11 +67,20 @@ function makePrismaMock(now = new Date(2026, 7, 15)) {
       findMany: async ({ where, orderBy }: any) => {
         const rows = periods.filter((p) => p.userId === where.userId);
         return rows.sort((a, b) =>
-          orderBy?.[0]?.year === 'asc' ? a.year - b.year || a.month - b.month : b.year - a.year || b.month - a.month,
+          orderBy?.[0]?.year === 'asc'
+            ? a.year - b.year || a.month - b.month
+            : b.year - a.year || b.month - a.month,
         );
       },
       create: async ({ data }: any) => {
-        if (periods.some((p) => p.userId === data.userId && p.month === data.month && p.year === data.year)) {
+        if (
+          periods.some(
+            (p) =>
+              p.userId === data.userId &&
+              p.month === data.month &&
+              p.year === data.year,
+          )
+        ) {
           throw new Error('Unique constraint failed');
         }
         return mkPeriod(data);
@@ -79,7 +94,10 @@ function makePrismaMock(now = new Date(2026, 7, 15)) {
       upsert: async ({ where, create }: any) => {
         const key = where.userId_month_year;
         const existing = periods.find(
-          (p) => p.userId === key.userId && p.month === key.month && p.year === key.year,
+          (p) =>
+            p.userId === key.userId &&
+            p.month === key.month &&
+            p.year === key.year,
         );
         if (existing) return existing;
         return mkPeriod({ userId: key.userId, ...create });
@@ -97,8 +115,10 @@ function makePrismaMock(now = new Date(2026, 7, 15)) {
       },
       findMany: async ({ where, select }: any) => {
         const rows = txns
-          .filter((t) => (where.periodId ? t.periodId === where.periodId : true))
-          .map((t) => (select ? ((t as any).__picked = true, t) : t));
+          .filter((t) =>
+            where.periodId ? t.periodId === where.periodId : true,
+          )
+          .map((t) => (select ? ((t.__picked = true), t) : t));
         return rows;
       },
       create: async ({ data }: any) => {
@@ -141,8 +161,20 @@ describe('CashFlowPeriodService — month rollover & carry-forward', () => {
       openingBank: 40000,
     });
     prisma.txns.push(
-      { id: 't1', periodId: july.id, kind: 'INCOME', amount: 30000, category: 'E' },
-      { id: 't2', periodId: july.id, kind: 'OUTFLOW', amount: 12500.75, category: 'E' },
+      {
+        id: 't1',
+        periodId: july.id,
+        kind: 'INCOME',
+        amount: 30000,
+        category: 'E',
+      },
+      {
+        id: 't2',
+        periodId: july.id,
+        kind: 'OUTFLOW',
+        amount: 12500.75,
+        category: 'E',
+      },
     );
 
     const current = await svc.getCurrentPeriod('u1');
@@ -312,5 +344,31 @@ describe('CashFlowPeriodService — month rollover & carry-forward', () => {
 
     const currentAfter = await svc.getCurrentPeriod('u1');
     expect(currentAfter.openingBank).toBe(6000);
+  });
+
+  it('correctly handles Decimal values from database', async () => {
+    const prisma = makePrismaMock();
+    const svc = new CashFlowPeriodService(prisma as any, () => FIXED_AUG_2026);
+
+    const period = prisma.mkPeriod({
+      userId: 'u1',
+      month: 8,
+      year: 2026,
+      openingBank: '1000.50',
+      openingCash: '200.25',
+    });
+    prisma.txns.push({
+      id: 't1',
+      periodId: period.id,
+      kind: 'INCOME',
+      amount: '500.50' as any,
+      category: 'E',
+    });
+
+    const serialized = await svc.getCurrentPeriod('u1');
+    expect(typeof serialized.openingBank).toBe('number');
+    expect(serialized.openingBank).toBe(1000.5);
+    expect(serialized.totalIncome).toBe(500.5);
+    expect(serialized.closingBank).toBe(1501);
   });
 });

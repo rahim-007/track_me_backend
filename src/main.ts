@@ -42,7 +42,7 @@ async function bootstrap() {
 
   // Swagger Documentation
   const config = new DocumentBuilder()
-    .setTitle('Track Me API')
+    .setTitle('UrDAY API')
     .setDescription('AI-Powered Productivity App REST API')
     .setVersion('1.0')
     .addBearerAuth(
@@ -68,9 +68,11 @@ async function bootstrap() {
   const port = process.env.PORT ?? 3000;
   await app.listen(port, '0.0.0.0');
 
-  console.log(`🚀 Track Me API running on: http://0.0.0.0:${port}/api`);
+  console.log(`🚀 UrDAY API running on: http://0.0.0.0:${port}/api`);
   console.log(`📚 Swagger docs: http://localhost:${port}/api/docs`);
-  console.log(`🗑️  Delete account page: http://localhost:${port}/delete-account.html`);
+  console.log(
+    `🗑️  Delete account page: http://localhost:${port}/delete-account.html`,
+  );
 }
 
 bootstrap();

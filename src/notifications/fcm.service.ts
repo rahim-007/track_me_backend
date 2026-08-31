@@ -14,6 +14,11 @@ import { getMessaging } from 'firebase-admin/messaging';
  * Initialization is lazy and best-effort: if the vars are missing the service
  * simply logs once and skips sending, so the app works without push configured.
  */
+export interface FcmPushResult {
+  success: boolean;
+  isUnregistered: boolean;
+}
+
 @Injectable()
 export class FcmService {
   private readonly logger = new Logger(FcmService.name);
@@ -74,17 +79,17 @@ export class FcmService {
 
   /**
    * Send a push notification to a device token.
-   * @returns true if the message was accepted by FCM, false otherwise
-   * (including when FCM isn't configured or the token is invalid/revoked).
+   * @returns FcmPushResult detailing whether the message was delivered or token is unregistered.
    */
   async sendPush(params: {
     token: string;
     title: string;
     body: string;
     data?: Record<string, string>;
-  }): Promise<boolean> {
-    if (!this.ensureInitialized()) return false;
-    if (!params.token) return false;
+  }): Promise<FcmPushResult> {
+    if (!this.ensureInitialized())
+      return { success: false, isUnregistered: false };
+    if (!params.token) return { success: false, isUnregistered: false };
 
     try {
       const message = {
@@ -104,15 +109,24 @@ export class FcmService {
         data: params.data ?? {},
       };
       await getMessaging().send(message);
-      return true;
+      return { success: true, isUnregistered: false };
     } catch (e) {
-      // UNREGISTERED / INVALID_ARGUMENT means the token is dead — the caller
-      // can decide whether to clear it (handled by NotificationsService).
       const err = e as { code?: string; message?: string };
+      const code = err.code ?? '';
+      const message = err.message ?? '';
+      const isUnregistered =
+        code.includes('registration-token-not-registered') ||
+        code.includes('invalid-registration-token') ||
+        code.includes('UNREGISTERED') ||
+        code.includes('INVALID_ARGUMENT') ||
+        message.includes('not registered') ||
+        message.includes('Requested entity was not found') ||
+        message.includes('invalid registration token');
+
       this.logger.debug(
-        `FCM send failed (${err.code ?? 'unknown'}): ${err.message ?? e}`,
+        `FCM send failed (${code || 'unknown'}): ${message || e}`,
       );
-      return false;
+      return { success: false, isUnregistered };
     }
   }
 }

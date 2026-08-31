@@ -19,7 +19,10 @@ export class GoogleAuthDto {
   @IsOptional()
   avatarUrl?: string;
 
-  @ApiProperty({ required: false, description: 'Google ID token for server-side verification' })
+  @ApiProperty({
+    required: false,
+    description: 'Google ID token for server-side verification',
+  })
   @IsString()
   @IsOptional()
   id_token?: string;

@@ -1,6 +1,13 @@
 import {
-  Controller, Get, Post, Patch, Delete,
-  Body, Param, Request, UseGuards
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Request,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { HabitsService } from './habits.service';
@@ -35,7 +42,11 @@ export class HabitsController {
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update a habit' })
-  update(@Request() req: any, @Param('id') id: string, @Body() dto: UpdateHabitDto) {
+  update(
+    @Request() req: any,
+    @Param('id') id: string,
+    @Body() dto: UpdateHabitDto,
+  ) {
     return this.habitsService.update(req.user.id, id, dto);
   }
 

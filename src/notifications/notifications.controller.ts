@@ -1,5 +1,14 @@
 import {
-  Body, Controller, Delete, Get, Patch, Post, Param, Query, Request, UseGuards
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Patch,
+  Post,
+  Param,
+  Query,
+  Request,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { NotificationsService } from './notifications.service';
@@ -34,19 +43,28 @@ export class NotificationsController {
   }
 
   @Post('device-token')
-  @ApiOperation({ summary: 'Register (or refresh) the user\'s FCM device token' })
-  registerDeviceToken(@Request() req: any, @Body() dto: RegisterDeviceTokenDto) {
+  @ApiOperation({
+    summary: "Register (or refresh) the user's FCM device token",
+  })
+  registerDeviceToken(
+    @Request() req: any,
+    @Body() dto: RegisterDeviceTokenDto,
+  ) {
     if (!dto.token || dto.token.trim().length === 0) {
       return this.notificationsService.clearDeviceToken(req.user.id);
     }
     return this.notificationsService.registerDeviceToken(
       req.user.id,
       dto.token.trim(),
+      dto.platform,
     );
   }
 
   @Post('test-push')
-  @ApiOperation({ summary: 'Send an immediate test push notification to the authenticated user\'s device' })
+  @ApiOperation({
+    summary:
+      "Send an immediate test push notification to the authenticated user's device",
+  })
   sendTestPush(@Request() req: any) {
     return this.notificationsService.sendTestPush(req.user.id);
   }

@@ -15,7 +15,8 @@ export class UpdateUserDto {
 
   @ApiProperty({
     required: false,
-    description: 'IANA timezone name (e.g. "Asia/Kolkata") used to schedule reminders at the user\'s local clock',
+    description:
+      'IANA timezone name (e.g. "Asia/Kolkata") used to schedule reminders at the user\'s local clock',
   })
   @IsOptional()
   @IsString()

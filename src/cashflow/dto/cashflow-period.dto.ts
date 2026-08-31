@@ -31,7 +31,10 @@ export class CreatePeriodDto {
   @IsNumber()
   openingCash: number;
 
-  @ApiProperty({ example: -12000, description: 'Opening credit-card balance (use negative for amount owed)' })
+  @ApiProperty({
+    example: -12000,
+    description: 'Opening credit-card balance (use negative for amount owed)',
+  })
   @IsNumber()
   openingCreditCard: number;
 

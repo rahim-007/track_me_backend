@@ -33,7 +33,8 @@ function makePrismaMock() {
         return row;
       },
       findFirst: async ({ where }: any) =>
-        debts.find((d) => d.id === where.id && d.userId === where.userId) ?? null,
+        debts.find((d) => d.id === where.id && d.userId === where.userId) ??
+        null,
       update: async ({ where, data }: any) => {
         const row = debts.find((d) => d.id === where.id);
         if (!row) throw new Error('not found');
@@ -141,5 +142,30 @@ describe('CashFlowDebtService', () => {
       date: '2026-08-05',
     });
     expect(d.date).toBe('2026-08-05');
+  });
+
+  it('correctly parses Decimal objects in aggregates and serialization', async () => {
+    const prisma = makePrismaMock();
+    const svc = new CashFlowDebtService(prisma as any);
+
+    prisma.debts.push({
+      id: 'd1',
+      userId: 'u1',
+      direction: 'GIVE',
+      person: 'Bank',
+      amount: '1250.75' as any,
+      settled: false,
+      settledAt: null,
+      date: new Date('2026-08-01'),
+      createdAt: new Date(),
+    });
+
+    const summary = await svc.getSummary('u1');
+    expect(typeof summary.yetToGive).toBe('number');
+    expect(summary.yetToGive).toBe(1250.75);
+
+    const all = await svc.findAll('u1');
+    expect(typeof all[0].amount).toBe('number');
+    expect(all[0].amount).toBe(1250.75);
   });
 });

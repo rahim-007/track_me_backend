@@ -34,7 +34,10 @@ export class CreateCashFlowDebtDto {
   @MaxLength(500)
   note?: string;
 
-  @ApiProperty({ example: '2026-08-22', description: 'Date in YYYY-MM-DD format' })
+  @ApiProperty({
+    example: '2026-08-22',
+    description: 'Date in YYYY-MM-DD format',
+  })
   @IsDateString()
   date: string;
 }

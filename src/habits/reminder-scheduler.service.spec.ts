@@ -6,7 +6,7 @@ const MON_730 = new Date(2026, 7, 10, 7, 30, 0, 0);
 const config = (overrides: Record<string, any> = {}) =>
   ({
     get: (key: string, def?: any) => (key in overrides ? overrides[key] : def),
-  } as any);
+  }) as any;
 
 describe('ReminderSchedulerService.tick (habits)', () => {
   const habit = (over: Partial<any> = {}) => ({
@@ -38,7 +38,11 @@ describe('ReminderSchedulerService.tick (habits)', () => {
   });
 
   it('sends a reminder for a habit due at the current time', async () => {
-    const service = new ReminderSchedulerService(prisma as any, notifications as any, config());
+    const service = new ReminderSchedulerService(
+      prisma as any,
+      notifications as any,
+      config(),
+    );
 
     const sent = await service.tick(MON_730);
 
@@ -72,7 +76,11 @@ describe('ReminderSchedulerService.tick (habits)', () => {
 
   it('does nothing when no habit has a reminder time', async () => {
     prisma.habit.findMany.mockResolvedValue([]);
-    const service = new ReminderSchedulerService(prisma as any, notifications as any, config());
+    const service = new ReminderSchedulerService(
+      prisma as any,
+      notifications as any,
+      config(),
+    );
     const sent = await service.tick(MON_730);
     expect(sent).toBe(0);
     expect(notifications.create).not.toHaveBeenCalled();
@@ -80,7 +88,11 @@ describe('ReminderSchedulerService.tick (habits)', () => {
 
   it('skips habits whose reminder time does not match the local clock', async () => {
     prisma.habit.findMany.mockResolvedValue([habit({ reminderTime: '08:00' })]);
-    const service = new ReminderSchedulerService(prisma as any, notifications as any, config());
+    const service = new ReminderSchedulerService(
+      prisma as any,
+      notifications as any,
+      config(),
+    );
     const sent = await service.tick(MON_730);
     expect(sent).toBe(0);
     expect(notifications.create).not.toHaveBeenCalled();
@@ -91,7 +103,11 @@ describe('ReminderSchedulerService.tick (habits)', () => {
     prisma.habit.findMany.mockResolvedValue([
       habit({ repeatDays: [false, true, true, true, true, true, true] }),
     ]);
-    const service = new ReminderSchedulerService(prisma as any, notifications as any, config());
+    const service = new ReminderSchedulerService(
+      prisma as any,
+      notifications as any,
+      config(),
+    );
     const sent = await service.tick(MON_730);
     expect(sent).toBe(0);
     expect(notifications.create).not.toHaveBeenCalled();
@@ -101,7 +117,11 @@ describe('ReminderSchedulerService.tick (habits)', () => {
     prisma.notification.findMany.mockResolvedValue([
       { userId: 'u1', data: { category: 'habit', relatedId: 'h1' } },
     ]);
-    const service = new ReminderSchedulerService(prisma as any, notifications as any, config());
+    const service = new ReminderSchedulerService(
+      prisma as any,
+      notifications as any,
+      config(),
+    );
     const sent = await service.tick(MON_730);
     expect(sent).toBe(0);
     expect(notifications.create).not.toHaveBeenCalled();
@@ -109,7 +129,11 @@ describe('ReminderSchedulerService.tick (habits)', () => {
 
   it('skips habits already completed today (non-skipped log exists)', async () => {
     prisma.habitLog.findMany.mockResolvedValue([{ habitId: 'h1' }]);
-    const service = new ReminderSchedulerService(prisma as any, notifications as any, config());
+    const service = new ReminderSchedulerService(
+      prisma as any,
+      notifications as any,
+      config(),
+    );
     const sent = await service.tick(MON_730);
     expect(sent).toBe(0);
     expect(notifications.create).not.toHaveBeenCalled();
@@ -120,18 +144,26 @@ describe('ReminderSchedulerService.tick (habits)', () => {
     prisma.habit.findMany.mockResolvedValue([
       habit({ reminderTime: '13:00', user: { timezone: 'Asia/Kolkata' } }),
     ]);
-    const service = new ReminderSchedulerService(prisma as any, notifications as any, config({
-      REMINDER_TIMEZONE: 'UTC', // fallback would NOT match 13:00
-    }));
+    const service = new ReminderSchedulerService(
+      prisma as any,
+      notifications as any,
+      config({
+        REMINDER_TIMEZONE: 'UTC', // fallback would NOT match 13:00
+      }),
+    );
     const utcNow = new Date(Date.UTC(2026, 7, 10, 7, 30, 0));
     const sent = await service.tick(utcNow);
     expect(sent).toBe(1);
   });
 
   it('falls back to the configured timezone when the user has none', async () => {
-    const service = new ReminderSchedulerService(prisma as any, notifications as any, config({
-      REMINDER_TIMEZONE: 'Asia/Kolkata',
-    }));
+    const service = new ReminderSchedulerService(
+      prisma as any,
+      notifications as any,
+      config({
+        REMINDER_TIMEZONE: 'Asia/Kolkata',
+      }),
+    );
     // 07:30 UTC = 13:00 IST. Habit's reminderTime is 07:30 but in IST it is
     // 13:00 — so no match, nothing is sent.
     const utcNow = new Date(Date.UTC(2026, 7, 10, 7, 30, 0));
@@ -148,10 +180,24 @@ describe('ReminderSchedulerService.tick (habits)', () => {
 
   it('only reminds the user whose local clock matches (mixed timezones)', async () => {
     prisma.habit.findMany.mockResolvedValue([
-      habit({ id: 'h-kolkata', userId: 'u-k', reminderTime: '13:00', user: { timezone: 'Asia/Kolkata' } }),
-      habit({ id: 'h-utc', userId: 'u-u', reminderTime: '07:30', user: { timezone: 'UTC' } }),
+      habit({
+        id: 'h-kolkata',
+        userId: 'u-k',
+        reminderTime: '13:00',
+        user: { timezone: 'Asia/Kolkata' },
+      }),
+      habit({
+        id: 'h-utc',
+        userId: 'u-u',
+        reminderTime: '07:30',
+        user: { timezone: 'UTC' },
+      }),
     ]);
-    const service = new ReminderSchedulerService(prisma as any, notifications as any, config());
+    const service = new ReminderSchedulerService(
+      prisma as any,
+      notifications as any,
+      config(),
+    );
     // 07:30 UTC → 13:00 IST for Kolkata user, 07:30 for UTC user. Both due.
     const utcNow = new Date(Date.UTC(2026, 7, 10, 7, 30, 0));
     const sent = await service.tick(utcNow);
@@ -159,15 +205,29 @@ describe('ReminderSchedulerService.tick (habits)', () => {
 
     // 07:30 UTC → 13:00 IST; a NYC user (UTC-4 in August) is at 03:30 → not due.
     prisma.habit.findMany.mockResolvedValue([
-      habit({ id: 'h-nyc', userId: 'u-n', reminderTime: '07:30', user: { timezone: 'America/New_York' } }),
-      habit({ id: 'h-kolkata', userId: 'u-k', reminderTime: '13:00', user: { timezone: 'Asia/Kolkata' } }),
+      habit({
+        id: 'h-nyc',
+        userId: 'u-n',
+        reminderTime: '07:30',
+        user: { timezone: 'America/New_York' },
+      }),
+      habit({
+        id: 'h-kolkata',
+        userId: 'u-k',
+        reminderTime: '13:00',
+        user: { timezone: 'Asia/Kolkata' },
+      }),
     ]);
     const sent2 = await service.tick(utcNow);
     expect(sent2).toBe(1);
   });
 
   it('is idempotent across repeated ticks (same-day dedupe via DB)', async () => {
-    const service = new ReminderSchedulerService(prisma as any, notifications as any, config());
+    const service = new ReminderSchedulerService(
+      prisma as any,
+      notifications as any,
+      config(),
+    );
     await service.tick(MON_730); // first run: sends
 
     // Second run: the DB now reports the reminder was already sent.
@@ -188,7 +248,11 @@ describe('ReminderSchedulerService.tick (habits)', () => {
       habit({ id: 'h1' }),
       habit({ id: 'h2', name: 'Read' }),
     ]);
-    const service = new ReminderSchedulerService(prisma as any, notifications as any, config());
+    const service = new ReminderSchedulerService(
+      prisma as any,
+      notifications as any,
+      config(),
+    );
 
     const sent = await service.tick(MON_730);
     expect(sent).toBe(1); // h1 failed, h2 succeeded
@@ -228,7 +292,11 @@ describe('ReminderSchedulerService.tick (goals)', () => {
   });
 
   it('sends a goal reminder for an in-progress goal within the window', async () => {
-    const service = new ReminderSchedulerService(prisma as any, notifications as any, config());
+    const service = new ReminderSchedulerService(
+      prisma as any,
+      notifications as any,
+      config(),
+    );
 
     const sent = await service.tick(TUE_0900);
 
@@ -263,7 +331,11 @@ describe('ReminderSchedulerService.tick (goals)', () => {
   });
 
   it('does not nudge when the local time-of-day is outside GOAL_REMINDER_TIME', async () => {
-    const service = new ReminderSchedulerService(prisma as any, notifications as any, config());
+    const service = new ReminderSchedulerService(
+      prisma as any,
+      notifications as any,
+      config(),
+    );
     const sent = await service.tick(MON_730); // 07:30 ≠ 09:00
     // The goal query still runs (per-user gate) but nothing is sent.
     expect(prisma.goal.findMany).toHaveBeenCalled();
@@ -272,9 +344,13 @@ describe('ReminderSchedulerService.tick (goals)', () => {
   });
 
   it('respects GOAL_REMINDER_DAYS as the per-user window (JS-side)', async () => {
-    const service = new ReminderSchedulerService(prisma as any, notifications as any, config({
-      GOAL_REMINDER_DAYS: 3,
-    }));
+    const service = new ReminderSchedulerService(
+      prisma as any,
+      notifications as any,
+      config({
+        GOAL_REMINDER_DAYS: 3,
+      }),
+    );
     // targetDate is 4 days out → outside the 3-day window → not sent.
     const sent = await service.tick(TUE_0900);
     expect(sent).toBe(0);
@@ -288,7 +364,11 @@ describe('ReminderSchedulerService.tick (goals)', () => {
 
   it('excludes completed/overdue goals via the status filter (no rows → no reminder)', async () => {
     prisma.goal.findMany.mockResolvedValue([]);
-    const service = new ReminderSchedulerService(prisma as any, notifications as any, config());
+    const service = new ReminderSchedulerService(
+      prisma as any,
+      notifications as any,
+      config(),
+    );
     const sent = await service.tick(TUE_0900);
     expect(sent).toBe(0);
     expect(prisma.goal.findMany).toHaveBeenCalledWith(
@@ -305,7 +385,11 @@ describe('ReminderSchedulerService.tick (goals)', () => {
     prisma.notification.findMany.mockResolvedValue([
       { userId: 'u1', data: { category: 'goals', relatedId: 'g1' } },
     ]);
-    const service = new ReminderSchedulerService(prisma as any, notifications as any, config());
+    const service = new ReminderSchedulerService(
+      prisma as any,
+      notifications as any,
+      config(),
+    );
     const sent = await service.tick(TUE_0900);
     expect(sent).toBe(0);
     expect(notifications.create).not.toHaveBeenCalled();
@@ -315,10 +399,16 @@ describe('ReminderSchedulerService.tick (goals)', () => {
     prisma.goal.findMany.mockResolvedValue([
       goal({ targetDate: new Date(Date.UTC(2026, 7, 11, 0, 0, 0)) }),
     ]);
-    const service = new ReminderSchedulerService(prisma as any, notifications as any, config());
+    const service = new ReminderSchedulerService(
+      prisma as any,
+      notifications as any,
+      config(),
+    );
     await service.tick(TUE_0900);
     expect(notifications.create).toHaveBeenCalledWith(
-      expect.objectContaining({ body: 'Your goal target date is today. Keep pushing!' }),
+      expect.objectContaining({
+        body: 'Your goal target date is today. Keep pushing!',
+      }),
     );
   });
 
@@ -326,7 +416,11 @@ describe('ReminderSchedulerService.tick (goals)', () => {
     prisma.goal.findMany.mockResolvedValue([
       goal({ id: 'g-k', userId: 'u-k', user: { timezone: 'Asia/Kolkata' } }),
     ]);
-    const service = new ReminderSchedulerService(prisma as any, notifications as any, config());
+    const service = new ReminderSchedulerService(
+      prisma as any,
+      notifications as any,
+      config(),
+    );
     // 2026-08-11 03:30 UTC = 09:00 IST → the Kolkata user's local goal time.
     const ist0900 = new Date(Date.UTC(2026, 7, 11, 3, 30, 0));
     const sent = await service.tick(ist0900);
@@ -338,7 +432,11 @@ describe('ReminderSchedulerService.tick (goals)', () => {
       goal({ id: 'g-k', userId: 'u-k', user: { timezone: 'Asia/Kolkata' } }),
       goal({ id: 'g-u', userId: 'u-u', user: { timezone: 'UTC' } }),
     ]);
-    const service = new ReminderSchedulerService(prisma as any, notifications as any, config());
+    const service = new ReminderSchedulerService(
+      prisma as any,
+      notifications as any,
+      config(),
+    );
     // 03:30 UTC: Kolkata is 09:00 (nudge), UTC is 03:30 (no nudge).
     const ist0900 = new Date(Date.UTC(2026, 7, 11, 3, 30, 0));
     const sent = await service.tick(ist0900);
@@ -363,11 +461,34 @@ describe('ReminderSchedulerService.tick (goals)', () => {
         user: { timezone: null },
       },
     ]);
-    const service = new ReminderSchedulerService(prisma as any, notifications as any, config({
-      GOAL_REMINDER_TIME: '07:30',
-    }));
+    const service = new ReminderSchedulerService(
+      prisma as any,
+      notifications as any,
+      config({
+        GOAL_REMINDER_TIME: '07:30',
+      }),
+    );
     const sent = await service.tick(MON_730);
     expect(sent).toBe(2);
     expect(notifications.create).toHaveBeenCalledTimes(2);
+  });
+
+  it('triggers cleanup of expired refresh tokens when authService is injected', async () => {
+    const authService = {
+      cleanupExpiredTokens: jest.fn().mockResolvedValue(3),
+    };
+    const service = new ReminderSchedulerService(
+      prisma as any,
+      notifications as any,
+      config(),
+      authService as any,
+    );
+
+    await service.tick(MON_730);
+    expect(authService.cleanupExpiredTokens).toHaveBeenCalledTimes(1);
+
+    // Second tick within 1 hour should throttle and not run cleanup again
+    await service.tick(new Date(MON_730.getTime() + 1000 * 60));
+    expect(authService.cleanupExpiredTokens).toHaveBeenCalledTimes(1);
   });
 });

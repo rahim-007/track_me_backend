@@ -84,6 +84,7 @@ model User {
   missedHabitReasons MissedHabitReason[]
   cashFlowPeriods    CashFlowPeriod[]
   cashFlowDebts      CashFlowDebt[]
+  devices            Device[]
 
   @@index([email])
   @@index([googleId])
@@ -113,7 +114,21 @@ model RefreshToken {
 
   @@index([userId])
   @@index([token])
+  @@index([expiresAt])
   @@map("refresh_tokens")
+}
+
+model Device {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fcmToken  String   @unique
+  platform  String   @default("android")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("devices")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -316,10 +331,10 @@ model CashFlowPeriod {
   user              User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   month             Int // 1-12
   year              Int
-  openingBank       Float
-  openingCash       Float
-  openingCreditCard Float
-  openingDebt       Float
+  openingBank       Decimal @db.Decimal(12, 2)
+  openingCash       Decimal @db.Decimal(12, 2)
+  openingCreditCard Decimal @db.Decimal(12, 2)
+  openingDebt       Decimal @db.Decimal(12, 2)
   createdAt         DateTime @default(now())
 
   transactions CashFlowTransaction[]
@@ -335,7 +350,7 @@ model CashFlowTransaction {
   period    CashFlowPeriod   @relation(fields: [periodId], references: [id], onDelete: Cascade)
   kind      CashFlowTxnKind
   category  String           // income: E | S | B | I | G ; outflow: E | S | D | I
-  amount    Float
+  amount    Decimal          @db.Decimal(12, 2)
   note      String?
   date      DateTime         @db.Date
   // Which account pocket this entry posts to (INCOME) or from (OUTFLOW).
@@ -359,7 +374,7 @@ model CashFlowDebt {
   user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   direction CashFlowDebtDirection
   person    String
-  amount    Float
+  amount    Decimal               @db.Decimal(12, 2)
   note      String?
   date      DateTime              @db.Date
   settled   Boolean               @default(false)

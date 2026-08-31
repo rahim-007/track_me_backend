@@ -1,7 +1,14 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+  Optional,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { AuthService } from '../auth/auth.service';
 
 /**
  * Backend reminder scheduler.
@@ -15,6 +22,7 @@ import { NotificationsService } from '../notifications/notifications.service';
  *    reminder window (GOAL_REMINDER_DAYS, default 7), nudged once per goal per
  *    day at the user's local GOAL_REMINDER_TIME (default 09:00), skipping
  *    completed/overdue goals.
+ * 3. Maintenance — runs periodic cleanup for expired refresh tokens.
  *
  * **Timezone resolution** — each user's stored `timezone` (IANA name) decides
  * what "now" means for them, so a 07:00 habit or the 09:00 goal nudge fires at
@@ -42,22 +50,28 @@ export class ReminderSchedulerService implements OnModuleInit, OnModuleDestroy {
   private timer: NodeJS.Timeout | null = null;
   private running = false;
   private readonly fallbackTimezone: string;
+  private lastTokenCleanup = 0;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
     private readonly config: ConfigService,
+    @Optional() private readonly authService?: AuthService,
   ) {
-    this.fallbackTimezone = this.config.get<string>('REMINDER_TIMEZONE', '') ?? '';
+    this.fallbackTimezone =
+      this.config.get<string>('REMINDER_TIMEZONE', '') ?? '';
   }
 
   onModuleInit() {
-    if (this.config.get<string>('HABIT_REMINDERS_ENABLED', 'true') === 'false') {
+    if (
+      this.config.get<string>('HABIT_REMINDERS_ENABLED', 'true') === 'false'
+    ) {
       this.logger.log('Reminders disabled (HABIT_REMINDERS_ENABLED=false)');
       return;
     }
     const intervalMs =
-      this.config.get<number>('HABIT_REMINDER_CHECK_INTERVAL_MS', 60_000) ?? 60_000;
+      this.config.get<number>('HABIT_REMINDER_CHECK_INTERVAL_MS', 60_000) ??
+      60_000;
 
     // First pass shortly after boot, then on the interval.
     setTimeout(() => void this.tickSafe(), 5_000);
@@ -87,14 +101,31 @@ export class ReminderSchedulerService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * One scheduler pass: fires due habit reminders AND the daily goal check.
+   * One scheduler pass: fires due habit reminders AND the daily goal check,
+   * plus maintenance tasks (e.g. expired token cleanup).
    * Public + injectable `now` so it's unit-testable.
    * @returns how many reminders were sent (habit + goal).
    */
   async tick(now: Date = new Date()): Promise<number> {
+    await this.checkTokenCleanup(now);
     const habitSent = await this.checkHabitReminders(now);
     const goalSent = await this.checkGoalReminders(now);
     return habitSent + goalSent;
+  }
+
+  private async checkTokenCleanup(now: Date): Promise<void> {
+    if (!this.authService) return;
+    const nowMs = now.getTime();
+    if (nowMs - this.lastTokenCleanup < 60 * 60 * 1000) return;
+    this.lastTokenCleanup = nowMs;
+    try {
+      const cleaned = await this.authService.cleanupExpiredTokens();
+      if (cleaned > 0) {
+        this.logger.log(`Cleaned up ${cleaned} expired refresh token(s)`);
+      }
+    } catch (e) {
+      this.logger.warn(`Expired token cleanup error: ${(e as Error).message}`);
+    }
   }
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -129,7 +160,8 @@ export class ReminderSchedulerService implements OnModuleInit, OnModuleDestroy {
       const tz = this.effectiveTz(h.user?.timezone);
       const { hhmm, weekday } = this.timeParts(now, tz);
       if (h.reminderTime !== hhmm) continue;
-      if (!Array.isArray(h.repeatDays) || h.repeatDays[weekday] !== true) continue;
+      if (!Array.isArray(h.repeatDays) || h.repeatDays[weekday] !== true)
+        continue;
       const list = groups.get(tz) ?? [];
       list.push(h);
       groups.set(tz, list);
@@ -206,7 +238,8 @@ export class ReminderSchedulerService implements OnModuleInit, OnModuleDestroy {
   // ───────────────────────────────────────────────────────────────────────────
 
   private async checkGoalReminders(now: Date): Promise<number> {
-    const goalTime = this.config.get<string>('GOAL_REMINDER_TIME', '09:00') ?? '09:00';
+    const goalTime =
+      this.config.get<string>('GOAL_REMINDER_TIME', '09:00') ?? '09:00';
     const windowDays = this.config.get<number>('GOAL_REMINDER_DAYS', 7) ?? 7;
 
     // Coarse server-side prune with a generous margin (user timezones span
@@ -325,7 +358,10 @@ export class ReminderSchedulerService implements OnModuleInit, OnModuleDestroy {
    * is empty). Returns the "HH:MM" string, weekday index (0 = Monday) and the
    * YYYY-MM-DD date string — all in that same zone so matching is consistent.
    */
-  private timeParts(now: Date, tz: string): {
+  private timeParts(
+    now: Date,
+    tz: string,
+  ): {
     hhmm: string;
     weekday: number;
     dateStr: string;
@@ -337,8 +373,7 @@ export class ReminderSchedulerService implements OnModuleInit, OnModuleDestroy {
       // Server-local fallback (invalid/empty timezone).
       const hhmm = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
       const weekday = (now.getDay() + 6) % 7;
-      const dateStr =
-        `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+      const dateStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
       return { hhmm, weekday, dateStr };
     }
 
@@ -381,7 +416,13 @@ export class ReminderSchedulerService implements OnModuleInit, OnModuleDestroy {
       if (hour === 24) hour = 0; // h23 shouldn't emit 24, but be defensive
 
       const weekdayNames: Record<string, number> = {
-        Sun: 6, Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5,
+        Sun: 6,
+        Mon: 0,
+        Tue: 1,
+        Wed: 2,
+        Thu: 3,
+        Fri: 4,
+        Sat: 5,
       };
       return {
         hour,

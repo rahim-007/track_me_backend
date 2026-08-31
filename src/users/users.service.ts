@@ -34,20 +34,28 @@ export class UsersService {
     // long-time users instead of walking every day since the first habit.
     const windowStart = new Date();
     windowStart.setUTCDate(windowStart.getUTCDate() - 366);
-    const scanStart = earliestHabitDate < windowStart ? windowStart : earliestHabitDate;
+    const scanStart =
+      earliestHabitDate < windowStart ? windowStart : earliestHabitDate;
 
     const logs = await this.prisma.habitLog.findMany({
       where: {
         userId,
         date: {
           gte: new Date(
-            Date.UTC(scanStart.getUTCFullYear(), scanStart.getUTCMonth(), scanStart.getUTCDate()),
+            Date.UTC(
+              scanStart.getUTCFullYear(),
+              scanStart.getUTCMonth(),
+              scanStart.getUTCDate(),
+            ),
           ),
         },
       },
     });
 
-    const { currentStreak, longestStreak } = computeOverallStreaks(habits, logs);
+    const { currentStreak, longestStreak } = computeOverallStreaks(
+      habits,
+      logs,
+    );
 
     await this.prisma.user.update({
       where: { id: userId },
@@ -105,10 +113,31 @@ export class UsersService {
     });
   }
 
-  async updateFcmToken(userId: string, fcmToken: string) {
+  async updateFcmToken(userId: string, fcmToken: string, platform = 'android') {
+    if (!fcmToken || fcmToken.trim().length === 0) {
+      await this.prisma.device.deleteMany({ where: { userId } });
+      return this.prisma.user.update({
+        where: { id: userId },
+        data: { fcmToken: null },
+      });
+    }
+
+    await this.prisma.device.upsert({
+      where: { fcmToken: fcmToken.trim() },
+      create: {
+        userId,
+        fcmToken: fcmToken.trim(),
+        platform: platform || 'android',
+      },
+      update: {
+        userId,
+        platform: platform || 'android',
+      },
+    });
+
     return this.prisma.user.update({
       where: { id: userId },
-      data: { fcmToken },
+      data: { fcmToken: fcmToken.trim() },
     });
   }
 
@@ -152,9 +181,10 @@ export class UsersService {
       const user = await tx.user.findUnique({ where: { id: userId } });
       if (!user) return null;
 
-      // Defensive: clear FCM token before cascade so no stale push can be
-      // attempted between the moment the delete starts and when the row is gone.
+      // Defensive: clear FCM token and devices before cascade so no stale push
+      // can be attempted between the moment the delete starts and when the row is gone.
       if (user.fcmToken) {
+        await tx.device.deleteMany({ where: { userId } });
         await tx.user.update({
           where: { id: userId },
           data: { fcmToken: null },
@@ -168,4 +198,3 @@ export class UsersService {
     });
   }
 }
-

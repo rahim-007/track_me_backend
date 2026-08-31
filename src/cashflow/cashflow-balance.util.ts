@@ -133,7 +133,9 @@ export function nextMonth(
   month: number,
   year: number,
 ): { month: number; year: number } {
-  return month === 12 ? { month: 1, year: year + 1 } : { month: month + 1, year };
+  return month === 12
+    ? { month: 1, year: year + 1 }
+    : { month: month + 1, year };
 }
 
 /** Previous calendar month before (month 1-12, year). */
@@ -141,7 +143,9 @@ export function prevMonth(
   month: number,
   year: number,
 ): { month: number; year: number } {
-  return month === 1 ? { month: 12, year: year - 1 } : { month: month - 1, year };
+  return month === 1
+    ? { month: 12, year: year - 1 }
+    : { month: month - 1, year };
 }
 
 /** Calendar month/year of a Date (server-local clock). */

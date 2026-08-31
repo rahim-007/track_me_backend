@@ -63,7 +63,12 @@ export class HabitLogsService {
     return log;
   }
 
-  async skipHabit(userId: string, habitId: string, date: string, reason: string) {
+  async skipHabit(
+    userId: string,
+    habitId: string,
+    date: string,
+    reason: string,
+  ) {
     await this.assertOwnedHabit(userId, habitId);
     const parsedDate = new Date(date);
 
@@ -131,10 +136,18 @@ export class HabitLogsService {
     const [total, completed, skipped] = await Promise.all([
       this.prisma.habit.count({ where: { userId, isActive: true } }),
       this.prisma.habitLog.count({
-        where: { userId, isSkipped: false, date: { gte: weekStart, lte: weekEnd } },
+        where: {
+          userId,
+          isSkipped: false,
+          date: { gte: weekStart, lte: weekEnd },
+        },
       }),
       this.prisma.habitLog.count({
-        where: { userId, isSkipped: true, date: { gte: weekStart, lte: weekEnd } },
+        where: {
+          userId,
+          isSkipped: true,
+          date: { gte: weekStart, lte: weekEnd },
+        },
       }),
     ]);
 
@@ -142,7 +155,8 @@ export class HabitLogsService {
       totalHabits: total,
       completedThisWeek: completed,
       skippedThisWeek: skipped,
-      completionRate: total > 0 ? Math.round((completed / (total * 7)) * 100) : 0,
+      completionRate:
+        total > 0 ? Math.round((completed / (total * 7)) * 100) : 0,
     };
   }
 

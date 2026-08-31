@@ -85,13 +85,21 @@ describe('computeHabitStreak', () => {
 });
 
 describe('computeOverallStreaks', () => {
-  const habit = (id: string, repeatDays: boolean[], createdAt: string): StreakHabitInput => ({
+  const habit = (
+    id: string,
+    repeatDays: boolean[],
+    createdAt: string,
+  ): StreakHabitInput => ({
     id,
     repeatDays,
     createdAt: day(createdAt),
   });
 
-  const log = (habitId: string, date: string, isSkipped = false): StreakLogInput => ({
+  const log = (
+    habitId: string,
+    date: string,
+    isSkipped = false,
+  ): StreakLogInput => ({
     habitId,
     date: day(date),
     isSkipped,
@@ -141,7 +149,11 @@ describe('computeOverallStreaks', () => {
       log('c', '2026-08-12', true),
     ];
 
-    const { currentStreak } = computeOverallStreaks([a, b, c], logs, day('2026-08-13'));
+    const { currentStreak } = computeOverallStreaks(
+      [a, b, c],
+      logs,
+      day('2026-08-13'),
+    );
     expect(currentStreak).toBe(0);
   });
 
@@ -152,7 +164,11 @@ describe('computeOverallStreaks', () => {
     // Aug 11 all done; Aug 12 (today) not completed yet → grace.
     const logs = [log('a', '2026-08-11'), log('b', '2026-08-11')];
 
-    const { currentStreak } = computeOverallStreaks([a, b], logs, day('2026-08-12'));
+    const { currentStreak } = computeOverallStreaks(
+      [a, b],
+      logs,
+      day('2026-08-12'),
+    );
     expect(currentStreak).toBe(1);
   });
 
@@ -163,7 +179,11 @@ describe('computeOverallStreaks', () => {
     // Aug 11: only A done, B missing → failure on a past day → 0.
     const logs = [log('a', '2026-08-11')];
 
-    const { currentStreak } = computeOverallStreaks([a, b], logs, day('2026-08-12'));
+    const { currentStreak } = computeOverallStreaks(
+      [a, b],
+      logs,
+      day('2026-08-12'),
+    );
     expect(currentStreak).toBe(0);
   });
 
@@ -172,7 +192,11 @@ describe('computeOverallStreaks', () => {
     const h = habit('h', monWedFri, '2026-08-01');
     const logs = [log('h', '2026-08-12')];
 
-    const { currentStreak } = computeOverallStreaks([h], logs, day('2026-08-13'));
+    const { currentStreak } = computeOverallStreaks(
+      [h],
+      logs,
+      day('2026-08-13'),
+    );
     // Aug 12 (Wed) ✅ → 1. Aug 13 (Thu) not scheduled → neutral.
     expect(currentStreak).toBe(1);
   });

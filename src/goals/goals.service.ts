@@ -70,7 +70,12 @@ export class GoalsService {
     });
   }
 
-  async updateProgress(userId: string, id: string, progress: number, notes?: string) {
+  async updateProgress(
+    userId: string,
+    id: string,
+    progress: number,
+    notes?: string,
+  ) {
     // Clamp progress to a valid 0.0 – 1.0 range
     const safeProgress = Math.min(1, Math.max(0, progress));
 

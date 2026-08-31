@@ -9,21 +9,21 @@ describe('FcmService', () => {
   };
 
   describe('when FCM is not configured', () => {
-    it('sendPush returns false without throwing', async () => {
+    it('sendPush returns success: false without throwing', async () => {
       const service = createService({});
       await expect(
         service.sendPush({ token: 'tok', title: 't', body: 'b' }),
-      ).resolves.toBe(false);
+      ).resolves.toEqual({ success: false, isUnregistered: false });
     });
 
-    it('returns false when only some vars are present', async () => {
+    it('returns success: false when only some vars are present', async () => {
       const service = createService({ FIREBASE_PROJECT_ID: 'p' });
       await expect(
         service.sendPush({ token: 'tok', title: 't', body: 'b' }),
-      ).resolves.toBe(false);
+      ).resolves.toEqual({ success: false, isUnregistered: false });
     });
 
-    it('returns false for an empty token even when configured', async () => {
+    it('returns success: false for an empty token even when configured', async () => {
       const service = createService({
         FIREBASE_PROJECT_ID: 'p',
         FIREBASE_CLIENT_EMAIL: 'e',
@@ -31,7 +31,7 @@ describe('FcmService', () => {
       });
       await expect(
         service.sendPush({ token: '', title: 't', body: 'b' }),
-      ).resolves.toBe(false);
+      ).resolves.toEqual({ success: false, isUnregistered: false });
     });
   });
 });

@@ -59,9 +59,7 @@ const CURRENCY_UNITS = new Set<string>(['₹', '$', '€', '£']);
 
 export function isAllowedUnit(unit: string | undefined | null): boolean {
   return (
-    unit === undefined ||
-    unit === null ||
-    GOAL_UNITS.includes(unit as GoalUnit)
+    unit === undefined || unit === null || GOAL_UNITS.includes(unit as GoalUnit)
   );
 }
 
