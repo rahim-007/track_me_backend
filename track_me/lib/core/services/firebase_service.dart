@@ -16,30 +16,37 @@ class FirebaseService {
     try {
       await Firebase.initializeApp();
       await _setupFCM();
+      // Ensure the device token and timezone are registered with the backend on every startup
+      unawaited(registerDeviceWithBackend());
     } catch (e) {
       // Firebase not configured yet — safe to ignore for development
-      debugPrint('Firebase not configured: $e');
+      debugPrint('[FCM] Firebase not configured or init failed: $e');
     }
   }
 
   static Future<void> _setupFCM() async {
     final messaging = FirebaseMessaging.instance;
 
-    // Request permission
-    await messaging.requestPermission(
+    // Request permissions (alert, badge, sound)
+    final settings = await messaging.requestPermission(
       alert: true,
       badge: true,
       sound: true,
+      provisional: false,
     );
+    debugPrint('[FCM] Notification authorization status: ${settings.authorizationStatus}');
 
     // Get FCM token
     final token = await messaging.getToken();
-    debugPrint('FCM Token: $token');
+    debugPrint('[FCM] Token acquired: $token');
+    if (token != null && token.isNotEmpty) {
+      unawaited(registerTokenWithBackend(token));
+    }
 
     // FCM rotates tokens (monthly, reinstall, clear-data). Re-register the new
     // token with the backend so pushes never silently die on a stale token.
     messaging.onTokenRefresh.listen((newToken) {
-      debugPrint('FCM token rotated: $newToken');
+      debugPrint('[FCM] Token rotated: $newToken');
       unawaited(registerTokenWithBackend(newToken));
     });
 
@@ -48,10 +55,10 @@ class FirebaseService {
     // here. Re-surface it through the local plugin or live pushes are
     // invisible whenever the app is in the foreground.
     FirebaseMessaging.onMessage.listen((message) {
-      final title = message.notification?.title;
-      final body = message.notification?.body;
+      final title = message.notification?.title ?? message.data['title'];
+      final body = message.notification?.body ?? message.data['body'];
       if (title == null && body == null) return;
-      debugPrint('FCM Foreground: $title');
+      debugPrint('[FCM] Foreground message received: $title');
       NotificationService.showInstantNotification(
         title: title ?? 'Track Me',
         body: body ?? '',
@@ -66,7 +73,8 @@ class FirebaseService {
   static Future<String?> getFcmToken() async {
     try {
       return await FirebaseMessaging.instance.getToken();
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[FCM] Error getting FCM token: $e');
       return null;
     }
   }
@@ -76,16 +84,28 @@ class FirebaseService {
   /// no-op when Firebase is unavailable, no token is registered, or the user
   /// isn't authenticated (the request will 401 and be silently ignored).
   static Future<void> registerTokenWithBackend([String? token]) async {
-    token ??= await getFcmToken();
-    if (token == null || token.isEmpty) return;
+    if (kIsWeb) return;
+
+    // Retry token acquisition up to 3 times if initially null
+    for (var attempt = 0; attempt < 3; attempt++) {
+      token ??= await getFcmToken();
+      if (token != null && token.isNotEmpty) break;
+      await Future.delayed(const Duration(milliseconds: 800));
+    }
+
+    if (token == null || token.isEmpty) {
+      debugPrint('[FCM] No FCM token available to register');
+      return;
+    }
+
     try {
       await DioClient().dio.post(
         '/notifications/device-token',
         data: {'token': token},
       );
-      debugPrint('FCM token registered with backend');
+      debugPrint('[FCM] FCM token successfully registered with backend');
     } catch (e) {
-      debugPrint('FCM token registration skipped: $e');
+      debugPrint('[FCM] FCM token registration skipped/failed: $e');
     }
   }
 
@@ -119,6 +139,20 @@ class FirebaseService {
   static Future<void> registerDeviceWithBackend() async {
     await registerTokenWithBackend();
     await syncTimezoneWithBackend();
+  }
+
+  /// Trigger an immediate test push notification from the backend to verify
+  /// delivery to this device.
+  static Future<bool> sendTestPush() async {
+    try {
+      final response = await DioClient().dio.post('/notifications/test-push');
+      final data = response.data['data'] ?? response.data;
+      debugPrint('[FCM] Test push response: $data');
+      return data['success'] == true || data['deliveredToFCM'] == true;
+    } catch (e) {
+      debugPrint('[FCM] Test push failed: $e');
+      return false;
+    }
   }
 }
 

@@ -45,6 +45,14 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
+        <!-- Firebase Cloud Messaging: default channel and icon for background / terminated state pushes -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="habit_reminders" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@mipmap/ic_launcher" />
+
         <!-- flutter_local_notifications: the plugin's scheduled-notification
              receivers. v17 relies on class-targeted PendingIntents, but on
              Android 15/16 (and Motorola's SmartBackground) broadcasts to

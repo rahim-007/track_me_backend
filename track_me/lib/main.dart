@@ -95,14 +95,6 @@ Future<void> _initServicesAsync() async {
   }
 
   try {
-    debugPrint('[startup] Firebase init…');
-    await FirebaseService.initialize().timeout(const Duration(seconds: 10));
-    debugPrint('[startup] Firebase ready');
-  } catch (e) {
-    debugPrint('[startup] Firebase init failed: $e');
-  }
-
-  try {
     debugPrint('[startup] Notifications init…');
     await NotificationService.initialize().timeout(const Duration(seconds: 8));
     debugPrint('[startup] Notifications ready');
@@ -114,5 +106,13 @@ Future<void> _initServicesAsync() async {
     await NotificationService.requestPermissions();
   } catch (e) {
     debugPrint('[startup] Notifications init failed: $e');
+  }
+
+  try {
+    debugPrint('[startup] Firebase init…');
+    await FirebaseService.initialize().timeout(const Duration(seconds: 10));
+    debugPrint('[startup] Firebase ready');
+  } catch (e) {
+    debugPrint('[startup] Firebase init failed: $e');
   }
 }
