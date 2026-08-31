@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Delete Your Account — Track Me</title>
+  <meta name="description" content="Request permanent deletion of your Track Me account and all associated data.">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: #111118;
+      color: #EDEDF4;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 40px 24px 60px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 40px;
+    }
+
+    .brand-icon {
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, #6E49E6, #4930D8);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      color: #fff;
+      font-weight: 700;
+    }
+
+    .brand-name {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #EDEDF4;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.8px;
+      margin-bottom: 8px;
+      color: #EDEDF4;
+    }
+
+    .subtitle {
+      font-size: 15px;
+      color: #8A899A;
+      margin-bottom: 32px;
+    }
+
+    .card {
+      background: #1A1A24;
+      border: 1px solid #2A2244;
+      border-radius: 22px;
+      padding: 28px;
+      margin-bottom: 24px;
+    }
+
+    .card h2 {
+      font-size: 17px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      color: #EDEDF4;
+    }
+
+    .card p, .card li {
+      font-size: 14px;
+      color: #8A899A;
+      line-height: 1.7;
+    }
+
+    .card ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .card ul li {
+      padding: 6px 0;
+      padding-left: 24px;
+      position: relative;
+    }
+
+    .card ul li::before {
+      content: '•';
+      position: absolute;
+      left: 8px;
+      color: #E06B6B;
+      font-weight: 700;
+    }
+
+    .warning-card {
+      border-color: rgba(224, 107, 107, 0.35);
+      background: rgba(224, 107, 107, 0.08);
+    }
+
+    .warning-card h2 {
+      color: #E06B6B;
+    }
+
+    .steps-card .step {
+      display: flex;
+      gap: 16px;
+      padding: 16px 0;
+      border-bottom: 1px solid rgba(42, 34, 68, 0.6);
+    }
+
+    .steps-card .step:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .step-number {
+      width: 32px;
+      height: 32px;
+      background: rgba(110, 73, 230, 0.2);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 700;
+      color: #6E49E6;
+      flex-shrink: 0;
+    }
+
+    .step-content h3 {
+      font-size: 14px;
+      font-weight: 700;
+      color: #EDEDF4;
+      margin-bottom: 4px;
+    }
+
+    .step-content p {
+      font-size: 13px;
+      color: #8A899A;
+    }
+
+    .form-section {
+      margin-top: 8px;
+    }
+
+    .form-section p {
+      margin-bottom: 16px;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #8A899A;
+      margin-bottom: 8px;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 14px 16px;
+      background: #111118;
+      border: 1px solid #2A2244;
+      border-radius: 14px;
+      color: #EDEDF4;
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .form-group input:focus {
+      border-color: #6E49E6;
+    }
+
+    .form-group input::placeholder {
+      color: #5E5D6E;
+    }
+
+    .submit-btn {
+      width: 100%;
+      padding: 16px;
+      background: #C95252;
+      color: #fff;
+      border: none;
+      border-radius: 16px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s, opacity 0.2s;
+    }
+
+    .submit-btn:hover {
+      background: #B04444;
+    }
+
+    .submit-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .result-msg {
+      margin-top: 16px;
+      padding: 14px 18px;
+      border-radius: 14px;
+      font-size: 14px;
+      font-weight: 600;
+      display: none;
+    }
+
+    .result-msg.success {
+      display: block;
+      background: rgba(74, 222, 128, 0.12);
+      color: #4ADE80;
+      border: 1px solid rgba(74, 222, 128, 0.3);
+    }
+
+    .result-msg.error {
+      display: block;
+      background: rgba(224, 107, 107, 0.12);
+      color: #E06B6B;
+      border: 1px solid rgba(224, 107, 107, 0.3);
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 40px;
+      padding-top: 24px;
+      border-top: 1px solid #2A2244;
+    }
+
+    .footer p {
+      font-size: 12px;
+      color: #5E5D6E;
+    }
+
+    @media (max-width: 480px) {
+      .container { padding: 24px 16px 40px; }
+      h1 { font-size: 24px; }
+      .card { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Brand -->
+    <div class="brand">
+      <div class="brand-icon">T</div>
+      <span class="brand-name">Track Me</span>
+    </div>
+
+    <!-- Title -->
+    <h1>Delete Your Account</h1>
+    <p class="subtitle">Request permanent deletion of your Track Me account and all associated data.</p>
+
+    <!-- What gets deleted -->
+    <div class="card warning-card">
+      <h2>⚠️ Data That Will Be Permanently Deleted</h2>
+      <ul>
+        <li>Your profile information (name, email, avatar)</li>
+        <li>All habits and completion history</li>
+        <li>All goals and progress records</li>
+        <li>All cash flow records, income, and expenses</li>
+        <li>All debt tracking records</li>
+        <li>AI-generated reports and analytics</li>
+        <li>Notification history and device registrations</li>
+        <li>Authentication tokens and sessions</li>
+      </ul>
+      <p style="margin-top: 16px; font-weight: 600; color: #E06B6B;">
+        This action is permanent and cannot be undone.
+      </p>
+    </div>
+
+    <!-- Steps to delete from app -->
+    <div class="card steps-card">
+      <h2>Delete From the App (Recommended)</h2>
+      <div class="step">
+        <div class="step-number">1</div>
+        <div class="step-content">
+          <h3>Open Track Me</h3>
+          <p>Launch the Track Me app on your device.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-number">2</div>
+        <div class="step-content">
+          <h3>Go to Profile</h3>
+          <p>Tap the Profile tab in the bottom navigation bar.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-number">3</div>
+        <div class="step-content">
+          <h3>Find Delete Account</h3>
+          <p>Scroll to the "Account &amp; Security" section and tap "Delete Account".</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-number">4</div>
+        <div class="step-content">
+          <h3>Confirm Deletion</h3>
+          <p>Follow the on-screen prompts to confirm permanent deletion of your account.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Web deletion request form -->
+    <div class="card">
+      <h2>Can't Access the App?</h2>
+      <div class="form-section">
+        <p>If you are unable to access the Track Me app, you can request account deletion by providing the email address associated with your account. We will send a verification email to confirm your identity before processing the deletion.</p>
+        <form id="deleteForm" onsubmit="return handleSubmit(event)">
+          <div class="form-group">
+            <label for="email">Email Address</label>
+            <input type="email" id="email" name="email" placeholder="Enter your account email" required>
+          </div>
+          <button type="submit" class="submit-btn" id="submitBtn">Request Account Deletion</button>
+        </form>
+        <div id="resultMsg" class="result-msg"></div>
+      </div>
+    </div>
+
+    <!-- What happens after -->
+    <div class="card">
+      <h2>What Happens After Deletion</h2>
+      <ul>
+        <li>You will be immediately logged out of the app on all devices.</li>
+        <li>All your data will be permanently removed from our servers.</li>
+        <li>You will no longer receive any notifications from Track Me.</li>
+        <li>You can create a new account at any time, but your previous data cannot be recovered.</li>
+      </ul>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p>&copy; 2025 Track Me. All rights reserved.</p>
+      <p style="margin-top: 8px;">For questions, contact <a href="mailto:support@trackme.app" style="color: #6E49E6; text-decoration: none;">support@trackme.app</a></p>
+    </div>
+  </div>
+
+  <script>
+    async function handleSubmit(e) {
+      e.preventDefault();
+      const btn = document.getElementById('submitBtn');
+      const msg = document.getElementById('resultMsg');
+      const email = document.getElementById('email').value.trim();
+
+      if (!email) return;
+
+      btn.disabled = true;
+      btn.textContent = 'Submitting…';
+      msg.className = 'result-msg';
+      msg.style.display = 'none';
+
+      try {
+        const resp = await fetch('/api/users/request-deletion', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+
+        // Always show the same message regardless of whether the email exists,
+        // to prevent email enumeration.
+        msg.className = 'result-msg success';
+        msg.textContent = 'If an account with this email exists, we have sent a verification email with instructions to complete the deletion. Please check your inbox.';
+      } catch (err) {
+        msg.className = 'result-msg error';
+        msg.textContent = 'Unable to submit your request. Please check your internet connection and try again.';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Request Account Deletion';
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { computeOverallStreaks } from '../streaks/streaks.util';
 
@@ -129,6 +129,43 @@ export class UsersService {
       totalCompletedHabits: completedHabitsCount,
       activeGoals,
     };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Account Deletion
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  private readonly logger = new Logger(UsersService.name);
+
+  /**
+   * Permanently delete the authenticated user's account and all associated data.
+   *
+   * Wrapped in a Prisma interactive transaction so that a partial failure cannot
+   * leave the account in a half-deleted state. All child records (habits, goals,
+   * cash-flow, notifications, tokens, etc.) cascade automatically via the
+   * schema's `onDelete: Cascade` constraints.
+   *
+   * @returns `true` if the account was deleted, `null` if it did not exist.
+   */
+  async deleteAccount(userId: string): Promise<boolean | null> {
+    return this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({ where: { id: userId } });
+      if (!user) return null;
+
+      // Defensive: clear FCM token before cascade so no stale push can be
+      // attempted between the moment the delete starts and when the row is gone.
+      if (user.fcmToken) {
+        await tx.user.update({
+          where: { id: userId },
+          data: { fcmToken: null },
+        });
+      }
+
+      await tx.user.delete({ where: { id: userId } });
+
+      this.logger.log(`Account deleted: ${userId}`);
+      return true;
+    });
   }
 }
 
