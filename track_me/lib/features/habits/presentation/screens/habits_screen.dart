@@ -9,7 +9,9 @@ import '../../../../core/theme/app_shadows.dart';
 import '../../data/models/habit_model.dart';
 import '../../data/quotes_data.dart';
 import '../../providers/habits_provider.dart';
+import '../../providers/missed_habits_provider.dart';
 import '../widgets/add_habit_dialog.dart';
+import '../widgets/missed_habits_reflection_dialog.dart';
 import '../widgets/skip_reason_dialog.dart';
 
 class HabitsScreen extends ConsumerStatefulWidget {
@@ -77,6 +79,83 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
     );
   }
 
+  void _showReflectionDialog(List<HabitModel> missedHabits) {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => MissedHabitsReflectionDialog(
+        missedHabits: List.from(missedHabits),
+        onSubmitted: () {
+          Navigator.of(context, rootNavigator: true).pop();
+        },
+      ),
+    );
+  }
+
+  void _showMissedReasonDetails(HabitModel habit, String reason) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: const Color(0xFF8B5CF6).withOpacity(0.16),
+                shape: BoxShape.circle,
+              ),
+              child: const Center(child: Text('📝', style: TextStyle(fontSize: 18))),
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Missed Habit Reason',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              habit.name,
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceVariant,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFF8B5CF6).withOpacity(0.2)),
+              ),
+              child: Text(
+                '"$reason"',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontStyle: FontStyle.italic,
+                  height: 1.4,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showHabitOptionsMenu(HabitModel habit) {
     showModalBottomSheet<void>(
       context: context,
@@ -132,12 +211,55 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                     );
                   },
                 ),
-                ListTile(
-                  leading: const Icon(Icons.remove_circle_outline, color: Color(0xFFEAB308)),
-                  title: const Text('Log Skip / Missed Reason'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _showSkipReasonDialog(habit, _selectedDate);
+                Builder(
+                  builder: (context) {
+                    final now = DateTime.now();
+                    final nowDay = DateTime(now.year, now.month, now.day);
+                    final yesterdayDay = nowDay.subtract(const Duration(days: 1));
+                    final selectedDay = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
+                    final isFuture = selectedDay.isAfter(nowDay);
+                    final isHistoricalLocked = selectedDay.isBefore(yesterdayDay);
+
+                    return ListTile(
+                      leading: Icon(
+                        Icons.remove_circle_outline,
+                        color: (isHistoricalLocked || isFuture)
+                            ? AppColors.textSecondary
+                            : const Color(0xFFEAB308),
+                      ),
+                      title: Text(
+                        'Log Skip / Missed Reason',
+                        style: TextStyle(
+                          color: (isHistoricalLocked || isFuture)
+                              ? AppColors.textSecondary
+                              : null,
+                        ),
+                      ),
+                      onTap: () {
+                        Navigator.pop(context);
+                        if (isFuture) {
+                          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Habits for future dates are locked.'),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                          return;
+                        }
+                        if (isHistoricalLocked) {
+                          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Records older than 24 hours are locked to preserve streak integrity.'),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                          return;
+                        }
+                        _showSkipReasonDialog(habit, _selectedDate);
+                      },
+                    );
                   },
                 ),
                 ListTile(
@@ -167,22 +289,6 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
     return maxStreak;
   }
 
-  int _calculateWeeklyCompletions(List<HabitModel> habits) {
-    int count = 0;
-    final weekDates = List.generate(
-      7,
-      (i) => DateFormat('yyyy-MM-dd').format(_weekStartDate.add(Duration(days: i))),
-    );
-    for (final habit in habits) {
-      for (final dateStr in weekDates) {
-        if (habit.completedDates.contains(dateStr)) {
-          count++;
-        }
-      }
-    }
-    return count;
-  }
-
   @override
   Widget build(BuildContext context) {
     final habitsAsync = ref.watch(habitsProvider);
@@ -190,6 +296,35 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showAddHabitDialog,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+        child: Container(
+          width: 56,
+          height: 56,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: const Color(0xFF5334EA),
+            gradient: const LinearGradient(
+              colors: [Color(0xFF6849F7), Color(0xFF4325D6)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF5334EA).withOpacity(0.4),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: const Icon(Icons.add_rounded, color: Colors.white, size: 28),
+        ),
+      ),
       body: SafeArea(
         child: habitsAsync.when(
           data: (habits) {
@@ -204,14 +339,14 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
             }).toList();
 
             final selectedDateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
+            final missedReasons = ref.watch(missedReasonsForDateProvider(selectedDateStr)).valueOrNull ?? {};
             final completedCount = visibleHabits
                 .where((h) => h.completedDates.contains(selectedDateStr))
                 .length;
             final totalCount = visibleHabits.length;
             final progress = totalCount > 0 ? completedCount / totalCount : 0.0;
-            final percentage = (progress * 100).round();
             final streak = _calculateMaxStreak(habits);
-            final weeklyCompletions = _calculateWeeklyCompletions(habits);
+            final weeklyStats = calculateWeeklyHabitStats(habits);
 
             return CustomScrollView(
               physics: const BouncingScrollPhysics(),
@@ -220,77 +355,26 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 16, 20, 14),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Habits',
-                              style: TextStyle(
-                                fontSize: 30,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.textPrimary,
-                                letterSpacing: -0.8,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Build today. Become tomorrow.',
-                              style: TextStyle(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w500,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
+                        Text(
+                          'Habits',
+                          style: TextStyle(
+                            fontSize: 30,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary,
+                            letterSpacing: -0.8,
+                          ),
                         ),
-                        Row(
-                          children: [
-                            // Filter Button
-                            Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                color: AppColors.surface,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: AppColors.borderLine),
-                                boxShadow: AppShadows.soft,
-                              ),
-                              child: Icon(
-                                Icons.filter_list_rounded,
-                                color: AppColors.textSecondary,
-                                size: 20,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            // Add Habit Button
-                            GestureDetector(
-                              onTap: _showAddHabitDialog,
-                              child: Container(
-                                width: 44,
-                                height: 44,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF5334EA),
-                                  borderRadius: BorderRadius.circular(14),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(0xFF5334EA).withOpacity(0.35),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: const Icon(
-                                  Icons.add_rounded,
-                                  color: Colors.white,
-                                  size: 24,
-                                ),
-                              ),
-                            ),
-                          ],
+                        const SizedBox(height: 2),
+                        Text(
+                          'Build today. Become tomorrow.',
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                       ],
                     ),
@@ -435,7 +519,7 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                                 size: 18,
                               ),
                             ),
-                            value: '$weeklyCompletions',
+                            value: '${weeklyStats.completedCount}',
                             valueColor: const Color(0xFF10B981),
                             title: 'Completed',
                             subtitle: 'This Week',
@@ -483,7 +567,7 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                               color: AppColors.primary,
                               size: 16,
                             ),
-                            value: '$percentage%',
+                            value: '${weeklyStats.percent}%',
                             valueColor: AppColors.primary,
                             title: 'Success Rate',
                             subtitle: 'This Week',
@@ -553,7 +637,6 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                           children: List.generate(7, (index) {
                             final date = _weekStartDate.add(Duration(days: index));
                             final isSelected = DateUtils.isSameDay(date, _selectedDate);
-                            final isToday = DateUtils.isSameDay(date, DateTime.now());
                             final dateStr = DateFormat('yyyy-MM-dd').format(date);
 
                             // Check if all scheduled habits were completed on this date
@@ -561,85 +644,90 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                                 habits.any((h) => h.completedDates.contains(dateStr));
 
                             return GestureDetector(
+                              behavior: HitTestBehavior.opaque,
                               onTap: () {
                                 setState(() {
                                   _selectedDate = date;
                                 });
                               },
-                              child: Column(
-                                children: [
-                                  Text(
-                                    DateFormat('EEE').format(date),
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: isSelected
-                                          ? AppColors.primary
-                                          : AppColors.textSecondary,
+                              child: Container(
+                                color: Colors.transparent,
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                child: Column(
+                                  children: [
+                                    Text(
+                                      DateFormat('EEE').format(date),
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: isSelected
+                                            ? AppColors.primary
+                                            : AppColors.textSecondary,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    '${date.day}',
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                                      color: isSelected
-                                          ? AppColors.primary
-                                          : AppColors.textPrimary,
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      '${date.day}',
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                                        color: isSelected
+                                            ? AppColors.primary
+                                            : AppColors.textPrimary,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  // Status Indicator Dot / Check
-                                  if (isSelected)
-                                    Column(
-                                      children: [
-                                        Container(
-                                          width: 28,
-                                          height: 28,
-                                          decoration: const BoxDecoration(
-                                            color: Color(0xFF5334EA),
-                                            shape: BoxShape.circle,
+                                    const SizedBox(height: 8),
+                                    // Status Indicator Dot / Check
+                                    if (isSelected)
+                                      Column(
+                                        children: [
+                                          Container(
+                                            width: 28,
+                                            height: 28,
+                                            decoration: const BoxDecoration(
+                                              color: Color(0xFF5334EA),
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Container(
+                                            width: 4,
+                                            height: 4,
+                                            decoration: const BoxDecoration(
+                                              color: Color(0xFF5334EA),
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                        ],
+                                      )
+                                    else if (dayCompleted)
+                                      Container(
+                                        width: 24,
+                                        height: 24,
+                                        decoration: const BoxDecoration(
+                                          color: Color(0xFF10B981),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.check_rounded,
+                                          color: Colors.white,
+                                          size: 16,
+                                        ),
+                                      )
+                                    else
+                                      Container(
+                                        width: 24,
+                                        height: 24,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: AppColors.borderLine,
+                                            width: 1.5,
                                           ),
                                         ),
-                                        const SizedBox(height: 4),
-                                        Container(
-                                          width: 4,
-                                          height: 4,
-                                          decoration: const BoxDecoration(
-                                            color: Color(0xFF5334EA),
-                                            shape: BoxShape.circle,
-                                          ),
-                                        ),
-                                      ],
-                                    )
-                                  else if (dayCompleted)
-                                    Container(
-                                      width: 24,
-                                      height: 24,
-                                      decoration: const BoxDecoration(
-                                        color: Color(0xFF10B981),
-                                        shape: BoxShape.circle,
                                       ),
-                                      child: const Icon(
-                                        Icons.check_rounded,
-                                        color: Colors.white,
-                                        size: 16,
-                                      ),
-                                    )
-                                  else
-                                    Container(
-                                      width: 24,
-                                      height: 24,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: AppColors.borderLine,
-                                          width: 1.5,
-                                        ),
-                                      ),
-                                    ),
-                                ],
+                                  ],
+                                ),
                               ),
                             );
                           }),
@@ -658,14 +746,20 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                     child: Builder(
                       builder: (context) {
                         final nowDay = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+                        final yesterdayDay = nowDay.subtract(const Duration(days: 1));
                         final selectedDay = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
                         final isFutureDate = selectedDay.isAfter(nowDay);
+                        final isHistoricalLocked = selectedDay.isBefore(yesterdayDay);
 
                         String sectionTitle = "Today's Habits";
                         if (DateUtils.isSameDay(_selectedDate, DateTime.now().add(const Duration(days: 1)))) {
                           sectionTitle = "Tomorrow's Habits 🔒";
                         } else if (isFutureDate) {
                           sectionTitle = "${DateFormat('EEEE').format(_selectedDate)}'s Habits 🔒";
+                        } else if (DateUtils.isSameDay(_selectedDate, yesterdayDay)) {
+                          sectionTitle = "Yesterday's Habits";
+                        } else if (isHistoricalLocked) {
+                          sectionTitle = "${DateFormat('MMM d').format(_selectedDate)} Habits 🔒";
                         } else if (!DateUtils.isSameDay(_selectedDate, DateTime.now())) {
                           sectionTitle = "${DateFormat('MMM d').format(_selectedDate)} Habits";
                         }
@@ -673,14 +767,19 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                         return Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              sectionTitle,
-                              style: TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.textPrimary,
+                            Flexible(
+                              child: Text(
+                                sectionTitle,
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.textPrimary,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
+                            const SizedBox(width: 8),
                             if (isFutureDate)
                               Row(
                                 children: [
@@ -688,6 +787,21 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                                   const SizedBox(width: 4),
                                   Text(
                                     'Unlocks ${DateFormat('MMM d').format(_selectedDate)}',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              )
+                            else if (isHistoricalLocked)
+                              Row(
+                                children: [
+                                  Icon(Icons.lock_clock_rounded, size: 14, color: AppColors.textSecondary),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Archived ($completedCount of $totalCount done)',
                                     style: TextStyle(
                                       fontSize: 11.5,
                                       fontWeight: FontWeight.w600,
@@ -729,6 +843,74 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                       },
                     ),
                   ),
+                ),
+
+                Builder(
+                  builder: (context) {
+                    final yesterdayDay = DateTime.now().subtract(const Duration(days: 1));
+                    final isYesterday = DateUtils.isSameDay(_selectedDate, yesterdayDay);
+                    final missedYesterday = ref.watch(missedYesterdayHabitsProvider).valueOrNull ?? [];
+
+                    if (isYesterday && missedYesterday.isNotEmpty) {
+                      return SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () => _showReflectionDialog(missedYesterday),
+                              borderRadius: BorderRadius.circular(16),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: isDark ? const Color(0xFF261D10) : const Color(0xFFFFFBEB),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: isDark ? const Color(0xFF854D0E) : const Color(0xFFFDE68A),
+                                    width: 1.5,
+                                  ),
+                                  boxShadow: AppShadows.soft,
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Text('📝', style: TextStyle(fontSize: 20)),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        'You missed ${missedYesterday.length} habit(s) yesterday. Tap to reflect & keep streaks honest.',
+                                        style: TextStyle(
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w600,
+                                          color: isDark ? const Color(0xFFFDE68A) : const Color(0xFF92400E),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                      decoration: BoxDecoration(
+                                        color: isDark ? const Color(0xFFB45309) : const Color(0xFFF59E0B),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: const Text(
+                                        'Reflect',
+                                        style: TextStyle(
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+                    return const SliverToBoxAdapter(child: SizedBox.shrink());
+                  },
                 ),
 
                 const SliverToBoxAdapter(child: SizedBox(height: 12)),
@@ -779,7 +961,14 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                             (context, index) {
                               final habit = visibleHabits[index];
                               final isDone = habit.completedDates.contains(selectedDateStr);
-                              final accentColor = _getCategoryAccentColor(habit.category);
+                              final isSkipped = habit.skippedDates.contains(selectedDateStr);
+                              final missedReason = missedReasons[habit.id];
+                              final isMissed = missedReason != null && !isDone && !isSkipped;
+                              final accentColor = isMissed
+                                  ? const Color(0xFF8B5CF6)
+                                  : _getCategoryAccentColor(habit.category);
+
+                              debugPrint('[HabitsScreen] index=$index, habit="${habit.name}", habit.id="${habit.id}", missedReasons keys=${missedReasons.keys.toList()}, isMissed=$isMissed');
 
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 12),
@@ -790,7 +979,9 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                                     border: Border.all(
                                       color: isDone
                                           ? const Color(0xFF10B981).withOpacity(0.3)
-                                          : AppColors.borderLine,
+                                          : isMissed
+                                              ? const Color(0xFF8B5CF6).withOpacity(0.4)
+                                              : AppColors.borderLine,
                                     ),
                                     boxShadow: AppShadows.soft,
                                   ),
@@ -878,17 +1069,53 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                                                             ),
                                                           ],
                                                         ),
+                                                        if (isMissed && missedReason.isNotEmpty) ...[
+                                                          const SizedBox(height: 5),
+                                                          GestureDetector(
+                                                            onTap: () => _showMissedReasonDetails(habit, missedReason),
+                                                            child: Container(
+                                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                              decoration: BoxDecoration(
+                                                                color: const Color(0xFF8B5CF6).withOpacity(0.12),
+                                                                borderRadius: BorderRadius.circular(8),
+                                                                border: Border.all(color: const Color(0xFF8B5CF6).withOpacity(0.35)),
+                                                              ),
+                                                              child: Row(
+                                                                mainAxisSize: MainAxisSize.min,
+                                                                children: [
+                                                                  const Icon(Icons.rate_review_rounded, size: 12, color: Color(0xFF8B5CF6)),
+                                                                  const SizedBox(width: 5),
+                                                                  Flexible(
+                                                                    child: Text(
+                                                                      'Reflected: "$missedReason"',
+                                                                      style: const TextStyle(
+                                                                        fontSize: 11,
+                                                                        fontWeight: FontWeight.w600,
+                                                                        color: Color(0xFF8B5CF6),
+                                                                      ),
+                                                                      maxLines: 1,
+                                                                      overflow: TextOverflow.ellipsis,
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ],
                                                       ],
                                                     ),
                                                   ),
                                                   const SizedBox(width: 10),
-                                                  // Right Action Button (Completed, Mark Done, or Locked for Future)
+                                                  // Right Action Button (Completed, Mark Done, Locked Past, or Locked Future)
                                                   Builder(
                                                     builder: (context) {
                                                       final nowDay = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+                                                      final yesterdayDay = nowDay.subtract(const Duration(days: 1));
                                                       final selectedDay = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
                                                       final isFutureDate = selectedDay.isAfter(nowDay);
+                                                      final isHistoricalLocked = selectedDay.isBefore(yesterdayDay);
 
+                                                      // 1. Future Date: Locked
                                                       if (isFutureDate) {
                                                         return GestureDetector(
                                                           onTap: () {
@@ -948,6 +1175,109 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                                                         );
                                                       }
 
+                                                      // 2. Historical Locked (Older than Yesterday): Read-Only to preserve streak integrity
+                                                      if (isHistoricalLocked) {
+                                                        return GestureDetector(
+                                                          onTap: () {
+                                                            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                                            ScaffoldMessenger.of(context).showSnackBar(
+                                                              SnackBar(
+                                                                content: const Row(
+                                                                  children: [
+                                                                    Icon(Icons.history_rounded, color: Colors.white, size: 18),
+                                                                    SizedBox(width: 8),
+                                                                    Expanded(
+                                                                      child: Text(
+                                                                        'Records older than 24 hours are locked to preserve your streak integrity.',
+                                                                        style: TextStyle(fontWeight: FontWeight.w600),
+                                                                      ),
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                                backgroundColor: const Color(0xFF5334EA),
+                                                                behavior: SnackBarBehavior.floating,
+                                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                                                duration: const Duration(seconds: 2),
+                                                              ),
+                                                            );
+                                                          },
+                                                          child: Column(
+                                                            mainAxisAlignment: MainAxisAlignment.center,
+                                                            children: [
+                                                              Container(
+                                                                width: 36,
+                                                                height: 36,
+                                                                decoration: BoxDecoration(
+                                                                  color: isDone
+                                                                      ? const Color(0xFF10B981).withOpacity(0.85)
+                                                                      : (isDark ? const Color(0xFF282836) : const Color(0xFFF1EFF8)),
+                                                                  shape: BoxShape.circle,
+                                                                  border: isDone
+                                                                      ? null
+                                                                      : Border.all(
+                                                                          color: AppColors.borderLine,
+                                                                          width: 1.5,
+                                                                        ),
+                                                                ),
+                                                                child: Icon(
+                                                                  isDone ? Icons.check_rounded : Icons.lock_clock_rounded,
+                                                                  color: isDone ? Colors.white : AppColors.textSecondary,
+                                                                  size: isDone ? 20 : 17,
+                                                                ),
+                                                              ),
+                                                              const SizedBox(height: 3),
+                                                              Text(
+                                                                isDone ? 'Completed' : 'Locked',
+                                                                style: TextStyle(
+                                                                  fontSize: 10,
+                                                                  fontWeight: FontWeight.w700,
+                                                                  color: isDone ? const Color(0xFF10B981) : AppColors.textSecondary,
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        );
+                                                      }
+
+                                                      // 2.5 Missed with Reflection Reason
+                                                      if (isMissed) {
+                                                        return GestureDetector(
+                                                          onTap: () => _showMissedReasonDetails(habit, missedReason),
+                                                          child: Column(
+                                                            mainAxisAlignment: MainAxisAlignment.center,
+                                                            children: [
+                                                              Container(
+                                                                width: 36,
+                                                                height: 36,
+                                                                decoration: BoxDecoration(
+                                                                  color: const Color(0xFF8B5CF6).withOpacity(0.16),
+                                                                  shape: BoxShape.circle,
+                                                                  border: Border.all(
+                                                                    color: const Color(0xFF8B5CF6),
+                                                                    width: 2,
+                                                                  ),
+                                                                ),
+                                                                child: const Icon(
+                                                                  Icons.rate_review_rounded,
+                                                                  color: Color(0xFF8B5CF6),
+                                                                  size: 18,
+                                                                ),
+                                                              ),
+                                                              const SizedBox(height: 3),
+                                                              const Text(
+                                                                'Missed',
+                                                                style: TextStyle(
+                                                                  fontSize: 10,
+                                                                  fontWeight: FontWeight.w700,
+                                                                  color: Color(0xFF8B5CF6),
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        );
+                                                      }
+
+                                                      // 3. Active Window (Today & Yesterday grace period): Editable
                                                       return GestureDetector(
                                                         onTap: () {
                                                           ref
@@ -1081,7 +1411,9 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                               Row(
                                 children: [
                                   Text(
-                                    '$weeklyCompletions / 15',
+                                    weeklyStats.scheduledCount > 0
+                                        ? '${weeklyStats.completedCount} / ${weeklyStats.scheduledCount}'
+                                        : '${weeklyStats.completedCount} / 15',
                                     style: TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w800,
@@ -1111,7 +1443,9 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(6),
                                   child: LinearProgressIndicator(
-                                    value: (weeklyCompletions / 15).clamp(0.0, 1.0),
+                                    value: weeklyStats.scheduledCount > 0
+                                        ? (weeklyStats.completedCount / weeklyStats.scheduledCount).clamp(0.0, 1.0)
+                                        : 0.0,
                                     minHeight: 4,
                                     backgroundColor: isDark
                                         ? const Color(0xFF322857)

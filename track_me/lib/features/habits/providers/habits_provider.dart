@@ -580,3 +580,76 @@ final totalHabitsCountProvider = Provider<int>((ref) {
         error: (_, __) => 0,
       );
 });
+
+// ─── Weekly Habit Stats (Single Source of Truth) ─────────────────────────────
+
+class WeeklyHabitStats {
+  final int completedCount;
+  final int scheduledCount;
+  final int percent;
+
+  const WeeklyHabitStats({
+    required this.completedCount,
+    required this.scheduledCount,
+    required this.percent,
+  });
+
+  static const empty = WeeklyHabitStats(
+    completedCount: 0,
+    scheduledCount: 0,
+    percent: 0,
+  );
+}
+
+WeeklyHabitStats calculateWeeklyHabitStats(List<HabitModel> habits, {DateTime? now}) {
+  if (habits.isEmpty) return WeeklyHabitStats.empty;
+
+  final current = now ?? DateTime.now();
+  final today = DateTime(current.year, current.month, current.day);
+  final diff = today.weekday % 7; // Sunday anchor (matches Habits screen)
+  final weekStart = today.subtract(Duration(days: diff));
+
+  int scheduledCount = 0;
+  int completedCount = 0;
+
+  for (int i = 0; i < 7; i++) {
+    final date = weekStart.add(Duration(days: i));
+    final day = DateTime(date.year, date.month, date.day);
+    final dateStr = DateFormat('yyyy-MM-dd').format(date);
+    final weekdayIndex = date.weekday - 1; // 0 = Monday, 6 = Sunday
+
+    for (final habit in habits) {
+      final hasRepeatDay = habit.repeatDays.any((d) => d);
+      final isScheduled = !hasRepeatDay ||
+          (weekdayIndex >= 0 &&
+              weekdayIndex < habit.repeatDays.length &&
+              habit.repeatDays[weekdayIndex]);
+
+      if (isScheduled) {
+        scheduledCount++;
+        if (!day.isAfter(today) && habit.completedDates.contains(dateStr)) {
+          completedCount++;
+        }
+      }
+    }
+  }
+
+  final percent = scheduledCount > 0
+      ? ((completedCount / scheduledCount) * 100).round().clamp(0, 100)
+      : 0;
+
+  return WeeklyHabitStats(
+    completedCount: completedCount,
+    scheduledCount: scheduledCount,
+    percent: percent,
+  );
+}
+
+final weeklyHabitStatsProvider = Provider<WeeklyHabitStats>((ref) {
+  return ref.watch(habitsProvider).when(
+        data: (habits) => calculateWeeklyHabitStats(habits),
+        loading: () => WeeklyHabitStats.empty,
+        error: (_, __) => WeeklyHabitStats.empty,
+      );
+});
+

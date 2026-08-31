@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:isar/isar.dart';
@@ -12,14 +13,30 @@ import 'habits_provider.dart';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
-/// Represents one missed habit plus the user's typed reason (mutable per card).
+/// Represents one missed habit plus the user's answer (mutable per card).
+///
+/// Before asking for a reason we first ask "Did you complete this habit
+/// yesterday?":
+/// - `didComplete == true`  → the user actually did it → we mark it completed
+///   for yesterday and never ask for a reason.
+/// - `didComplete == false` → it was genuinely missed → a reason is required.
+/// - `didComplete == null`  → not answered yet.
 class MissedHabitEntry {
   final HabitModel habit;
   String reason;
+  bool? didComplete;
 
-  MissedHabitEntry({required this.habit, this.reason = ''});
+  MissedHabitEntry({required this.habit, this.reason = '', this.didComplete});
 
-  bool get isValid => reason.trim().length >= 5;
+  /// Fully resolved once answered, and (when missed) a valid reason is given.
+  bool get isValid {
+    if (didComplete == null) return false;
+    if (didComplete == true) return true; // marked done — no reason needed
+    return reason.trim().length >= 5;
+  }
+
+  /// Whether this entry was answered "No" and therefore needs a reason.
+  bool get needsReason => didComplete == false;
 }
 
 // ─── Global flag — set by splash, read by dashboard ──────────────────────────
@@ -37,83 +54,87 @@ final missedYesterdayHabitsProvider = FutureProvider<List<HabitModel>>((ref) asy
   final yesterday = DateTime.now().subtract(const Duration(days: 1));
   final yesterdayStr = DateFormat('yyyy-MM-dd').format(yesterday);
 
-  // 2. Check if we already submitted reasons for yesterday (local Isar gate)
+  debugPrint('[MissedHabits] Checking missed habits for yesterday: $yesterdayStr');
+
+  // Collect IDs of habits for which the user has ALREADY submitted a reason for yesterday
+  final alreadyReflectedIds = <String>{};
+
   if (IsarService.isAvailable) {
-    final isar = IsarService.instance;
-    final settings = await isar.appSettingsModels.get(1);
-    if (settings?.lastReflectionDate == yesterdayStr) {
-      return []; // Already handled today — skip popup
+    try {
+      final isar = IsarService.instance;
+      final localReasons = await isar.missedHabitReasonLocalModels
+          .where()
+          .missedDateEqualTo(yesterdayStr)
+          .findAll();
+      for (final r in localReasons) {
+        alreadyReflectedIds.add(r.habitId);
+      }
+      debugPrint('[MissedHabits] Found ${alreadyReflectedIds.length} reflected habit(s) in local Isar');
+    } catch (e) {
+      debugPrint('[MissedHabits] Failed reading local missed reasons: $e');
     }
   }
 
-  // 3. Check backend API gate to see if reasons were already submitted for yesterday
   try {
     final client = DioClient();
     final response = await client.dio.get(
-      '/missed-reasons/check',
+      '/missed-reasons',
       queryParameters: {'date': yesterdayStr},
     );
     final data = response.data;
-    bool hasSubmitted = false;
-    if (data is Map<String, dynamic>) {
-      if (data['data'] != null && data['data'] is bool) {
-        hasSubmitted = data['data'] as bool;
-      } else if (data['hasSubmitted'] != null) {
-        hasSubmitted = data['hasSubmitted'] as bool;
+    if (data is List) {
+      for (final item in data) {
+        if (item is Map && item['habitId'] != null) {
+          alreadyReflectedIds.add(item['habitId'].toString());
+        }
       }
-    } else if (data is bool) {
-      hasSubmitted = data;
     }
-
-    if (hasSubmitted) {
-      // Save locally to Isar as well so offline checks work next time
-      if (IsarService.isAvailable) {
-        final isar = IsarService.instance;
-        await isar.writeTxn(() async {
-          final settings = await isar.appSettingsModels.get(1) ?? AppSettingsModel();
-          settings.lastReflectionDate = yesterdayStr;
-          await isar.appSettingsModels.put(settings);
-        });
-      }
-      return [];
-    }
-  } catch (_) {
-    // Offline or request failure — proceed with local habit checks
+    debugPrint('[MissedHabits] Total already reflected habits (local+backend): ${alreadyReflectedIds.length}');
+  } catch (e) {
+    debugPrint('[MissedHabits] Backend missed-reasons fetch failed ($e) — proceeding with local check');
   }
 
   // 4. Fetch habits list reactively
   final habitsState = ref.watch(habitsProvider);
+  final habits = habitsState.valueOrNull;
 
-  return habitsState.when(
-    data: (habits) {
-      if (habits.isEmpty) return [];
+  if (habits == null || habits.isEmpty) {
+    debugPrint('[MissedHabits] habits list is null or empty: $habits');
+    return [];
+  }
 
-      final yesterdayStart = DateTime(yesterday.year, yesterday.month, yesterday.day);
+  final yesterdayStart = DateTime(yesterday.year, yesterday.month, yesterday.day);
 
-      // 5. Filter: missed = created on or before yesterday AND not completed AND not skipped for yesterday
-      return habits.where((habit) {
-        // Exclude habits created after yesterday (e.g. created today)
-        final createdAtDate = DateTime(
-          habit.createdAt.year,
-          habit.createdAt.month,
-          habit.createdAt.day,
-        );
-        if (createdAtDate.isAfter(yesterdayStart)) {
-          return false;
-        }
+  // 5. Filter: missed = scheduled for yesterday AND created on/before yesterday AND not completed AND not skipped AND not already reflected
+  final missed = habits.where((habit) {
+    // Exclude habits created after yesterday (e.g. created today)
+    final createdAtDate = DateTime(
+      habit.createdAt.year,
+      habit.createdAt.month,
+      habit.createdAt.day,
+    );
+    final isCreatedAfterYesterday = createdAtDate.isAfter(yesterdayStart);
 
-        final isCompleted = habit.completedDates.contains(yesterdayStr);
-        final isSkipped = habit.skippedDates.contains(yesterdayStr);
-        final dayIndex = yesterday.weekday - 1; // 0=Mon … 6=Sun
-        final wasScheduled = habit.repeatDays.length > dayIndex
-            ? habit.repeatDays[dayIndex]
-            : true;
-        return wasScheduled && !isCompleted && !isSkipped;
-      }).toList();
-    },
-    loading: () => Completer<List<HabitModel>>().future, // Suspend the future provider until data is loaded
-    error: (err, stack) => [], // If it fails, fallback to empty list
-  );
+    final isCompleted = habit.completedDates.contains(yesterdayStr);
+    final isSkipped = habit.skippedDates.contains(yesterdayStr);
+    final isReflected = alreadyReflectedIds.contains(habit.id);
+
+    final dayIndex = yesterday.weekday - 1; // 0=Mon … 6=Sun
+    final wasScheduled = habit.repeatDays.length > dayIndex
+        ? habit.repeatDays[dayIndex]
+        : true;
+
+    debugPrint('[MissedHabits] Habit "${habit.name}": createdAt=${habit.createdAt} (afterYesterday=$isCreatedAfterYesterday), scheduled=$wasScheduled, completed=$isCompleted, skipped=$isSkipped, alreadyReflected=$isReflected');
+
+    if (isCreatedAfterYesterday) {
+      return false;
+    }
+
+    return wasScheduled && !isCompleted && !isSkipped && !isReflected;
+  }).toList();
+
+  debugPrint('[MissedHabits] Final missed habits count for $yesterdayStr: ${missed.length}');
+  return missed;
 });
 
 // ─── Save reasons notifier ────────────────────────────────────────────────────
@@ -123,7 +144,8 @@ class MissedReasonsNotifier extends StateNotifier<AsyncValue<void>> {
 
   MissedReasonsNotifier(this._ref) : super(const AsyncValue.data(null));
 
-  /// Save all reasons locally and sync to backend.
+  /// Resolve the reflection: habits answered "Yes" are marked completed for
+  /// yesterday; habits answered "No" get a reason saved locally + synced.
   Future<bool> saveReasons({
     required List<MissedHabitEntry> entries,
     required String userId,
@@ -133,55 +155,35 @@ class MissedReasonsNotifier extends StateNotifier<AsyncValue<void>> {
     final yesterdayStr = DateFormat('yyyy-MM-dd').format(yesterday);
 
     try {
-      // ── 1. Save to Isar (local, offline-first) ──
-      if (IsarService.isAvailable) {
-        final isar = IsarService.instance;
+      // Split the user's answers: "yes" → actually completed (no reason),
+      // "no" → genuinely missed (reason required).
+      final completedEntries =
+          entries.where((e) => e.didComplete == true).toList();
+      final missedEntries =
+          entries.where((e) => e.didComplete == false).toList();
 
-        // Fetch all existing records for yesterday using indexed where() query
-        final allForDate = await isar.missedHabitReasonLocalModels
-            .where()
-            .missedDateEqualTo(yesterdayStr)
-            .findAll();
-
-        await isar.writeTxn(() async {
-          for (final entry in entries) {
-            // Find existing record for this habit via in-memory filter
-            final existing = allForDate
-                .where((r) => r.habitId == entry.habit.id)
-                .firstOrNull;
-
-            if (existing != null) {
-              existing.reason = entry.reason.trim();
-              existing.isSynced = false;
-              await isar.missedHabitReasonLocalModels.put(existing);
-            } else {
-              final model = MissedHabitReasonLocalModel()
-                ..habitId = entry.habit.id
-                ..habitName = entry.habit.name
-                ..habitEmoji = entry.habit.emoji
-                ..userId = userId
-                ..missedDate = yesterdayStr
-                ..reason = entry.reason.trim()
-                ..createdAt = DateTime.now()
-                ..isSynced = false;
-              await isar.missedHabitReasonLocalModels.put(model);
-            }
-          }
-        });
-
-        // ── 2. Mark reflection as done to prevent re-showing today ──
-        await isar.writeTxn(() async {
-          final settings = await isar.appSettingsModels.get(1) ?? AppSettingsModel();
-          settings.lastReflectionDate = yesterdayStr;
-          await isar.appSettingsModels.put(settings);
-        });
+      // ── 1. Mark "yes" habits as completed yesterday ──
+      // Uses the same optimistic + backend-sync path the habit grid uses, so
+      // streaks / dashboard reflect the completion immediately.
+      for (final entry in completedEntries) {
+        await _ref
+            .read(habitsProvider.notifier)
+            .toggleCompletion(entry.habit, yesterday);
       }
 
-      // ── 3. Sync to backend ──
-      await _syncToBackend(entries, yesterdayStr);
+      // ── 2. Save reasons for genuinely missed habits (offline-first) ──
+      if (missedEntries.isNotEmpty) {
+        await _saveReasonsLocal(missedEntries, yesterdayStr, userId);
+        await _syncToBackend(missedEntries, yesterdayStr);
+      }
 
-      // ── 4. Invalidate provider so Riverpod updates immediately ──
+      // ── 3. Mark reflection as done to prevent re-showing today ──
+      await _markReflectionDone(yesterdayStr);
+
+      // ── 4. Invalidate providers so UI updates immediately ──
       _ref.invalidate(missedYesterdayHabitsProvider);
+      _ref.invalidate(habitsProvider);
+      _ref.invalidate(missedReasonsForDateProvider(yesterdayStr));
 
       state = const AsyncValue.data(null);
       return true;
@@ -189,6 +191,59 @@ class MissedReasonsNotifier extends StateNotifier<AsyncValue<void>> {
       state = AsyncValue.error(e, st);
       return false;
     }
+  }
+
+  /// Persist missed-habit reasons to Isar (local, offline-first).
+  Future<void> _saveReasonsLocal(
+    List<MissedHabitEntry> entries,
+    String yesterdayStr,
+    String userId,
+  ) async {
+    if (!IsarService.isAvailable) return;
+    final isar = IsarService.instance;
+
+    // Fetch all existing records for yesterday using indexed where() query
+    final allForDate = await isar.missedHabitReasonLocalModels
+        .where()
+        .missedDateEqualTo(yesterdayStr)
+        .findAll();
+
+    await isar.writeTxn(() async {
+      for (final entry in entries) {
+        // Find existing record for this habit via in-memory filter
+        final existing = allForDate
+            .where((r) => r.habitId == entry.habit.id)
+            .firstOrNull;
+
+        if (existing != null) {
+          existing.reason = entry.reason.trim();
+          existing.isSynced = false;
+          await isar.missedHabitReasonLocalModels.put(existing);
+        } else {
+          final model = MissedHabitReasonLocalModel()
+            ..habitId = entry.habit.id
+            ..habitName = entry.habit.name
+            ..habitEmoji = entry.habit.emoji
+            ..userId = userId
+            ..missedDate = yesterdayStr
+            ..reason = entry.reason.trim()
+            ..createdAt = DateTime.now()
+            ..isSynced = false;
+          await isar.missedHabitReasonLocalModels.put(model);
+        }
+      }
+    });
+  }
+
+  /// Record that today's reflection is done so it doesn't re-show today.
+  Future<void> _markReflectionDone(String yesterdayStr) async {
+    if (!IsarService.isAvailable) return;
+    final isar = IsarService.instance;
+    await isar.writeTxn(() async {
+      final settings = await isar.appSettingsModels.get(1) ?? AppSettingsModel();
+      settings.lastReflectionDate = yesterdayStr;
+      await isar.appSettingsModels.put(settings);
+    });
   }
 
   /// Backend sync. Marks local records as synced on success.
@@ -202,7 +257,8 @@ class MissedReasonsNotifier extends StateNotifier<AsyncValue<void>> {
                 'reason': e.reason.trim(),
               })
           .toList();
-      await client.dio.post('/missed-reasons', data: payload);
+      final res = await client.dio.post('/missed-reasons', data: payload);
+      debugPrint('[MissedHabits] Synced reasons to backend: ${res.statusCode}');
 
       // Mark as synced in Isar
       if (IsarService.isAvailable) {
@@ -221,7 +277,8 @@ class MissedReasonsNotifier extends StateNotifier<AsyncValue<void>> {
           });
         }
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[MissedHabits] Sync failed: $e');
       // Silently fail — will retry on next launch if not synced
     }
   }
@@ -231,3 +288,42 @@ final missedReasonsNotifierProvider =
     StateNotifierProvider<MissedReasonsNotifier, AsyncValue<void>>(
   (ref) => MissedReasonsNotifier(ref),
 );
+
+/// Maps habitId -> reason for a specific date (e.g. yesterday).
+final missedReasonsForDateProvider =
+    FutureProvider.family<Map<String, String>, String>((ref, dateStr) async {
+  final result = <String, String>{};
+
+  if (IsarService.isAvailable) {
+    try {
+      final isar = IsarService.instance;
+      final local = await isar.missedHabitReasonLocalModels
+          .where()
+          .missedDateEqualTo(dateStr)
+          .findAll();
+      for (final r in local) {
+        result[r.habitId] = r.reason;
+      }
+    } catch (_) {}
+  }
+
+  try {
+    final client = DioClient();
+    final response = await client.dio.get(
+      '/missed-reasons',
+      queryParameters: {'date': dateStr},
+    );
+    final data = response.data;
+    if (data is List) {
+      for (final item in data) {
+        if (item is Map && item['habitId'] != null && item['reason'] != null) {
+          result[item['habitId'].toString()] = item['reason'].toString();
+        }
+      }
+    }
+  } catch (e) {
+    debugPrint('[MissedReasonsProvider] dio fetch error: $e');
+  }
+  debugPrint('[MissedReasonsProvider] dateStr=$dateStr, result=$result');
+  return result;
+});

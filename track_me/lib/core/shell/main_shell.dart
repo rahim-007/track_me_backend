@@ -6,27 +6,17 @@ import '../router/app_router.dart';
 import '../theme/app_colors.dart';
 import '../theme/theme_provider.dart';
 
-class MainShell extends ConsumerWidget {
+class MainShell extends ConsumerStatefulWidget {
   final Widget child;
 
   const MainShell({super.key, required this.child});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // Watch themeProvider to rebuild MainShell instantly when dark mode is toggled
-    ref.watch(themeProvider);
+  ConsumerState<MainShell> createState() => _MainShellState();
+}
 
-    final location = GoRouterState.of(context).uri.toString();
-    final selectedIndex = _locationToIndex(location);
-
-    return Scaffold(
-      body: child,
-      bottomNavigationBar: _ClayBottomNavBar(
-        selectedIndex: selectedIndex,
-        onTap: (index) => _onNavTap(context, index),
-      ),
-    );
-  }
+class _MainShellState extends ConsumerState<MainShell> {
+  double _dragDistance = 0;
 
   int _locationToIndex(String location) {
     if (location.startsWith(AppRoutes.habits)) return 1;
@@ -37,6 +27,9 @@ class MainShell extends ConsumerWidget {
   }
 
   void _onNavTap(BuildContext context, int index) {
+    final currentIndex = _locationToIndex(GoRouterState.of(context).uri.toString());
+    if (index == currentIndex) return;
+
     switch (index) {
       case 0:
         context.go(AppRoutes.dashboard);
@@ -54,6 +47,54 @@ class MainShell extends ConsumerWidget {
         context.go(AppRoutes.profile);
         break;
     }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Watch themeProvider to rebuild MainShell instantly when dark mode is toggled
+    ref.watch(themeProvider);
+
+    final location = GoRouterState.of(context).uri.toString();
+    final selectedIndex = _locationToIndex(location);
+
+    return Scaffold(
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onHorizontalDragStart: (_) {
+          _dragDistance = 0;
+        },
+        onHorizontalDragUpdate: (details) {
+          _dragDistance += details.primaryDelta ?? 0;
+        },
+        onHorizontalDragEnd: (details) {
+          final velocity = details.primaryVelocity ?? 0;
+          const minDistance = 45.0;
+          const minVelocity = 220.0;
+
+          // Drag Left (finger moves right to left, negative delta) -> Navigate to Next Screen
+          if (_dragDistance < -minDistance || velocity < -minVelocity) {
+            if (selectedIndex < 4) {
+              _onNavTap(context, selectedIndex + 1);
+            }
+          }
+          // Drag Right (finger moves left to right, positive delta) -> Navigate to Previous Screen
+          else if (_dragDistance > minDistance || velocity > minVelocity) {
+            if (selectedIndex > 0) {
+              _onNavTap(context, selectedIndex - 1);
+            }
+          }
+          _dragDistance = 0;
+        },
+        onHorizontalDragCancel: () {
+          _dragDistance = 0;
+        },
+        child: widget.child,
+      ),
+      bottomNavigationBar: _ClayBottomNavBar(
+        selectedIndex: selectedIndex,
+        onTap: (index) => _onNavTap(context, index),
+      ),
+    );
   }
 }
 
@@ -148,8 +189,9 @@ class _ClayNavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activeColor = const Color(0xFF5334EA);
-    final inactiveColor = const Color(0xFF718096);
+    final isDark = AppColors.isDarkMode;
+    final activeColor = isDark ? const Color(0xFFA78BFA) : const Color(0xFF5334EA);
+    final inactiveColor = AppColors.textSecondary;
 
     return Expanded(
       child: GestureDetector(
@@ -164,7 +206,7 @@ class _ClayNavItem extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
               decoration: BoxDecoration(
                 color: isSelected
-                    ? const Color(0xFFEEECFE)
+                    ? (isDark ? const Color(0x286E49E6) : const Color(0xFFEEECFE))
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(16),
               ),

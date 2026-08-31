@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
 
 import 'package:track_me/features/habits/data/models/habit_model.dart';
+import 'package:track_me/features/habits/presentation/widgets/habit_3d_checkbox.dart';
 import 'package:track_me/features/habits/presentation/widgets/habit_grid_row.dart';
 import 'package:track_me/features/habits/providers/habits_provider.dart';
 
@@ -208,10 +209,10 @@ void main() {
         onComplete: () => completeCalls++,
       );
 
-      expect(find.text('Mark'), findsOneWidget);
-      expect(find.text('Skip'), findsOneWidget); // skip available when pending
+      expect(find.byType(Habit3dCheckbox), findsOneWidget);
+      expect(find.byIcon(Icons.circle_outlined), findsOneWidget);
 
-      await tester.tap(find.text('Mark'));
+      await tester.tap(find.byType(Habit3dCheckbox));
       await tester.pumpAndSettle();
       expect(completeCalls, 1);
     });
@@ -225,11 +226,11 @@ void main() {
         onComplete: () => completeCalls++,
       );
 
-      // Status button shows Skipped; no Skip action available anymore.
-      expect(find.text('Skipped'), findsOneWidget);
-      expect(find.text('Skip'), findsNothing);
+      // Status button shows Skipped icon; tapping it does NOT complete.
+      expect(find.byType(Habit3dCheckbox), findsOneWidget);
+      expect(find.byIcon(Icons.skip_next_rounded), findsOneWidget);
 
-      await tester.tap(find.text('Skipped'));
+      await tester.tap(find.byType(Habit3dCheckbox));
       await tester.pumpAndSettle();
 
       // The reported bug: this must NOT call onComplete.
@@ -244,10 +245,10 @@ void main() {
         onComplete: () => completeCalls++,
       );
 
-      expect(find.text('Done'), findsOneWidget);
-      expect(find.text('Skip'), findsNothing); // can't skip a done habit
+      expect(find.byType(Habit3dCheckbox), findsOneWidget);
+      expect(find.byIcon(Icons.check_rounded), findsOneWidget);
 
-      await tester.tap(find.text('Done'));
+      await tester.tap(find.byType(Habit3dCheckbox));
       await tester.pumpAndSettle();
       expect(completeCalls, 1); // existing undo behavior preserved
     });

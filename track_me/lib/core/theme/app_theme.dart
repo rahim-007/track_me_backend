@@ -169,7 +169,7 @@ class AppTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.primary,
           side: BorderSide(color: AppColors.primary.withOpacity(0.4), width: 1.5),
-          minimumSize: const Size(double.infinity, 52),
+          minimumSize: const Size(64, 48),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
@@ -305,7 +305,7 @@ class AppTheme {
 
   static SnackBarThemeData get _snackBarTheme => SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: AppColors.surfaceElevated,
+        backgroundColor: AppColors.surface,
         contentTextStyle: GoogleFonts.inter(
           fontSize: 14,
           fontWeight: FontWeight.w400,

@@ -1,5 +1,8 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+final isHabit3dFxEnabledProvider = StateProvider<bool>((ref) => true);
 
 /// 3D Tactile Checkbox Wrapper with 3D Z-Axis matrix squishy press
 /// and 3D liquid energy wave ripple effect.

@@ -172,9 +172,13 @@ class NotificationService {
   /// Cancel every slot scheduled for [habitId] (daily + all weekdays).
   static Future<void> cancelHabitReminder(String habitId) async {
     if (kIsWeb) return;
-    final base = _notificationBase(habitId);
-    for (var slot = 0; slot < 8; slot++) {
-      await _plugin.cancel(base + slot);
+    try {
+      final base = _notificationBase(habitId);
+      for (var slot = 0; slot < 8; slot++) {
+        await _plugin.cancel(base + slot);
+      }
+    } catch (_) {
+      // Platform channel unavailable in test or background environments
     }
   }
 

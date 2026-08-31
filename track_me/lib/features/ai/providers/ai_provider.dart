@@ -45,7 +45,7 @@ final aiInsightsProvider = FutureProvider<AiInsightsModel>((ref) async {
   } catch (_) {
     // Return predefined insights for MVP/offline mode
     return const AiInsightsModel(
-      productivityScore: 78,
+      productivityScore: 0,
       weeklyReport:
           'This week you completed 85% of your scheduled habits — a 12% improvement from last week! Your morning routines are your strongest area, while evening habits still need some work. You\'ve maintained an impressive 7-day streak for meditation. Keep up the momentum!',
       strengths: [

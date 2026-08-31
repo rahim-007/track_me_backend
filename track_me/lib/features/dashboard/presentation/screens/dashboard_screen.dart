@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
 import '../../../notifications/presentation/widgets/notification_bell.dart';
 import '../../../../core/router/app_router.dart';
@@ -17,6 +16,8 @@ import '../../../goals/providers/goals_provider.dart';
 import '../../../goals/presentation/widgets/add_goal_dialog.dart';
 import '../../../profile/providers/profile_provider.dart';
 import '../../../cashflow/providers/cashflow_provider.dart';
+import '../../../cashflow/data/models/cashflow_models.dart';
+import '../../../cashflow/presentation/widgets/cashflow_hero_card.dart';
 import '../../../cashflow/presentation/widgets/add_entry_sheet.dart';
 import '../../../profile/presentation/screens/profile_screen.dart';
 import '../../../habits/data/models/habit_model.dart';
@@ -82,29 +83,49 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     await AddEntrySheet.show(context, initialKindIndex: 0);
   }
 
+  void _showReflectionDialog(List<HabitModel> missedHabits) {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => MissedHabitsReflectionDialog(
+        missedHabits: List.from(missedHabits),
+        onSubmitted: () {
+          Navigator.of(context, rootNavigator: true).pop();
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Watch themeProvider to rebuild instantly when Dark Mode is toggled
     ref.watch(themeProvider);
 
-    // Listen for missed habits from yesterday to show reflection dialog
-    ref.listen<AsyncValue<List<dynamic>>>(
+    // Watch missed yesterday habits
+    final missedYesterdayAsync = ref.watch(missedYesterdayHabitsProvider);
+    final missedYesterday = missedYesterdayAsync.valueOrNull ?? [];
+
+    // Trigger dialog if missed habits already loaded on initial frame
+    if (!_hasShownReflection && missedYesterday.isNotEmpty) {
+      _hasShownReflection = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _showReflectionDialog(missedYesterday);
+      });
+    }
+
+    // Listen for missed habits from yesterday to show reflection dialog when loaded asynchronously
+    ref.listen<AsyncValue<List<HabitModel>>>(
       missedYesterdayHabitsProvider,
       (prev, next) {
         if (_hasShownReflection) return;
         next.whenData((missedHabits) {
           if (missedHabits.isNotEmpty && mounted) {
             _hasShownReflection = true;
-            showDialog<void>(
-              context: context,
-              barrierDismissible: false,
-              builder: (_) => MissedHabitsReflectionDialog(
-                missedHabits: List.from(missedHabits),
-                onSubmitted: () {
-                  Navigator.of(context, rootNavigator: true).pop();
-                },
-              ),
-            );
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              _showReflectionDialog(missedHabits);
+            });
           }
         });
       },
@@ -267,6 +288,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
+                  // ─── 0. Yesterday's Missed Habits Reflection Banner ────────
+                  if (missedYesterday.isNotEmpty) ...[
+                    _MissedHabitsBanner(
+                      missedHabits: missedYesterday,
+                      onTap: () => _showReflectionDialog(missedYesterday),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
                   // ─── 2. Your Progress Hero Card ────────────────────────────
                   _ProgressBannerCard(
                     habits: habitsAsync.value ?? [],
@@ -303,16 +333,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
                   const SizedBox(height: 24),
 
-                  // ─── 5. Active Goals Section ──────────────────────────────
+                  // ─── 5. Cash Flow Hero Card Section ───────────────────────
+                  _CashFlowSnapshotCard(cashFlowState: cashFlow),
+
+                  const SizedBox(height: 24),
+
+                  // ─── 6. Active Goals Section ──────────────────────────────
                   _ActiveGoalsSection(
                     goals: goalsAsync.value ?? [],
                     onAddGoal: _showAddGoalModal,
                   ),
-
-                  const SizedBox(height: 24),
-
-                  // ─── 6. Achievements Section ──────────────────────────────
-                  _AchievementsSection(),
 
                   const SizedBox(height: 24),
 
@@ -323,15 +353,103 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     onAddExpense: _showAddExpenseModal,
                     onAddIncome: _showAddIncomeModal,
                   ),
-
-                  const SizedBox(height: 24),
-
-                  // ─── 8. Cash Flow Snapshot ────────────────────────────────
-                  _CashFlowSnapshotCard(cashFlowState: cashFlow),
                 ]),
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── 0. Missed Habits Reflection Banner Widget ────────────────────────────────
+
+class _MissedHabitsBanner extends StatelessWidget {
+  final List<HabitModel> missedHabits;
+  final VoidCallback onTap;
+
+  const _MissedHabitsBanner({
+    required this.missedHabits,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final count = missedHabits.length;
+    final isDark = AppColors.isDarkMode;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF261D10) : const Color(0xFFFFFBEB),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isDark ? const Color(0xFF854D0E) : const Color(0xFFFDE68A),
+              width: 1.5,
+            ),
+            boxShadow: AppShadows.soft,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF452C16) : const Color(0xFFFEF3C7),
+                  shape: BoxShape.circle,
+                ),
+                child: const Center(
+                  child: Text('📝', style: TextStyle(fontSize: 22)),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Yesterday's Reflection",
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? const Color(0xFFFDE68A) : const Color(0xFF92400E),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'You missed $count ${count == 1 ? 'habit' : 'habits'}. Tap to reflect.',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w500,
+                        color: isDark ? const Color(0xFFD97706) : const Color(0xFFB45309),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFFB45309) : const Color(0xFFF59E0B),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'Reflect',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -347,12 +465,10 @@ class _ProgressBannerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final completedCount = habits.where((h) => h.isCompletedToday).length;
-    final totalCount = habits.isEmpty ? 1 : habits.length;
-    final calculatedPercent = (completedCount / totalCount * 100).round();
-    final displayPercent = habits.isEmpty ? 78 : calculatedPercent;
-    final progressFactor = displayPercent / 100.0;
-    final gradientColors = [const Color(0xFF5F4DE1), const Color(0xFF5143CA)];
+    final stats = calculateWeeklyHabitStats(habits);
+    final displayPercent = stats.percent;
+    final progressFactor = (displayPercent / 100.0).clamp(0.0, 1.0);
+    final gradientColors = [const Color(0xFF5848D6), const Color(0xFF4930D8)];
 
     return Container(
       height: 180,
@@ -377,19 +493,29 @@ class _ProgressBannerCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         child: Stack(
           children: [
-            // Exact Cropped Mountain Illustration Asset from Reference
+            // Exact Mountain Illustration Asset with Flag, Clouds and Winding Road
             Positioned(
-              right: 0,
-              top: 0,
-              bottom: 0,
-              width: 230,
+              right: -10,
+              bottom: -18,
+              width: 260,
+              height: 195,
               child: Image.asset(
                 'assets/images/mountain_illustration.png',
-                fit: BoxFit.cover,
-                alignment: Alignment.centerRight,
+                fit: BoxFit.contain,
+                alignment: Alignment.bottomRight,
                 errorBuilder: (context, error, stackTrace) {
                   return CustomPaint(painter: _MountainPainter());
                 },
+              ),
+            ),
+            // Left Accent Vertical Line (Matching Goal & Habit banners)
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              child: Container(
+                width: 4,
+                color: const Color(0xFF8B6EF5),
               ),
             ),
             // Card Content
@@ -402,42 +528,44 @@ class _ProgressBannerCard extends StatelessWidget {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Your Progress',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.white.withOpacity(0.9),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
                       Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Text(
-                            '$displayPercent%',
-                            style: const TextStyle(
-                              fontSize: 42,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
-                              letterSpacing: -1.5,
+                            'Weekly Progress',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white.withOpacity(0.92),
+                              letterSpacing: 0.2,
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 8),
                           Container(
-                            width: 32,
-                            height: 32,
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              shape: BoxShape.circle,
+                              color: Colors.white.withOpacity(0.18),
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Icon(
-                              Icons.north_east_rounded,
-                              color: Colors.white,
-                              size: 16,
+                            child: const Text(
+                              'This Week',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '$displayPercent%',
+                        style: const TextStyle(
+                          fontSize: 42,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          letterSpacing: -1.5,
+                        ),
                       ),
                     ],
                   ),
@@ -450,19 +578,21 @@ class _ProgressBannerCard extends StatelessWidget {
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(10),
                           child: LinearProgressIndicator(
-                            value: progressFactor.clamp(0.05, 1.0),
+                            value: progressFactor.clamp(0.0, 1.0),
                             backgroundColor: Colors.white.withOpacity(0.25),
                             color: Colors.white,
                             minHeight: 6,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 10),
                       Text(
-                        "Keep going! You're doing great.",
+                        stats.scheduledCount > 0
+                            ? '${stats.completedCount} of ${stats.scheduledCount} completed this week'
+                            : (habits.isEmpty ? "Keep going! You're doing great." : 'No habits scheduled yet'),
                         style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
                           color: Colors.white.withOpacity(0.95),
                         ),
                       ),
@@ -635,214 +765,6 @@ class _StatCard extends StatelessWidget {
                 color: AppColors.textSecondary,
               ),
             ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── 4. Achievements Section Widget ──────────────────────────────────────────
-
-class _AchievementsSection extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        // Section Header
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                const Text('🏆', style: TextStyle(fontSize: 18)),
-                const SizedBox(width: 6),
-                Text(
-                  'Achievements',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ],
-            ),
-            GestureDetector(
-              onTap: () => context.go(AppRoutes.habits),
-              child: Text(
-                'View All >',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primary,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
-        // Horizontal Badges Row
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          physics: const BouncingScrollPhysics(),
-          child: Row(
-            children: [
-              // Badge 1: 7-Day Streak
-              _AchievementBadgeCard(
-                iconWidget: const Text('🔥', style: TextStyle(fontSize: 22)),
-                bgColor: AppColors.isDarkMode
-                    ? const Color(0x28FF6B00)
-                    : const Color(0xFFFFF4EC),
-                title: '7-Day Streak',
-                subtitle: 'Keep it up!',
-                isLocked: true,
-              ),
-              const SizedBox(width: 12),
-              // Badge 2: First Habit
-              _AchievementBadgeCard(
-                iconWidget: Icon(
-                  Icons.star_rounded,
-                  color: AppColors.primary,
-                  size: 26,
-                ),
-                bgColor: AppColors.primaryContainer,
-                title: 'First Habit',
-                subtitle: 'Great start!',
-                isSelected: true,
-              ),
-              const SizedBox(width: 12),
-              // Badge 3: Goal Setter
-              _AchievementBadgeCard(
-                iconWidget: const Icon(
-                  Icons.sports_score_rounded,
-                  color: Color(0xFF10B981),
-                  size: 26,
-                ),
-                bgColor: AppColors.isDarkMode
-                    ? const Color(0x2810B981)
-                    : const Color(0xFFECFDF5),
-                title: 'Goal Setter',
-                subtitle: "You're on fire!",
-              ),
-              const SizedBox(width: 12),
-              // Badge 4: Consistent
-              _AchievementBadgeCard(
-                iconWidget: Icon(
-                  Icons.workspace_premium_rounded,
-                  color: AppColors.secondary,
-                  size: 26,
-                ),
-                bgColor: AppColors.secondaryContainer,
-                title: 'Consistent',
-                subtitle: 'Coming soon',
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _AchievementBadgeCard extends StatelessWidget {
-  final Widget iconWidget;
-  final Color bgColor;
-  final String title;
-  final String subtitle;
-  final bool isLocked;
-  final bool isSelected;
-
-  const _AchievementBadgeCard({
-    required this.iconWidget,
-    required this.bgColor,
-    required this.title,
-    required this.subtitle,
-    this.isLocked = false,
-    this.isSelected = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 110,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isSelected ? AppColors.primary : AppColors.borderLine,
-          width: isSelected ? 1.5 : 1.0,
-        ),
-        boxShadow: AppShadows.soft,
-      ),
-      child: Column(
-        children: [
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: bgColor,
-                  shape: BoxShape.circle,
-                ),
-                child: Center(child: iconWidget),
-              ),
-              if (isLocked)
-                Positioned(
-                  top: -2,
-                  right: -2,
-                  child: Container(
-                    padding: const EdgeInsets.all(3),
-                    decoration: BoxDecoration(
-                      color: AppColors.textDisabled,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.surface, width: 1.5),
-                    ),
-                    child: const Icon(
-                      Icons.lock_rounded,
-                      size: 10,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 2),
-          Text(
-            subtitle,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
-              color: AppColors.textSecondary,
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          if (isSelected) ...[
-            const SizedBox(height: 8),
-            Container(
-              width: 32,
-              height: 2.5,
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ],
         ],
       ),
     );
@@ -1507,7 +1429,7 @@ class _QuickActionButton extends StatelessWidget {
   }
 }
 
-// ─── 7. Cash Flow Snapshot Card Widget ────────────────────────────────────────
+// ─── 7. Cash Flow Hero Card Widget ────────────────────────────────────────
 
 class _CashFlowSnapshotCard extends StatelessWidget {
   final CashFlowState cashFlowState;
@@ -1516,27 +1438,19 @@ class _CashFlowSnapshotCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final period = cashFlowState.current.asData?.value;
-    final inflows = period?.totalIncome ?? 0.0;
-    final outflows = period?.totalOutflow ?? 0.0;
-    final net = inflows - outflows;
-
-    final formattedNet = NumberFormat.currency(
-      symbol: '₹',
-      decimalDigits: 0,
-    ).format(net.abs());
-
-    final formattedInflows = NumberFormat.currency(
-      symbol: '₹',
-      decimalDigits: 0,
-    ).format(inflows);
-
-    final formattedOutflows = NumberFormat.currency(
-      symbol: '-₹',
-      decimalDigits: 0,
-    ).format(outflows);
+    final period = cashFlowState.current.asData?.value ??
+        CashFlowPeriodModel(
+          id: 'current',
+          month: DateTime.now().month,
+          year: DateTime.now().year,
+          openingBank: 0,
+          openingCash: 0,
+          openingCreditCard: 0,
+          openingDebt: 0,
+        );
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Header Row
         Row(
@@ -1544,14 +1458,14 @@ class _CashFlowSnapshotCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(
+                const Icon(
                   Icons.account_balance_wallet_outlined,
                   color: AppColors.primary,
                   size: 20,
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'Cash Flow Snapshot',
+                  'Cash Flow',
                   style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w800,
@@ -1560,11 +1474,11 @@ class _CashFlowSnapshotCard extends StatelessWidget {
                 ),
               ],
             ),
-            Row(
-              children: [
-                GestureDetector(
-                  onTap: () => context.go(AppRoutes.cashflow),
-                  child: Text(
+            GestureDetector(
+              onTap: () => context.go(AppRoutes.cashflow),
+              child: const Row(
+                children: [
+                  Text(
                     'View All',
                     style: TextStyle(
                       fontSize: 13,
@@ -1572,168 +1486,23 @@ class _CashFlowSnapshotCard extends StatelessWidget {
                       color: AppColors.primary,
                     ),
                   ),
-                ),
-                const SizedBox(width: 4),
-                Icon(
-                  Icons.more_vert_rounded,
-                  color: AppColors.textSecondary,
-                  size: 20,
-                ),
-              ],
+                  SizedBox(width: 2),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppColors.primary,
+                    size: 18,
+                  ),
+                ],
+              ),
             ),
           ],
         ),
-        const SizedBox(height: 14),
-        // Main Card
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.borderLine),
-            boxShadow: AppShadows.soft,
-          ),
-          child: Row(
-            children: [
-              // 1. Net This Month
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Net This Month',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      formattedNet,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF10B981),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.isDarkMode
-                            ? const Color(0x2810B981)
-                            : const Color(0xFFECFDF5),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          Icon(
-                            Icons.trending_up_rounded,
-                            size: 12,
-                            color: Color(0xFF10B981),
-                          ),
-                          SizedBox(width: 3),
-                          Text(
-                            'Positive',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF10B981),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                width: 1,
-                height: 50,
-                color: AppColors.borderLine,
-              ),
-              const SizedBox(width: 12),
-              // 2. Inflows
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Inflows',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      formattedInflows,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF10B981),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'From all sources',
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                width: 1,
-                height: 50,
-                color: AppColors.borderLine,
-              ),
-              const SizedBox(width: 12),
-              // 3. Outflows
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Outflows',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      formattedOutflows,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFFEF4444),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Total spending',
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+        const SizedBox(height: 12),
+        // The Signature Hero Financial Card (Compact Dashboard Mode)
+        CashFlowHeroCard(
+          period: period,
+          isCompact: true,
+          onTap: () => context.go(AppRoutes.cashflow),
         ),
       ],
     );

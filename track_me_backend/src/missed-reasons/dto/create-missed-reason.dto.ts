@@ -12,12 +12,12 @@ export class CreateMissedReasonDto {
 
   @ApiProperty({
     example: 'Had a long day at work and came home exhausted.',
-    description: 'Reason for missing the habit (20–250 chars)',
-    minLength: 20,
+    description: 'Reason for missing the habit (5–250 chars)',
+    minLength: 5,
     maxLength: 250,
   })
   @IsString()
-  @MinLength(20)
+  @MinLength(5)
   @MaxLength(250)
   reason: string;
 }

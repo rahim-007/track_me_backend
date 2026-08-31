@@ -1,11 +1,12 @@
 import { UsersService } from './users.service';
 
 describe('UsersService', () => {
-  const prisma = {
+  const prisma: Record<string, any> = {
     habit: { findMany: jest.fn().mockResolvedValue([]) },
     habitLog: { findMany: jest.fn().mockResolvedValue([]) },
     user: { update: jest.fn(), findUnique: jest.fn() },
     goal: { count: jest.fn().mockResolvedValue(0) },
+    $transaction: jest.fn(),
   };
 
   beforeEach(() => {
@@ -61,5 +62,86 @@ describe('UsersService', () => {
       }),
     );
     expect(result?.timezone).toBe('America/New_York');
+  });
+
+  // ─── deleteAccount ──────────────────────────────────────────────────────────
+
+  describe('deleteAccount', () => {
+    let tx: Record<string, any>;
+
+    beforeEach(() => {
+      tx = {
+        user: {
+          findUnique: jest.fn(),
+          update: jest.fn(),
+          delete: jest.fn(),
+        },
+      };
+      prisma.$transaction = jest.fn((cb: (t: any) => any) => cb(tx));
+    });
+
+    it('deletes the user and returns true', async () => {
+      tx.user.findUnique.mockResolvedValue({
+        id: 'u1',
+        email: 'a@b.c',
+        name: 'A',
+        fcmToken: 'some-token',
+      });
+      tx.user.update.mockResolvedValue({});
+      tx.user.delete.mockResolvedValue({});
+
+      const service = new UsersService(prisma as any);
+      const result = await service.deleteAccount('u1');
+
+      expect(result).toBe(true);
+      // FCM token should be cleared before deletion
+      expect(tx.user.update).toHaveBeenCalledWith({
+        where: { id: 'u1' },
+        data: { fcmToken: null },
+      });
+      expect(tx.user.delete).toHaveBeenCalledWith({ where: { id: 'u1' } });
+    });
+
+    it('returns null for a nonexistent user', async () => {
+      tx.user.findUnique.mockResolvedValue(null);
+
+      const service = new UsersService(prisma as any);
+      const result = await service.deleteAccount('nonexistent');
+
+      expect(result).toBeNull();
+      expect(tx.user.delete).not.toHaveBeenCalled();
+    });
+
+    it('skips fcmToken update when token is already null', async () => {
+      tx.user.findUnique.mockResolvedValue({
+        id: 'u1',
+        email: 'a@b.c',
+        name: 'A',
+        fcmToken: null,
+      });
+      tx.user.delete.mockResolvedValue({});
+
+      const service = new UsersService(prisma as any);
+      const result = await service.deleteAccount('u1');
+
+      expect(result).toBe(true);
+      expect(tx.user.update).not.toHaveBeenCalled();
+      expect(tx.user.delete).toHaveBeenCalledWith({ where: { id: 'u1' } });
+    });
+
+    it('uses a Prisma transaction for atomicity', async () => {
+      tx.user.findUnique.mockResolvedValue({
+        id: 'u1',
+        email: 'a@b.c',
+        name: 'A',
+        fcmToken: null,
+      });
+      tx.user.delete.mockResolvedValue({});
+
+      const service = new UsersService(prisma as any);
+      await service.deleteAccount('u1');
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    });
   });
 });

@@ -72,6 +72,17 @@ class _MissedHabitsReflectionDialogState
 
   bool get _allValid => _entries.every((e) => e.isValid);
 
+  /// Record the user's Yes/No answer for a card. "Yes" means they actually did
+  /// it (no reason needed), "No" reveals the reason field below.
+  void _answerEntry(int index, bool didComplete) {
+    setState(() {
+      _entries[index].didComplete = didComplete;
+      if (didComplete) {
+        _entries[index].reason = ''; // no reason needed for a completion
+      }
+    });
+  }
+
   Future<void> _submit() async {
     if (!_allValid || _isSubmitting) return;
     setState(() => _isSubmitting = true);
@@ -134,6 +145,7 @@ class _MissedHabitsReflectionDialogState
                           _entries[i].reason = text;
                         });
                       },
+                      onAnswer: _answerEntry,
                       onSubmit: _submit,
                     ),
             ),
@@ -152,6 +164,7 @@ class _ReflectionContent extends StatelessWidget {
   final bool allValid;
   final bool isSubmitting;
   final void Function(int index, String text) onChanged;
+  final void Function(int index, bool didComplete) onAnswer;
   final VoidCallback onSubmit;
 
   const _ReflectionContent({
@@ -160,6 +173,7 @@ class _ReflectionContent extends StatelessWidget {
     required this.allValid,
     required this.isSubmitting,
     required this.onChanged,
+    required this.onAnswer,
     required this.onSubmit,
   });
 
@@ -182,6 +196,7 @@ class _ReflectionContent extends StatelessWidget {
                 controller: controllers[i],
                 index: i,
                 onChanged: (text) => onChanged(i, text),
+                onAnswer: (didComplete) => onAnswer(i, didComplete),
               ),
             ),
           ),
@@ -280,12 +295,14 @@ class _HabitReasonCard extends StatefulWidget {
   final TextEditingController controller;
   final int index;
   final ValueChanged<String> onChanged;
+  final ValueChanged<bool> onAnswer;
 
   const _HabitReasonCard({
     required this.entry,
     required this.controller,
     required this.index,
     required this.onChanged,
+    required this.onAnswer,
   });
 
   @override
@@ -304,7 +321,6 @@ class _HabitReasonCardState extends State<_HabitReasonCard> {
     });
   }
 
-  bool get _isValid => _charCount >= 5;
   bool get _isTooLong => _charCount > 250;
 
   @override
@@ -312,16 +328,19 @@ class _HabitReasonCardState extends State<_HabitReasonCard> {
     final habit = widget.entry.habit;
     final emoji = habit.emoji ?? '📋';
 
+    final valid = widget.entry.isValid;
+    final didComplete = widget.entry.didComplete;
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: _isValid
+          color: valid
               ? AppColors.primary.withOpacity(0.5)
               : AppColors.border,
-          width: _isValid ? 1.5 : 1,
+          width: valid ? 1.5 : 1,
         ),
         boxShadow: AppShadows.raised,
       ),
@@ -358,25 +377,42 @@ class _HabitReasonCardState extends State<_HabitReasonCard> {
                         ),
                       ),
                       const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          const Icon(Icons.cancel_outlined,
-                              size: 12, color: Colors.redAccent),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Not completed yesterday',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.redAccent.withOpacity(0.8),
-                              fontWeight: FontWeight.w500,
+                      if (didComplete == true)
+                        Row(
+                          children: [
+                            const Icon(Icons.check_circle_rounded,
+                                size: 12, color: Colors.green),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Completed yesterday',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.green.shade600,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        )
+                      else
+                        Row(
+                          children: [
+                            const Icon(Icons.cancel_outlined,
+                                size: 12, color: Colors.redAccent),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Not completed yesterday',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.redAccent.withOpacity(0.8),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
                     ],
                   ),
                 ),
-                if (_isValid)
+                if (valid)
                   Icon(Icons.check_circle_rounded,
                       color: AppColors.success, size: 22),
               ],
@@ -384,6 +420,12 @@ class _HabitReasonCardState extends State<_HabitReasonCard> {
 
             const SizedBox(height: 14),
 
+            // Body: question → confirmation / reason
+            if (didComplete == null)
+              _buildQuestion()
+            else if (didComplete == true)
+              _buildCompletedConfirmation()
+            else ...[
             // Reason label
             Text(
               'Why couldn\'t you complete this habit?',
@@ -452,7 +494,7 @@ class _HabitReasonCardState extends State<_HabitReasonCard> {
                     fontSize: 11,
                     color: _isTooLong
                         ? Colors.red
-                        : _isValid
+                        : valid
                             ? AppColors.success
                             : AppColors.textHint,
                     fontWeight: FontWeight.w500,
@@ -467,14 +509,136 @@ class _HabitReasonCardState extends State<_HabitReasonCard> {
                 ),
               ],
             ),
+            ],
           ],
         ),
       ),
     );
   }
+
+  /// Yes/No prompt shown before any reason is requested.
+  Widget _buildQuestion() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Did you complete this habit yesterday?',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: AppColors.onSurface,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _AnswerPill(
+                label: 'Yes, I did it',
+                icon: Icons.check_rounded,
+                color: AppColors.success,
+                onTap: () => widget.onAnswer(true),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _AnswerPill(
+                label: 'No, I missed it',
+                icon: Icons.close_rounded,
+                color: Colors.redAccent,
+                onTap: () => widget.onAnswer(false),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// Shown after the user says they actually completed it yesterday.
+  Widget _buildCompletedConfirmation() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.success.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.success.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.check_circle_rounded, color: AppColors.success, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Marked as completed yesterday',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.success,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
 }
 
 // ─── Submit button ────────────────────────────────────────────────────────────
+
+/// A pill-style Yes / No answer button inside a missed-habit card.
+class _AnswerPill extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _AnswerPill({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: color.withOpacity(0.12),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: color.withOpacity(0.4)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 18, color: color),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _SubmitButton extends StatelessWidget {
   final bool allValid;
@@ -502,7 +666,7 @@ class _SubmitButton extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(
-                'Fill in all reasons (min. 5 characters each) to continue',
+                'Answer each habit, then tell us why the missed ones happened',
                 style: TextStyle(
                   fontSize: 12,
                   color: AppColors.textSecondary,

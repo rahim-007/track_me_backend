@@ -82,41 +82,46 @@ GoRouter appRouter(Ref ref) {
           GoRoute(
             path: AppRoutes.dashboard,
             name: 'dashboard',
-            pageBuilder: (context, state) => _noTransitionPage(
+            pageBuilder: (context, state) => _slidingTabPage(
               state: state,
               child: const DashboardScreen(),
+              targetIndex: 0,
             ),
           ),
           GoRoute(
             path: AppRoutes.habits,
             name: 'habits',
-            pageBuilder: (context, state) => _noTransitionPage(
+            pageBuilder: (context, state) => _slidingTabPage(
               state: state,
               child: const HabitsScreen(),
+              targetIndex: 1,
             ),
           ),
           GoRoute(
             path: AppRoutes.goals,
             name: 'goals',
-            pageBuilder: (context, state) => _noTransitionPage(
+            pageBuilder: (context, state) => _slidingTabPage(
               state: state,
               child: const GoalsScreen(),
+              targetIndex: 2,
             ),
           ),
           GoRoute(
             path: AppRoutes.cashflow,
             name: 'cashflow',
-            pageBuilder: (context, state) => _noTransitionPage(
+            pageBuilder: (context, state) => _slidingTabPage(
               state: state,
               child: const CashFlowScreen(),
+              targetIndex: 3,
             ),
           ),
           GoRoute(
             path: AppRoutes.profile,
             name: 'profile',
-            pageBuilder: (context, state) => _noTransitionPage(
+            pageBuilder: (context, state) => _slidingTabPage(
               state: state,
               child: const ProfileScreen(),
+              targetIndex: 4,
             ),
           ),
         ],
@@ -152,13 +157,39 @@ GoRouter appRouter(Ref ref) {
   );
 }
 
-NoTransitionPage<void> _noTransitionPage({
+int _lastNavIndex = 0;
+
+CustomTransitionPage<void> _slidingTabPage({
   required GoRouterState state,
   required Widget child,
+  required int targetIndex,
 }) {
-  return NoTransitionPage<void>(
+  final isForward = targetIndex >= _lastNavIndex;
+  _lastNavIndex = targetIndex;
+
+  return CustomTransitionPage<void>(
     key: state.pageKey,
     child: child,
+    transitionDuration: const Duration(milliseconds: 260),
+    reverseTransitionDuration: const Duration(milliseconds: 260),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final beginOffset = isForward
+          ? const Offset(1.0, 0.0)
+          : const Offset(-1.0, 0.0);
+
+      final slideAnimation = Tween<Offset>(
+        begin: beginOffset,
+        end: Offset.zero,
+      ).animate(CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+      ));
+
+      return SlideTransition(
+        position: slideAnimation,
+        child: child,
+      );
+    },
   );
 }
 

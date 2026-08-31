@@ -1,5 +1,5 @@
-import { Controller, Get, Patch, Body, Request, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Get, Patch, Delete, Body, Request, UseGuards, HttpCode, HttpStatus, NotFoundException } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -33,5 +33,19 @@ export class UsersController {
   @ApiOperation({ summary: 'Update FCM token' })
   updateFcmToken(@Request() req: any, @Body() dto: { fcmToken: string }) {
     return this.usersService.updateFcmToken(req.user.id, dto.fcmToken);
+  }
+
+  @Delete('me')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Permanently delete the authenticated user\'s account and all data' })
+  @ApiResponse({ status: 200, description: 'Account deleted successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Account not found' })
+  async deleteAccount(@Request() req: any) {
+    const result = await this.usersService.deleteAccount(req.user.id);
+    if (result === null) {
+      throw new NotFoundException('Account not found');
+    }
+    return { message: 'Account deleted successfully' };
   }
 }

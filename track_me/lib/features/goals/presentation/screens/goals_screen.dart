@@ -217,32 +217,6 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen> {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        // Add Button (+)
-                        GestureDetector(
-                          onTap: _showAddGoalDialog,
-                          child: Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF5334EA),
-                              borderRadius: BorderRadius.circular(14),
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFF6849F7), Color(0xFF4325D6)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFF5334EA).withOpacity(0.3),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: const Icon(Icons.add_rounded, color: Colors.white, size: 24),
-                          ),
-                        ),
                       ],
                     ),
                   ),

@@ -7,6 +7,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../../core/constants/app_constants.dart';
+import '../../../core/local/isar_service.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/services/firebase_service.dart';
 
@@ -24,6 +25,8 @@ class AuthError extends AuthState {
   final String message;
   AuthError({required this.message});
 }
+class AuthAccountDeleting extends AuthState {}
+class AuthAccountDeleted extends AuthState {}
 
 // ─── Notifier ────────────────────────────────────────────────────────────────
 
@@ -141,6 +144,94 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await _googleSignIn.signOut();
     state = AuthInitial();
   }
+
+  // ─── Account Deletion ──────────────────────────────────────────────────────
+
+  /// Permanently delete the authenticated user's account.
+  ///
+  /// 1. Calls DELETE /users/me on the backend (server-side deletion).
+  /// 2. If the backend returns 404 (or 401 User not found), it means the account is already gone on the server.
+  /// 3. In all successful/already-deleted cases: cleans up local Isar DB, secure storage, Google session.
+  /// 4. On network/unexpected errors: preserves local data and throws.
+  ///
+  /// Returns `true` on success.
+  Future<bool> deleteAccount() async {
+    state = AuthAccountDeleting();
+    try {
+      final client = DioClient();
+      try {
+        await client.dio.delete('/users/me');
+      } on DioException catch (dioErr) {
+        final statusCode = dioErr.response?.statusCode;
+        final responseMsg = dioErr.response?.data is Map
+            ? dioErr.response?.data['message']?.toString()
+            : null;
+
+        // 404 means user already does not exist on server.
+        // 401 with 'User not found' also means the user was already deleted from DB.
+        final isAlreadyDeleted = statusCode == 404 ||
+            (statusCode == 401 && (responseMsg?.contains('User not found') ?? false));
+
+        if (isAlreadyDeleted) {
+          debugPrint('[AUTH] Account already deleted on server ($statusCode). Completing local cleanup.');
+        } else {
+          rethrow;
+        }
+      }
+
+      // Server-side deletion succeeded (or was already deleted) — clean up locally.
+      // Clear all Isar local data (habits, goals, user cache, etc.)
+      if (IsarService.isAvailable) {
+        try {
+          await IsarService.clearAll();
+        } catch (e) {
+          debugPrint('[AUTH] Isar clearAll failed (non-fatal): $e');
+        }
+      }
+
+      // Clear secure storage (tokens, userId)
+      await _secureStorage.delete(key: AppConstants.accessTokenKey);
+      await _secureStorage.delete(key: AppConstants.refreshTokenKey);
+      await _secureStorage.delete(key: AppConstants.userIdKey);
+
+      // Sign out of Google
+      try {
+        await _googleSignIn.signOut();
+      } catch (e) {
+        debugPrint('[AUTH] Google signOut failed (non-fatal): $e');
+      }
+
+      state = AuthAccountDeleted();
+      return true;
+    } catch (e) {
+      debugPrint('[AUTH] ❌ Account deletion FAILED: $e');
+      state = AuthError(message: _parseDeleteError(e));
+      rethrow;
+    }
+  }
+
+  String _parseDeleteError(dynamic error) {
+    if (error is DioException) {
+      final statusCode = error.response?.statusCode;
+      if (statusCode == 401) {
+        return 'Your session has expired. Please log in again and try deleting your account.';
+      }
+      if (statusCode == 404) {
+        return 'Account not found. It may have already been deleted.';
+      }
+      if (error.type == DioExceptionType.connectionError ||
+          error.type == DioExceptionType.connectionTimeout) {
+        return 'Unable to connect. Please check your internet connection and try again.';
+      }
+      if (error.type == DioExceptionType.receiveTimeout ||
+          error.type == DioExceptionType.sendTimeout) {
+        return 'The request timed out. Please try again.';
+      }
+    }
+    return 'Something went wrong. Please try again.';
+  }
+
+  // ─── Helpers ───────────────────────────────────────────────────────────────
 
   Future<bool> isAuthenticated() async {
     final token = await _secureStorage.read(key: AppConstants.accessTokenKey);
