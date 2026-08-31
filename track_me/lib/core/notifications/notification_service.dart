@@ -54,6 +54,7 @@ class NotificationService {
     );
 
     await _plugin.initialize(settings);
+    await _ensureLocalTimezone();
   }
 
   /// Ask for the runtime permissions needed to show + exactly-timed reminders:
