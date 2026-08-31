@@ -224,6 +224,37 @@ class _NotificationsHeader extends StatelessWidget {
             ),
           ),
           IconButton(
+            onPressed: () async {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Sending test push to this device...'),
+                  behavior: SnackBarBehavior.floating,
+                  duration: Duration(seconds: 2),
+                ),
+              );
+              final success = await FirebaseService.sendTestPush();
+              await notifier.load();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      success
+                        ? '🎉 Test push notification delivered!'
+                        : '⚠️ Could not deliver push. Check device connection.',
+                    ),
+                    backgroundColor: success ? AppColors.success : AppColors.error,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            },
+            icon: const Icon(Icons.send_rounded, size: 20),
+            color: AppColors.primary,
+            tooltip: 'Send Test Push Notification',
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            padding: EdgeInsets.zero,
+          ),
+          IconButton(
             onPressed: canClearAll ? () => _confirmClearAll(context) : null,
             icon: const Icon(Icons.delete_sweep_rounded, size: 22),
             color: canClearAll ? AppColors.error : AppColors.textDisabled,
