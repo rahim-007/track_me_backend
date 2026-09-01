@@ -57,6 +57,107 @@ function isScheduled(repeatDays: boolean[], weekdayIndex: number): boolean {
 }
 
 /**
+ * Resolves the user's current local calendar date as a UTC midnight Date.
+ * If timezone is omitted or invalid, falls back to UTC.
+ */
+export function getUserNow(timezone?: string | null, date: Date = new Date()): Date {
+  if (!timezone) return date;
+  try {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    const formatted = formatter.format(date); // "YYYY-MM-DD"
+    const [y, m, d] = formatted.split('-').map(Number);
+    if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+      return new Date(Date.UTC(y, m - 1, d));
+    }
+  } catch (_) {
+    // Unsupported or malformed timezone name -> fallback to UTC date
+  }
+  return date;
+}
+
+/**
+ * Calculates both per-habit current streak and longest streak across the habit's
+ * lifetime (up to MAX_SCAN_DAYS).
+ *
+ * `completedDateStrs` must contain only non-skipped completion dates.
+ */
+export function computeHabitStreaks(
+  habit: Pick<StreakHabitInput, 'repeatDays'> & { createdAt?: Date },
+  completedDateStrs: Set<string>,
+  now: Date = new Date(),
+): { currentStreak: number; longestStreak: number } {
+  let currentStreak = 0;
+  const todayStr = toDateStr(now);
+  const earliestStr = habit.createdAt ? toDateStr(habit.createdAt) : '1970-01-01';
+
+  const dateStrings: string[] = [];
+  const checkDate = new Date(now);
+  let checkDateStr = toDateStr(checkDate);
+  const scanLimit = new Date(now);
+  scanLimit.setUTCDate(scanLimit.getUTCDate() - MAX_SCAN_DAYS);
+  const scanLimitStr = toDateStr(scanLimit);
+  const cutoffStr = earliestStr > scanLimitStr ? earliestStr : scanLimitStr;
+
+  while (checkDateStr >= cutoffStr) {
+    dateStrings.push(checkDateStr);
+    checkDate.setUTCDate(checkDate.getUTCDate() - 1);
+    checkDateStr = toDateStr(checkDate);
+  }
+
+  // Walk backward for currentStreak
+  for (const dateStr of dateStrings) {
+    const repeatIndex = weekdayIndexFromDateStr(dateStr);
+    if (!isScheduled(habit.repeatDays, repeatIndex)) {
+      continue;
+    }
+    if (completedDateStrs.has(dateStr)) {
+      currentStreak++;
+    } else {
+      // Today is in progress (grace period) — keep the streak from yesterday
+      if (dateStr === todayStr) {
+        continue;
+      } else {
+        break;
+      }
+    }
+  }
+
+  // Walk forward for longestStreak
+  let longestStreak = 0;
+  let tempStreak = 0;
+  const chronologicalDates = [...dateStrings].reverse();
+  for (const dateStr of chronologicalDates) {
+    const repeatIndex = weekdayIndexFromDateStr(dateStr);
+    if (!isScheduled(habit.repeatDays, repeatIndex)) {
+      continue;
+    }
+    if (completedDateStrs.has(dateStr)) {
+      tempStreak++;
+      if (tempStreak > longestStreak) {
+        longestStreak = tempStreak;
+      }
+    } else {
+      if (dateStr === todayStr) {
+        // Incomplete today does not reset historical longest streak
+      } else {
+        tempStreak = 0;
+      }
+    }
+  }
+
+  if (currentStreak > longestStreak) {
+    longestStreak = currentStreak;
+  }
+
+  return { currentStreak, longestStreak };
+}
+
+/**
  * Per-habit streak: consecutive scheduled days (walking backward from `now`)
  * with a valid non-skipped completion. Unscheduled days are ignored; a
  * scheduled day that is missing or skipped breaks the streak.
@@ -64,34 +165,11 @@ function isScheduled(repeatDays: boolean[], weekdayIndex: number): boolean {
  * `completedDateStrs` must contain only non-skipped completion dates.
  */
 export function computeHabitStreak(
-  habit: Pick<StreakHabitInput, 'repeatDays'>,
+  habit: Pick<StreakHabitInput, 'repeatDays'> & { createdAt?: Date },
   completedDateStrs: Set<string>,
   now: Date = new Date(),
 ): number {
-  let streak = 0;
-  const todayStr = toDateStr(now);
-  const day = new Date(now);
-  for (let i = 0; i < MAX_SCAN_DAYS; i++) {
-    const dateStr = toDateStr(day);
-    const repeatIndex = weekdayIndexFromDateStr(dateStr);
-    if (!isScheduled(habit.repeatDays, repeatIndex)) {
-      day.setUTCDate(day.getUTCDate() - 1);
-      continue;
-    }
-    if (completedDateStrs.has(dateStr)) {
-      streak++;
-    } else {
-      // Today is in progress (grace period) — keep the streak from yesterday
-      if (dateStr === todayStr) {
-        day.setUTCDate(day.getUTCDate() - 1);
-        continue;
-      } else {
-        break;
-      }
-    }
-    day.setUTCDate(day.getUTCDate() - 1);
-  }
-  return streak;
+  return computeHabitStreaks(habit, completedDateStrs, now).currentStreak;
 }
 
 /**

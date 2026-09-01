@@ -238,4 +238,38 @@ describe('computeOverallStreaks', () => {
     expect(skipLog.isSkipped).toBe(true);
     expect(logs).toHaveLength(1);
   });
+
+  it('correctly calculates 10, 30, and 100 consecutive completed days for habit and overall', () => {
+    const a = habit('a', daily, '2026-01-01');
+    const logs: StreakLogInput[] = [];
+    const dateSet = new Set<string>();
+
+    const base = new Date('2026-01-01T00:00:00Z');
+    for (let i = 0; i < 100; i++) {
+      const d = new Date(base);
+      d.setUTCDate(d.getUTCDate() + i);
+      const str = d.toISOString().split('T')[0];
+      logs.push(log('a', str));
+      dateSet.add(str);
+    }
+
+    const day10 = new Date(base);
+    day10.setUTCDate(day10.getUTCDate() + 9);
+    const res10 = computeOverallStreaks([a], logs, day10);
+    expect(res10.currentStreak).toBe(10);
+    expect(res10.longestStreak).toBe(10);
+
+    const day30 = new Date(base);
+    day30.setUTCDate(day30.getUTCDate() + 29);
+    const res30 = computeOverallStreaks([a], logs, day30);
+    expect(res30.currentStreak).toBe(30);
+    expect(res30.longestStreak).toBe(30);
+
+    const day100 = new Date(base);
+    day100.setUTCDate(day100.getUTCDate() + 99);
+    const res100 = computeOverallStreaks([a], logs, day100);
+    expect(res100.currentStreak).toBe(100);
+    expect(res100.longestStreak).toBe(100);
+  });
 });
+

@@ -1,6 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { computeHabitStreak } from '../streaks/streaks.util';
+import {
+  computeHabitStreaks,
+  getUserNow,
+  StreakHabitInput,
+} from '../streaks/streaks.util';
 import { CreateHabitDto } from './dto/create-habit.dto';
 import { UpdateHabitDto } from './dto/update-habit.dto';
 
@@ -9,30 +13,78 @@ export class HabitsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findAll(userId: string) {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    yesterday.setHours(0, 0, 0, 0);
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { timezone: true },
+    });
+    const userNow = getUserNow(user?.timezone);
 
-    const weekStart = this.getWeekStart();
+    const yesterday = new Date(userNow);
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    yesterday.setUTCHours(0, 0, 0, 0);
+
+    const weekStart = this.getWeekStart(userNow);
     const gteDate = yesterday < weekStart ? yesterday : weekStart;
 
-    const habits = await this.prisma.habit.findMany({
-      where: { userId, isActive: true },
-      include: {
-        logs: {
-          where: {
-            date: {
-              gte: gteDate,
-              lte: this.getWeekEnd(),
-            },
-          },
-          orderBy: { date: 'asc' },
-        },
-      },
-      orderBy: { createdAt: 'asc' },
-    });
+    // Scan up to 366 days of logs to compute per-habit streaks accurately
+    const scanStart = new Date(userNow);
+    scanStart.setUTCDate(scanStart.getUTCDate() - 366);
 
-    return habits.map((habit: any) => this.formatHabitWithDates(habit));
+    const [habits, allYearLogs] = await Promise.all([
+      this.prisma.habit.findMany({
+        where: { userId, isActive: true },
+        include: {
+          logs: {
+            where: {
+              date: {
+                gte: gteDate,
+                lte: this.getWeekEnd(userNow),
+              },
+            },
+            orderBy: { date: 'asc' },
+          },
+        },
+        orderBy: { createdAt: 'asc' },
+      }),
+      this.prisma.habitLog.findMany({
+        where: {
+          userId,
+          isSkipped: false,
+          date: { gte: scanStart },
+        },
+        select: {
+          habitId: true,
+          date: true,
+        },
+      }),
+    ]);
+
+    // Group completion dates by habitId
+    const completedByHabit = new Map<string, Set<string>>();
+    for (const log of allYearLogs) {
+      const dateStr = log.date.toISOString().split('T')[0];
+      const existing = completedByHabit.get(log.habitId);
+      if (existing) {
+        existing.add(dateStr);
+      } else {
+        completedByHabit.set(log.habitId, new Set([dateStr]));
+      }
+    }
+
+    return habits.map((habit: any) => {
+      const habitCompletedSet = completedByHabit.get(habit.id) ?? new Set<string>();
+      const { currentStreak, longestStreak } = computeHabitStreaks(
+        habit,
+        habitCompletedSet,
+        userNow,
+      );
+
+      return this.formatHabitWithDates({
+        ...habit,
+        currentStreak,
+        longestStreak,
+      });
+    });
   }
 
   async findOne(userId: string, id: string) {
@@ -85,29 +137,39 @@ export class HabitsService {
   }
 
   async getStreak(userId: string, habitId: string) {
-    const habit = await this.prisma.habit.findFirst({
-      where: { id: habitId, userId, isActive: true },
-      include: {
-        // Only valid non-skipped completions can extend a streak.
-        logs: {
-          where: { isSkipped: false },
-          orderBy: { date: 'desc' },
+    const [user, habit] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { timezone: true },
+      }),
+      this.prisma.habit.findFirst({
+        where: { id: habitId, userId, isActive: true },
+        include: {
+          // Only valid non-skipped completions can extend a streak.
+          logs: {
+            where: { isSkipped: false },
+            orderBy: { date: 'desc' },
+          },
         },
-      },
-    });
+      }),
+    ]);
+
     if (!habit) {
       // Never reveal whether the id exists but belongs to someone else.
       throw new NotFoundException('Habit not found');
     }
 
-    // Per-habit streak is schedule-aware: unscheduled days are ignored and
-    // never break the streak; a scheduled day that is skipped or missing does.
+    const userNow = getUserNow(user?.timezone);
     const completedDates = new Set(
       habit.logs.map((l: any) => l.date.toISOString().split('T')[0]),
     );
-    const currentStreak = computeHabitStreak(habit, completedDates);
+    const { currentStreak, longestStreak } = computeHabitStreaks(
+      habit,
+      completedDates,
+      userNow,
+    );
 
-    return { currentStreak };
+    return { currentStreak, longestStreak };
   }
 
   private formatHabitWithDates(habit: any) {
@@ -127,20 +189,20 @@ export class HabitsService {
     };
   }
 
-  private getWeekStart() {
-    const d = new Date();
-    const day = d.getDay();
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-    const monday = new Date(d.setDate(diff));
-    monday.setHours(0, 0, 0, 0);
+  private getWeekStart(now: Date = new Date()) {
+    const d = new Date(now);
+    const day = d.getUTCDay();
+    const diff = d.getUTCDate() - day + (day === 0 ? -6 : 1);
+    const monday = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), diff));
+    monday.setUTCHours(0, 0, 0, 0);
     return monday;
   }
 
-  private getWeekEnd() {
-    const start = this.getWeekStart();
+  private getWeekEnd(now: Date = new Date()) {
+    const start = this.getWeekStart(now);
     const end = new Date(start);
-    end.setDate(start.getDate() + 6);
-    end.setHours(23, 59, 59, 999);
+    end.setUTCDate(start.getUTCDate() + 6);
+    end.setUTCHours(23, 59, 59, 999);
     return end;
   }
 }

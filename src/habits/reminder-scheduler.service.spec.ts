@@ -139,6 +139,39 @@ describe('ReminderSchedulerService.tick (habits)', () => {
     expect(notifications.create).not.toHaveBeenCalled();
   });
 
+  it('triggers tomorrow reminder normally even when today habit was completed', async () => {
+    const service = new ReminderSchedulerService(
+      prisma as any,
+      notifications as any,
+      config(),
+    );
+
+    // Day 1 (Monday): completed today -> skipped
+    prisma.habitLog.findMany.mockResolvedValueOnce([{ habitId: 'h1' }]);
+    const sentDay1 = await service.tick(MON_730);
+    expect(sentDay1).toBe(0);
+    expect(notifications.create).not.toHaveBeenCalled();
+
+    // Day 2 (Tuesday): not completed today -> reminder sent
+    const TUE_730 = new Date(2026, 7, 11, 7, 30, 0, 0);
+    prisma.habitLog.findMany.mockResolvedValueOnce([]); // no log for Tuesday
+    prisma.notification.findMany.mockResolvedValueOnce([]);
+    const sentDay2 = await service.tick(TUE_730);
+    expect(sentDay2).toBe(1);
+    expect(notifications.create).toHaveBeenCalledWith({
+      userId: 'u1',
+      type: 'HABIT_REMINDER',
+      title: '⏰ 🏃 Morning Run',
+      body: 'Time to complete this habit. Keep your streak alive!',
+      data: {
+        category: 'habit',
+        relatedId: 'h1',
+        relatedType: 'habit',
+        route: '/habits',
+      },
+    });
+  });
+
   it('matches by the user stored timezone (overrides env fallback)', async () => {
     // User in Kolkata: 2026-08-10 07:30 UTC = 13:00 IST, Monday.
     prisma.habit.findMany.mockResolvedValue([

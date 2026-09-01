@@ -1,15 +1,21 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { computeOverallStreaks } from '../streaks/streaks.util';
+import { computeOverallStreaks, getUserNow } from '../streaks/streaks.util';
 
 @Injectable()
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
   async calculateUserStreak(userId: string) {
-    const habits = await this.prisma.habit.findMany({
-      where: { userId },
-    });
+    const [user, habits] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { timezone: true },
+      }),
+      this.prisma.habit.findMany({
+        where: { userId },
+      }),
+    ]);
 
     if (habits.length === 0) {
       await this.prisma.user.update({
@@ -19,6 +25,8 @@ export class UsersService {
       return { currentStreak: 0, longestStreak: 0 };
     }
 
+    const userNow = getUserNow(user?.timezone);
+
     // Earliest habit creation date
     let earliestHabitDate: Date | null = null;
     for (const h of habits) {
@@ -27,12 +35,12 @@ export class UsersService {
       }
     }
     if (!earliestHabitDate) {
-      earliestHabitDate = new Date();
+      earliestHabitDate = userNow;
     }
 
     // Cap the scan window to one year so streak computation stays fast for
     // long-time users instead of walking every day since the first habit.
-    const windowStart = new Date();
+    const windowStart = new Date(userNow);
     windowStart.setUTCDate(windowStart.getUTCDate() - 366);
     const scanStart =
       earliestHabitDate < windowStart ? windowStart : earliestHabitDate;
@@ -55,6 +63,7 @@ export class UsersService {
     const { currentStreak, longestStreak } = computeOverallStreaks(
       habits,
       logs,
+      userNow,
     );
 
     await this.prisma.user.update({

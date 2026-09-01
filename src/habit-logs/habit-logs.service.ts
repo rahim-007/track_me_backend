@@ -27,11 +27,8 @@ export class HabitLogsService {
       where: { habitId, date: parsedDate, userId },
     });
 
-    // Idempotent + state-safe: a repeated tap on an already-completed habit is
-    // a no-op, and an existing Skipped record must NEVER flip to Completed from
-    // a blind completion request. The app un-completes via DELETE first, so a
-    // fresh completion always creates a brand-new record here.
-    if (existing) {
+    // Idempotent: repeated tap on an already-completed habit is a no-op
+    if (existing && !existing.isSkipped) {
       return existing;
     }
 
@@ -51,14 +48,11 @@ export class HabitLogsService {
       },
     });
 
-    // totalCompleted counts distinct completed logs. Only increment when this
-    // is a brand-new completion (not when converting a skip back to complete).
-    if (!existing) {
-      await this.prisma.habit.update({
-        where: { id: habitId },
-        data: { totalCompleted: { increment: 1 } },
-      });
-    }
+    // Increment totalCompleted when converting from skip or creating a brand-new completion
+    await this.prisma.habit.update({
+      where: { id: habitId },
+      data: { totalCompleted: { increment: 1 } },
+    });
 
     return log;
   }

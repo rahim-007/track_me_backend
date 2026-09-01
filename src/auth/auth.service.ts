@@ -403,15 +403,15 @@ export class AuthService {
         body: JSON.stringify({
           from: this.config.get<string>(
             'RESEND_FROM_EMAIL',
-            'UrDAY <noreply@urday.app>',
+            'UrDay <noreply@urday.app>',
           ),
           to: [to],
-          subject: 'Reset your UrDAY password',
+          subject: 'Reset your UrDay password',
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
               <h2>Reset your password</h2>
               <p>Hi ${name ?? 'there'},</p>
-              <p>We received a request to reset your UrDAY password. This link is valid for 1 hour:</p>
+              <p>We received a request to reset your UrDay password. This link is valid for 1 hour:</p>
               <p><a href="${resetUrl}" style="display:inline-block;padding:12px 20px;background:#4F46E5;color:#fff;text-decoration:none;border-radius:8px;">Reset password</a></p>
               <p>If you didn't request this, you can safely ignore this email.</p>
             </div>
