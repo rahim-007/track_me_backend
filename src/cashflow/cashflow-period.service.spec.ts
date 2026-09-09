@@ -126,6 +126,12 @@ function makePrismaMock(now = new Date(2026, 7, 15)) {
         txns.push(row);
         return row;
       },
+      update: async ({ where, data }: any) => {
+        const row = txns.find((t) => t.id === where.id);
+        if (!row) throw new Error('not found');
+        Object.assign(row, data);
+        return row;
+      },
       delete: async ({ where }: any) => {
         const i = txns.findIndex((t) => t.id === where.id);
         if (i < 0) throw new Error('not found');
@@ -371,4 +377,67 @@ describe('CashFlowPeriodService — month rollover & carry-forward', () => {
     expect(serialized.totalIncome).toBe(500.5);
     expect(serialized.closingBank).toBe(1501);
   });
+
+  it('updates an existing transaction and recalculates period balances without changing ID', async () => {
+    const prisma = makePrismaMock();
+    const svc = new CashFlowPeriodService(prisma as any, () => FIXED_AUG_2026);
+
+    const created = await svc.createTransaction('u1', {
+      kind: 'INCOME',
+      category: 'E',
+      account: 'BANK',
+      amount: 1000,
+      note: 'Original note',
+      date: '2026-08-05',
+    } as any);
+
+    expect(created.amount).toBe(1000);
+    expect(created.note).toBe('Original note');
+
+    const periodBefore = await svc.getCurrentPeriod('u1');
+    expect(periodBefore.totalIncome).toBe(1000);
+    expect(periodBefore.closingBank).toBe(1000);
+
+    const updated = await svc.updateTransaction('u1', created.id, {
+      amount: 1500,
+      note: 'Updated note',
+      account: 'CASH',
+    });
+
+    expect(updated.id).toBe(created.id);
+    expect(updated.amount).toBe(1500);
+    expect(updated.note).toBe('Updated note');
+    expect(updated.account).toBe('CASH');
+
+    const periodAfter = await svc.getCurrentPeriod('u1');
+    expect(periodAfter.totalIncome).toBe(1500);
+    expect(periodAfter.closingCash).toBe(1500);
+    expect(periodAfter.closingBank).toBe(0);
+  });
+
+  it('rejects update with invalid category or INCOME on CREDIT_CARD', async () => {
+    const prisma = makePrismaMock();
+    const svc = new CashFlowPeriodService(prisma as any, () => FIXED_AUG_2026);
+
+    const created = await svc.createTransaction('u1', {
+      kind: 'INCOME',
+      category: 'E',
+      account: 'BANK',
+      amount: 1000,
+      date: '2026-08-05',
+    } as any);
+
+    await expect(
+      svc.updateTransaction('u1', created.id, {
+        category: 'D' as any, // D is outflow only
+      }),
+    ).rejects.toThrow(BadRequestException);
+
+    await expect(
+      svc.updateTransaction('u1', created.id, {
+        account: 'CREDIT_CARD',
+      }),
+    ).rejects.toThrow(BadRequestException);
+  });
 });
+

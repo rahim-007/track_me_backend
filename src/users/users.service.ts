@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { computeOverallStreaks, getUserNow } from '../streaks/streaks.util';
+import {
+  computeHabitStreaks,
+  computeOverallStreaks,
+  getUserNow,
+} from '../streaks/streaks.util';
 
 @Injectable()
 export class UsersService {
@@ -66,12 +70,36 @@ export class UsersService {
       userNow,
     );
 
+    // Also check max individual habit streak so users with completed habits don't get 0 overall streak
+    let maxHabitStreak = 0;
+    let maxHabitLongest = 0;
+    const completedByHabit = new Map<string, Set<string>>();
+    for (const log of logs) {
+      if (log.isSkipped) continue;
+      const dateStr = log.date.toISOString().split('T')[0];
+      const existing = completedByHabit.get(log.habitId);
+      if (existing) {
+        existing.add(dateStr);
+      } else {
+        completedByHabit.set(log.habitId, new Set([dateStr]));
+      }
+    }
+    for (const h of habits) {
+      const set = completedByHabit.get(h.id) ?? new Set<string>();
+      const res = computeHabitStreaks(h, set, userNow);
+      if (res.currentStreak > maxHabitStreak) maxHabitStreak = res.currentStreak;
+      if (res.longestStreak > maxHabitLongest) maxHabitLongest = res.longestStreak;
+    }
+
+    const finalCurrent = Math.max(currentStreak, maxHabitStreak);
+    const finalLongest = Math.max(longestStreak, maxHabitLongest);
+
     await this.prisma.user.update({
       where: { id: userId },
-      data: { currentStreak, longestStreak },
+      data: { currentStreak: finalCurrent, longestStreak: finalLongest },
     });
 
-    return { currentStreak, longestStreak };
+    return { currentStreak: finalCurrent, longestStreak: finalLongest };
   }
 
   async getProfile(userId: string) {

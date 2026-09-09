@@ -13,6 +13,7 @@ import {
 } from './cashflow-balance.util';
 import { CreatePeriodDto, UpdateBalancesDto } from './dto/cashflow-period.dto';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
+import { UpdateTransactionDto } from './dto/update-transaction.dto';
 
 type PeriodRow = {
   id: string;
@@ -254,6 +255,110 @@ export class CashFlowPeriodService {
     await this.recalculateFuturePeriods(userId, period.month, period.year);
 
     return this.serializeTxn(txn);
+  }
+
+  async updateTransaction(
+    userId: string,
+    txnId: string,
+    dto: UpdateTransactionDto,
+  ) {
+    const existing = await this.prisma.cashFlowTransaction.findFirst({
+      where: { id: txnId, period: { userId } },
+    });
+    if (!existing) throw new NotFoundException('Transaction not found');
+
+    const originalPeriod = await this.prisma.cashFlowPeriod.findFirst({
+      where: { id: existing.periodId },
+    });
+    if (!originalPeriod) throw new NotFoundException('Period not found');
+
+    const kind = dto.kind ?? (existing.kind as 'INCOME' | 'OUTFLOW');
+    const category = dto.category ?? existing.category;
+    const amount =
+      dto.amount !== undefined ? dto.amount : Number(existing.amount);
+    const account =
+      dto.account !== undefined ? dto.account : (existing.account ?? 'BANK');
+    const note = dto.note !== undefined ? (dto.note ?? null) : existing.note;
+
+    if (
+      kind === 'INCOME' &&
+      !['E', 'S', 'B', 'I', 'G'].includes(category)
+    ) {
+      throw new BadRequestException(
+        `Invalid category '${category}' for INCOME entry`,
+      );
+    }
+    if (
+      kind === 'OUTFLOW' &&
+      !['E', 'S', 'D', 'I', 'DO'].includes(category)
+    ) {
+      throw new BadRequestException(
+        `Invalid category '${category}' for OUTFLOW entry`,
+      );
+    }
+
+    if (kind === 'INCOME' && account === 'CREDIT_CARD') {
+      throw new BadRequestException(
+        'INCOME transactions cannot post to CREDIT_CARD. Use BANK or CASH.',
+      );
+    }
+
+    let targetPeriod = originalPeriod;
+    let date = existing.date;
+
+    if (dto.date) {
+      const dateParts = dto.date
+        .split('T')[0]
+        .split('-')
+        .map((p) => parseInt(p, 10));
+      const year = dateParts[0];
+      const month = dateParts[1];
+      const day = dateParts[2] || 1;
+
+      if (year !== originalPeriod.year || month !== originalPeriod.month) {
+        let period = await this.prisma.cashFlowPeriod.findFirst({
+          where: { userId, month, year },
+        });
+        if (!period) {
+          const current = await this.ensureCurrentPeriod(userId);
+          if (current.month === month && current.year === year) {
+            period = current;
+          } else {
+            throw new BadRequestException(
+              `Entry date must fall inside a valid period (${current.month}/${current.year})`,
+            );
+          }
+        }
+        targetPeriod = period;
+      }
+      date = new Date(Date.UTC(year, month - 1, day));
+    }
+
+    const updated = await this.prisma.cashFlowTransaction.update({
+      where: { id: txnId },
+      data: {
+        periodId: targetPeriod.id,
+        kind,
+        category,
+        amount,
+        note,
+        date,
+        account,
+      },
+    });
+
+    let earliestMonth = originalPeriod.month;
+    let earliestYear = originalPeriod.year;
+    if (
+      targetPeriod.year < earliestYear ||
+      (targetPeriod.year === earliestYear && targetPeriod.month < earliestMonth)
+    ) {
+      earliestMonth = targetPeriod.month;
+      earliestYear = targetPeriod.year;
+    }
+    await this.recalculateFuturePeriods(userId, earliestMonth, earliestYear);
+
+    return this.serializeTxn(updated);
   }
 
   async deleteTransaction(userId: string, txnId: string) {

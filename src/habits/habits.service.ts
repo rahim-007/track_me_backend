@@ -79,11 +79,14 @@ export class HabitsService {
         userNow,
       );
 
-      return this.formatHabitWithDates({
-        ...habit,
-        currentStreak,
-        longestStreak,
-      });
+      return this.formatHabitWithDates(
+        {
+          ...habit,
+          currentStreak,
+          longestStreak,
+        },
+        habitCompletedSet,
+      );
     });
   }
 
@@ -172,14 +175,16 @@ export class HabitsService {
     return { currentStreak, longestStreak };
   }
 
-  private formatHabitWithDates(habit: any) {
-    const completedDates = habit.logs
-      .filter((l: any) => !l.isSkipped)
-      .map((l: any) => l.date.toISOString().split('T')[0]);
+  private formatHabitWithDates(habit: any, allCompletedSet?: Set<string>) {
+    const completedDates = allCompletedSet
+      ? Array.from(allCompletedSet)
+      : (habit.logs
+          ?.filter((l: any) => !l.isSkipped)
+          .map((l: any) => l.date.toISOString().split('T')[0]) ?? []);
 
     const skippedDates = habit.logs
-      .filter((l: any) => l.isSkipped)
-      .map((l: any) => l.date.toISOString().split('T')[0]);
+      ?.filter((l: any) => l.isSkipped)
+      .map((l: any) => l.date.toISOString().split('T')[0]) ?? [];
 
     return {
       ...habit,

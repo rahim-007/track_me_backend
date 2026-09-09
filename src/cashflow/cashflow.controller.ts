@@ -14,6 +14,7 @@ import { CashFlowPeriodService } from './cashflow-period.service';
 import { CashFlowDebtService } from './cashflow-debt.service';
 import { CreatePeriodDto, UpdateBalancesDto } from './dto/cashflow-period.dto';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
+import { UpdateTransactionDto } from './dto/update-transaction.dto';
 import {
   CreateCashFlowDebtDto,
   UpdateCashFlowDebtDto,
@@ -90,6 +91,16 @@ export class CashFlowController {
   })
   createTransaction(@Request() req: any, @Body() dto: CreateTransactionDto) {
     return this.periodService.createTransaction(req.user.id, dto);
+  }
+
+  @Patch('transactions/:id')
+  @ApiOperation({ summary: 'Edit an existing transaction entry' })
+  updateTransaction(
+    @Request() req: any,
+    @Param('id') id: string,
+    @Body() dto: UpdateTransactionDto,
+  ) {
+    return this.periodService.updateTransaction(req.user.id, id, dto);
   }
 
   @Delete('transactions/:id')
