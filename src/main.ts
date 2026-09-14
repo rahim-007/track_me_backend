@@ -13,6 +13,18 @@ async function bootstrap() {
   // Global prefix
   app.setGlobalPrefix('api');
 
+  // Direct /health route without /api prefix for generic uptime monitors / load balancers
+  app.getHttpAdapter().get('/health', (req: any, res: any) => {
+    res.status(200).json({
+      success: true,
+      data: {
+        status: 'ok',
+        uptime: Math.floor(process.uptime()),
+      },
+      timestamp: new Date().toISOString(),
+    });
+  });
+
   // Serve the public/ directory for static pages (e.g. /delete-account.html).
   // These are served WITHOUT the /api prefix so they are accessible at the
   // root URL — exactly what Google Play Console expects.
@@ -69,6 +81,7 @@ async function bootstrap() {
   await app.listen(port, '0.0.0.0');
 
   console.log(`🚀 UrDay API running on: http://0.0.0.0:${port}/api`);
+  console.log(`💓 Health check: http://localhost:${port}/api/health`);
   console.log(`📚 Swagger docs: http://localhost:${port}/api/docs`);
   console.log(
     `🗑️  Delete account page: http://localhost:${port}/delete-account.html`,

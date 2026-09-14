@@ -12,6 +12,8 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { MissedReasonsModule } from './missed-reasons/missed-reasons.module';
 import { CashFlowModule } from './cashflow/cashflow.module';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
 
 @Module({
   imports: [
@@ -43,7 +45,9 @@ import { CashFlowModule } from './cashflow/cashflow.module';
     MissedReasonsModule,
     CashFlowModule,
   ],
+  controllers: [AppController],
   providers: [
+    AppService,
     // Global rate limiting — the ThrottlerModule config did nothing before
     // because no guard was ever registered to enforce it.
     { provide: APP_GUARD, useClass: ThrottlerGuard },

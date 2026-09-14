@@ -112,6 +112,12 @@ http://localhost:3000/api/docs
 
 ## 🔌 API Endpoints
 
+### Health / Monitoring
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/health` or `/health` | Server health check (exempt from rate limits, suitable for UptimeRobot) |
+| GET | `/api` | Root API ping |
+
 ### Auth
 | Method | Endpoint | Description |
 |--------|----------|-------------|
