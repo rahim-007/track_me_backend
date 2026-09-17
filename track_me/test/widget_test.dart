@@ -9,13 +9,13 @@ void main() {
         child: MaterialApp(
           home: Scaffold(
             body: Center(
-              child: Text('Track Me'),
+              child: Text('UrDay'),
             ),
           ),
         ),
       ),
     );
-    expect(find.text('Track Me'), findsOneWidget);
+    expect(find.text('UrDay'), findsOneWidget);
   });
 }
      

@@ -159,7 +159,93 @@ class CashFlowPeriodModel {
         'outflowByCategory': outflowByCategory,
       };
 
+  CashFlowPeriodModel copyWith({
+    String? id,
+    int? month,
+    int? year,
+    double? openingBank,
+    double? openingCash,
+    double? openingCreditCard,
+    double? openingDebt,
+    double? totalIncome,
+    double? totalOutflow,
+    double? netCashFlow,
+    double? closingBank,
+    double? closingCash,
+    double? closingCreditCard,
+    Map<String, double>? incomeByCategory,
+    Map<String, double>? outflowByCategory,
+    bool? isCurrent,
+  }) {
+    return CashFlowPeriodModel(
+      id: id ?? this.id,
+      month: month ?? this.month,
+      year: year ?? this.year,
+      openingBank: openingBank ?? this.openingBank,
+      openingCash: openingCash ?? this.openingCash,
+      openingCreditCard: openingCreditCard ?? this.openingCreditCard,
+      openingDebt: openingDebt ?? this.openingDebt,
+      totalIncome: totalIncome ?? this.totalIncome,
+      totalOutflow: totalOutflow ?? this.totalOutflow,
+      netCashFlow: netCashFlow ?? this.netCashFlow,
+      closingBank: closingBank ?? this.closingBank,
+      closingCash: closingCash ?? this.closingCash,
+      closingCreditCard: closingCreditCard ?? this.closingCreditCard,
+      incomeByCategory: incomeByCategory ?? this.incomeByCategory,
+      outflowByCategory: outflowByCategory ?? this.outflowByCategory,
+      isCurrent: isCurrent ?? this.isCurrent,
+    );
+  }
+
   String get label => '${_monthName(month)} $year';
+
+  /// Returns true if this period has recorded non-zero financial data.
+  bool get hasActivity =>
+      totalIncome > 0 ||
+      totalOutflow > 0 ||
+      openingBank > 0 ||
+      closingBank > 0 ||
+      openingCash > 0 ||
+      closingCash > 0 ||
+      openingCreditCard > 0 ||
+      closingCreditCard > 0 ||
+      openingDebt > 0;
+
+  /// Returns true if this period has a locally generated placeholder/dummy id.
+  bool get isSynthetic => id.startsWith('local_') || id.startsWith('period_');
+
+  /// Returns true if this period represents genuine user activity/history rather
+  /// than an unpopulated placeholder or dummy period generated for padding.
+  bool isAuthentic({
+    List<TransactionModel>? transactions,
+    int? currentKey,
+  }) {
+    // Current period is always valid
+    if (currentKey != null && (year * 100 + month) == currentKey) return true;
+    if (isCurrent) return true;
+
+    // Real backend periods (MongoDB ObjectIDs, etc.)
+    if (!isSynthetic && id.isNotEmpty) return true;
+
+    // Recorded financial values
+    if (hasActivity) return true;
+
+    // Has transactions for this period
+    if (transactions != null && transactions.isNotEmpty) {
+      for (final t in transactions) {
+        final parts = t.date.split('-');
+        if (parts.length >= 2) {
+          final y = int.tryParse(parts[0]);
+          final m = int.tryParse(parts[1]);
+          if (y == year && m == month) return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  static String monthName(int m) => _monthName(m);
 
   static String _monthName(int m) => const [
         'January', 'February', 'March', 'April', 'May', 'June',
@@ -200,6 +286,35 @@ class TransactionModel {
       account: CashFlowAccount.fromApi(json['account'] as String?),
     );
   }
+
+  TransactionModel copyWith({
+    String? id,
+    TxnKind? kind,
+    String? category,
+    double? amount,
+    String? note,
+    String? date,
+    CashFlowAccount? account,
+  }) =>
+      TransactionModel(
+        id: id ?? this.id,
+        kind: kind ?? this.kind,
+        category: category ?? this.category,
+        amount: amount ?? this.amount,
+        note: note ?? this.note,
+        date: date ?? this.date,
+        account: account ?? this.account,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'kind': kind == TxnKind.income ? 'INCOME' : 'OUTFLOW',
+        'category': category,
+        'amount': amount,
+        'note': note,
+        'date': date,
+        'account': account.apiValue,
+      };
 
   Map<String, dynamic> toCreateJson() => {
         'kind': kind == TxnKind.income ? 'INCOME' : 'OUTFLOW',

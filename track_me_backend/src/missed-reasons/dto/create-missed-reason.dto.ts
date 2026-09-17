@@ -6,7 +6,10 @@ export class CreateMissedReasonDto {
   @IsString()
   habitId: string;
 
-  @ApiProperty({ example: '2026-08-02', description: 'The date the habit was missed (YYYY-MM-DD)' })
+  @ApiProperty({
+    example: '2026-08-02',
+    description: 'The date the habit was missed (YYYY-MM-DD)',
+  })
   @IsDateString()
   missedDate: string;
 

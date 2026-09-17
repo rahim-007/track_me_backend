@@ -1,5 +1,5 @@
 name: track_me
-description: "Track Me - AI-Powered Productivity App"
+description: "UrDay - AI-Powered Productivity App"
 publish_to: 'none'
 version: 1.0.3+3
 
@@ -35,11 +35,6 @@ dependencies:
   # UI / Design
   google_fonts: ^6.2.1
   cached_network_image: ^3.3.1
-  shimmer: ^3.0.0
-  lottie: ^3.1.2
-  fl_chart: ^0.68.0
-  percent_indicator: ^4.2.3
-  badges: ^3.1.2
 
   # Notifications
   firebase_core: ^3.3.0
@@ -50,17 +45,11 @@ dependencies:
 
   # Utilities
   intl: ^0.19.0
-  equatable: ^2.0.5
   json_annotation: ^4.9.0
-  freezed_annotation: ^2.4.4
   uuid: ^4.4.0
   image_picker: ^1.1.2
-  share_plus: ^9.0.0
-  url_launcher: ^6.3.0
-  connectivity_plus: ^6.0.5
   package_info_plus: ^8.1.0
-  logger: ^2.4.0
-  dartz: ^0.10.1
+  home_widget: ^0.9.2+1
 
 dev_dependencies:
   flutter_test:
@@ -71,7 +60,6 @@ dev_dependencies:
   build_runner: ^2.4.11
   riverpod_generator: ^2.4.0
   json_serializable: ^6.8.0
-  freezed: ^2.5.2
   isar_generator: ^3.1.0+1
 
 flutter:

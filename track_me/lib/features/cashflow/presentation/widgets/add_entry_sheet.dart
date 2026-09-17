@@ -7,7 +7,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../providers/cashflow_provider.dart';
 import '../../data/models/cashflow_models.dart';
 
-/// Bottom sheet for adding an entry: Inflow / Outflow / Debt.
+/// Bottom sheet for adding an entry: Income / Outflow / Debt.
 ///
 /// Category model per spec:
 ///  - Income: E Employee, S Self-Employed, B Business, I Investor, G Gift
@@ -15,24 +15,33 @@ import '../../data/models/cashflow_models.dart';
 ///  - Debt: direction (I owe / they owe me) + person + amount
 ///
 /// Account selection:
-///  - Inflow  → "Deposit to"  [Bank | Cash]          (default: Bank)
+///  - Income   → "Deposit to"  [Bank | Cash]          (default: Bank)
 ///  - Outflow → "Pay from"    [Bank | Cash | Credit Card] (default: Bank)
 ///  - Debt    → no account selector (existing debt ledger behaviour unchanged)
 class AddEntrySheet extends ConsumerStatefulWidget {
   final int initialKindIndex;
+  final TransactionModel? initialTransaction;
 
   const AddEntrySheet({
     super.key,
     this.initialKindIndex = 0,
+    this.initialTransaction,
   });
 
-  /// Returns true if something was added.
-  static Future<bool> show(BuildContext context, {int initialKindIndex = 0}) async {
+  /// Returns true if something was added or updated.
+  static Future<bool> show(
+    BuildContext context, {
+    int initialKindIndex = 0,
+    TransactionModel? initialTransaction,
+  }) async {
     final result = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => AddEntrySheet(initialKindIndex: initialKindIndex),
+      builder: (_) => AddEntrySheet(
+        initialKindIndex: initialKindIndex,
+        initialTransaction: initialTransaction,
+      ),
     );
     return result ?? false;
   }
@@ -43,12 +52,6 @@ class AddEntrySheet extends ConsumerStatefulWidget {
 
 class _AddEntrySheetState extends ConsumerState<AddEntrySheet> {
   late int _kindIndex; // 0 income, 1 outflow, 2 debt
-
-  @override
-  void initState() {
-    super.initState();
-    _kindIndex = widget.initialKindIndex;
-  }
   String? _category;
   bool _theyOweMe = true;
   CashFlowAccount _account = CashFlowAccount.bank;
@@ -58,8 +61,27 @@ class _AddEntrySheetState extends ConsumerState<AddEntrySheet> {
   DateTime _date = DateTime.now();
   bool _saving = false;
 
+  bool get _isEditing => widget.initialTransaction != null;
   bool get _isDebt => _kindIndex == 2;
   bool get _isInflow => _kindIndex == 0;
+
+  @override
+  void initState() {
+    super.initState();
+    final txn = widget.initialTransaction;
+    if (txn != null) {
+      _kindIndex = txn.kind == TxnKind.income ? 0 : 1;
+      _category = txn.category;
+      _account = txn.account;
+      _amountCtrl.text = txn.amount % 1 == 0
+          ? txn.amount.toInt().toString()
+          : txn.amount.toString();
+      _noteCtrl.text = txn.note;
+      _date = DateTime.tryParse(txn.date) ?? DateTime.now();
+    } else {
+      _kindIndex = widget.initialKindIndex;
+    }
+  }
 
   /// Allowed accounts for the currently selected entry type.
   List<CashFlowAccount> get _accountOptions {
@@ -91,9 +113,33 @@ class _AddEntrySheetState extends ConsumerState<AddEntrySheet> {
 
   Future<void> _save() async {
     final amount = double.tryParse(_amountCtrl.text.trim());
-    if (amount == null || amount <= 0) return;
-    if (_isDebt && _personCtrl.text.trim().isEmpty) return;
-    if (!_isDebt && _category == null) return;
+    if (amount == null || amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Please enter a valid amount greater than 0'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+    if (_isDebt && _personCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Please enter the name of the person involved'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+    if (!_isDebt && _category == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Please select a category'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
 
     setState(() => _saving = true);
     final notifier = ref.read(cashFlowProvider.notifier);
@@ -108,6 +154,18 @@ class _AddEntrySheetState extends ConsumerState<AddEntrySheet> {
           date: DateFormat('yyyy-MM-dd').format(_date),
           settled: false,
         ));
+      } else if (_isEditing) {
+        final initial = widget.initialTransaction!;
+        final updatedTxn = TransactionModel(
+          id: initial.id,
+          kind: _kindIndex == 0 ? TxnKind.income : TxnKind.outflow,
+          category: _category!,
+          amount: amount,
+          note: _noteCtrl.text.trim(),
+          date: DateFormat('yyyy-MM-dd').format(_date),
+          account: _account,
+        );
+        await notifier.updateTransaction(updatedTxn);
       } else {
         await notifier.addTransaction(TransactionModel(
           id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
@@ -119,7 +177,17 @@ class _AddEntrySheetState extends ConsumerState<AddEntrySheet> {
           account: _account,
         ));
       }
-      if (mounted) Navigator.of(context).pop(true);
+      if (mounted) {
+        Navigator.of(context).pop(true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_isEditing
+                ? 'Transaction updated successfully'
+                : 'Entry added successfully'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
     } catch (_) {
       if (mounted) {
         setState(() => _saving = false);
@@ -165,7 +233,7 @@ class _AddEntrySheetState extends ConsumerState<AddEntrySheet> {
               ),
               const SizedBox(height: 16),
               Text(
-                'Add Entry',
+                _isEditing ? 'Edit Transaction' : 'Add Entry',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
@@ -174,17 +242,25 @@ class _AddEntrySheetState extends ConsumerState<AddEntrySheet> {
               ),
               const SizedBox(height: 16),
               SegmentedButton<int>(
-                segments: const [
-                  ButtonSegment(value: 0, label: Text('Inflow'), icon: Icon(Icons.south_west_rounded)),
-                  ButtonSegment(value: 1, label: Text('Outflow'), icon: Icon(Icons.north_east_rounded)),
-                  ButtonSegment(value: 2, label: Text('Debt'), icon: Icon(Icons.handshake_outlined)),
+                segments: [
+                  const ButtonSegment(value: 0, label: Text('Income'), icon: Icon(Icons.south_west_rounded)),
+                  const ButtonSegment(value: 1, label: Text('Outflow'), icon: Icon(Icons.north_east_rounded)),
+                  if (!_isEditing)
+                    const ButtonSegment(value: 2, label: Text('Debt'), icon: Icon(Icons.handshake_outlined)),
                 ],
                 selected: {_kindIndex},
                 onSelectionChanged: (s) => setState(() {
-                  _kindIndex = s.first;
-                  _category = null;
-                  // Reset account to Bank when switching type.
-                  _account = CashFlowAccount.bank;
+                  final newKind = s.first;
+                  if (newKind != _kindIndex) {
+                    _kindIndex = newKind;
+                    final validCats = _categories.map((c) => c.$1).toList();
+                    if (!validCats.contains(_category)) {
+                      _category = null;
+                    }
+                    if (_isInflow && _account == CashFlowAccount.creditCard) {
+                      _account = CashFlowAccount.bank;
+                    }
+                  }
                 }),
               ),
               const SizedBox(height: 20),
@@ -286,7 +362,7 @@ class _AddEntrySheetState extends ConsumerState<AddEntrySheet> {
                                 ),
                               ),
                               if (selected)
-                                Icon(Icons.check_circle_rounded,
+                                const Icon(Icons.check_circle_rounded,
                                     color: AppColors.primary, size: 20),
                             ],
                           ),
@@ -323,7 +399,7 @@ class _AddEntrySheetState extends ConsumerState<AddEntrySheet> {
                           context: context,
                           initialDate: _date,
                           firstDate: DateTime(2020),
-                          lastDate: DateTime.now(),
+                          lastDate: DateTime.now().add(const Duration(days: 365)),
                         );
                         if (picked != null) setState(() => _date = picked);
                       },
@@ -365,7 +441,9 @@ class _AddEntrySheetState extends ConsumerState<AddEntrySheet> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.check_rounded),
-                  label: Text(_saving ? 'Saving…' : 'Save Entry'),
+                  label: Text(_saving
+                      ? 'Saving…'
+                      : (_isEditing ? 'Save Changes' : 'Save Entry')),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,

@@ -10,43 +10,64 @@ void main() {
     return GoRouter(
       initialLocation: AppRoutes.dashboard,
       routes: [
-        ShellRoute(
-          builder: (context, state, child) => MainShell(child: child),
-          routes: [
-            GoRoute(
-              path: AppRoutes.dashboard,
-              pageBuilder: (context, state) => NoTransitionPage(
-                key: state.pageKey,
-                child: const Scaffold(body: Center(child: Text('Dashboard Tab'))),
-              ),
+        StatefulShellRoute.indexedStack(
+          builder: (context, state, navigationShell) =>
+              MainShell(navigationShell: navigationShell),
+          branches: [
+            StatefulShellBranch(
+              routes: [
+                GoRoute(
+                  path: AppRoutes.dashboard,
+                  pageBuilder: (context, state) => NoTransitionPage(
+                    key: state.pageKey,
+                    child: const Scaffold(body: Center(child: Text('Dashboard Tab'))),
+                  ),
+                ),
+              ],
             ),
-            GoRoute(
-              path: AppRoutes.habits,
-              pageBuilder: (context, state) => NoTransitionPage(
-                key: state.pageKey,
-                child: const Scaffold(body: Center(child: Text('Habits Tab'))),
-              ),
+            StatefulShellBranch(
+              routes: [
+                GoRoute(
+                  path: AppRoutes.habits,
+                  pageBuilder: (context, state) => NoTransitionPage(
+                    key: state.pageKey,
+                    child: const Scaffold(body: Center(child: Text('Habits Tab'))),
+                  ),
+                ),
+              ],
             ),
-            GoRoute(
-              path: AppRoutes.goals,
-              pageBuilder: (context, state) => NoTransitionPage(
-                key: state.pageKey,
-                child: const Scaffold(body: Center(child: Text('Goals Tab'))),
-              ),
+            StatefulShellBranch(
+              routes: [
+                GoRoute(
+                  path: AppRoutes.cashflow,
+                  pageBuilder: (context, state) => NoTransitionPage(
+                    key: state.pageKey,
+                    child: const Scaffold(body: Center(child: Text('Cashflow Tab'))),
+                  ),
+                ),
+              ],
             ),
-            GoRoute(
-              path: AppRoutes.cashflow,
-              pageBuilder: (context, state) => NoTransitionPage(
-                key: state.pageKey,
-                child: const Scaffold(body: Center(child: Text('Cashflow Tab'))),
-              ),
+            StatefulShellBranch(
+              routes: [
+                GoRoute(
+                  path: AppRoutes.goals,
+                  pageBuilder: (context, state) => NoTransitionPage(
+                    key: state.pageKey,
+                    child: const Scaffold(body: Center(child: Text('Goals Tab'))),
+                  ),
+                ),
+              ],
             ),
-            GoRoute(
-              path: AppRoutes.profile,
-              pageBuilder: (context, state) => NoTransitionPage(
-                key: state.pageKey,
-                child: const Scaffold(body: Center(child: Text('Profile Tab'))),
-              ),
+            StatefulShellBranch(
+              routes: [
+                GoRoute(
+                  path: AppRoutes.profile,
+                  pageBuilder: (context, state) => NoTransitionPage(
+                    key: state.pageKey,
+                    child: const Scaffold(body: Center(child: Text('Profile Tab'))),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -54,7 +75,7 @@ void main() {
     );
   }
 
-  testWidgets('swiping left moves forward across tabs: Dashboard -> Habits -> Goals', (tester) async {
+  testWidgets('swiping left moves forward across tabs: Dashboard -> Habits -> Cashflow -> Goals', (tester) async {
     final router = buildTestRouter();
     await tester.pumpWidget(
       ProviderScope(
@@ -73,14 +94,26 @@ void main() {
 
     expect(find.text('Habits Tab'), findsOneWidget);
 
-    // Swipe left again -> Navigates to Goals
+    // Swipe left again -> Navigates to Cashflow
     await tester.drag(find.text('Habits Tab'), const Offset(-200, 0));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Cashflow Tab'), findsOneWidget);
+
+    // Swipe left again -> Navigates to Goals
+    await tester.drag(find.text('Cashflow Tab'), const Offset(-200, 0));
     await tester.pumpAndSettle();
 
     expect(find.text('Goals Tab'), findsOneWidget);
 
-    // Swipe right (finger moves left to right: Offset(200, 0)) -> Navigates back to Habits
+    // Swipe right (finger moves left to right: Offset(200, 0)) -> Navigates back to Cashflow
     await tester.drag(find.text('Goals Tab'), const Offset(200, 0));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Cashflow Tab'), findsOneWidget);
+
+    // Swipe right again -> Navigates back to Habits
+    await tester.drag(find.text('Cashflow Tab'), const Offset(200, 0));
     await tester.pumpAndSettle();
 
     expect(find.text('Habits Tab'), findsOneWidget);

@@ -10,9 +10,11 @@ import 'package:timezone/data/latest.dart' as tz_init;
 
 import 'app/app.dart';
 import 'core/local/isar_service.dart';
+import 'core/local/user_local_cache.dart';
 import 'core/network/dio_client.dart';
 import 'core/notifications/notification_service.dart';
 import 'core/services/firebase_service.dart';
+import 'core/sync/sync_manager.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/theme_provider.dart';
 
@@ -92,6 +94,15 @@ Future<void> _initServicesAsync() async {
     debugPrint('[startup] Isar ready');
   } catch (e) {
     debugPrint('[startup] Isar init failed: $e');
+  }
+
+  try {
+    debugPrint('[startup] UserLocalCache & SyncManager init…');
+    await UserLocalCache.instance.getProfile();
+    await SyncManager.instance.initialize();
+    debugPrint('[startup] UserLocalCache & SyncManager ready');
+  } catch (e) {
+    debugPrint('[startup] SyncManager init failed: $e');
   }
 
   try {

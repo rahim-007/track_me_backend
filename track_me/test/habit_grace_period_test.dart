@@ -15,7 +15,7 @@ class _MockHabitsNotifier extends HabitsNotifier {
   Future<void> loadHabits() async {}
 
   @override
-  Future<void> toggleCompletion(HabitModel habit, DateTime date) async {
+  Future<void> toggleCompletion(HabitModel habit, DateTime date, {bool debounce = false}) async {
     final dateStr = DateFormat('yyyy-MM-dd').format(date);
     final current = state.valueOrNull ?? [];
     final updated = current.map((h) {

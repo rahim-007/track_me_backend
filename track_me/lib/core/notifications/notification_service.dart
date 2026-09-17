@@ -83,10 +83,10 @@ class NotificationService {
       final name = await FlutterTimezone.getLocalTimezone();
       if (name.isNotEmpty) {
         tz.setLocalLocation(tz.getLocation(name));
-        print('Notification timezone set to $name');
+        debugPrint('[NotificationService] Timezone set to $name');
       }
     } catch (e) {
-      print('Notification timezone resolve failed: $e');
+      debugPrint('[NotificationService] Timezone resolve failed: $e');
     }
     _localTzResolved = true;
   }
@@ -109,9 +109,12 @@ class NotificationService {
     required int hour,
     required int minute,
     List<bool> repeatDays = const [true, true, true, true, true, true, true],
+    bool skipToday = false,
   }) async {
     if (kIsWeb) return;
     await _ensureLocalTimezone();
+    // Cancel any previous reminder slots (daily/weekday) to prevent duplicate alarms
+    await cancelHabitReminder(habitId);
     try {
       final androidImpl =
           _plugin.resolvePlatformSpecificImplementation<
@@ -140,7 +143,7 @@ class NotificationService {
           _notificationId(habitId, slot: 0),
           '⏰ Time for your habit!',
           'Don\'t forget: $habitName',
-          _nextInstanceOfTime(hour, minute),
+          _nextInstanceOfTime(hour, minute, skipToday: skipToday),
           details,
           androidScheduleMode: scheduleMode,
           uiLocalNotificationDateInterpretation:
@@ -157,7 +160,12 @@ class NotificationService {
           _notificationId(habitId, slot: i + 1),
           '⏰ Time for your habit!',
           'Don\'t forget: $habitName',
-          _nextInstanceOfDay(hour, minute, weekdayIndex: i),
+          _nextInstanceOfDay(
+            hour,
+            minute,
+            weekdayIndex: i,
+            skipToday: skipToday,
+          ),
           details,
           androidScheduleMode: scheduleMode,
           uiLocalNotificationDateInterpretation:
@@ -166,7 +174,7 @@ class NotificationService {
         );
       }
     } catch (e) {
-      print('Failed to schedule notification: $e');
+      debugPrint('[NotificationService] Failed to schedule notification: $e');
     }
   }
 
@@ -237,7 +245,11 @@ class NotificationService {
     return _notificationBase(habitId) + slot;
   }
 
-  static tz.TZDateTime _nextInstanceOfTime(int hour, int minute) {
+  static tz.TZDateTime _nextInstanceOfTime(
+    int hour,
+    int minute, {
+    bool skipToday = false,
+  }) {
     final now = tz.TZDateTime.now(tz.local);
     var scheduled = tz.TZDateTime(
       tz.local,
@@ -247,7 +259,13 @@ class NotificationService {
       hour,
       minute,
     );
-    if (scheduled.isBefore(now)) {
+    if (skipToday) {
+      // Habit is already completed/handled today — start from tomorrow
+      scheduled = scheduled.add(const Duration(days: 1));
+      while (scheduled.isBefore(now)) {
+        scheduled = scheduled.add(const Duration(days: 1));
+      }
+    } else if (scheduled.isBefore(now)) {
       scheduled = scheduled.add(const Duration(days: 1));
     }
     return scheduled;
@@ -259,6 +277,7 @@ class NotificationService {
     int hour,
     int minute, {
     required int weekdayIndex,
+    bool skipToday = false,
   }) {
     final now = tz.TZDateTime.now(tz.local);
     final targetWeekday = weekdayIndex + 1; // tz: 1 = Monday … 7 = Sunday
@@ -270,6 +289,10 @@ class NotificationService {
       hour,
       minute,
     );
+    // If today is the scheduled weekday and today's habit is completed, advance to tomorrow before searching
+    if (skipToday && scheduled.weekday == targetWeekday) {
+      scheduled = scheduled.add(const Duration(days: 1));
+    }
     while (scheduled.weekday != targetWeekday || scheduled.isBefore(now)) {
       scheduled = scheduled.add(const Duration(days: 1));
     }

@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../config/app_env.dart';
 import '../constants/app_constants.dart';
+import 'dio_cache_interceptor.dart';
 
 class DioClient {
   DioClient._();
@@ -31,6 +32,7 @@ class DioClient {
 
     dio.interceptors.addAll([
       _authInterceptor(),
+      DioCacheInterceptor(),
       _loggingInterceptor(),
       _retryInterceptor(),
     ]);

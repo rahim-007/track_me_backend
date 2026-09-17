@@ -1,6 +1,13 @@
 import {
-  Controller, Get, Post, Patch, Delete,
-  Body, Param, Request, UseGuards
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Request,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { GoalsService } from './goals.service';
@@ -51,7 +58,12 @@ export class GoalsController {
     @Param('id') id: string,
     @Body() dto: UpdateGoalProgressDto,
   ) {
-    return this.goalsService.updateProgress(req.user.id, id, dto.progress, dto.notes);
+    return this.goalsService.updateProgress(
+      req.user.id,
+      id,
+      dto.progress,
+      dto.notes,
+    );
   }
 
   @Delete(':id')

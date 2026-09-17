@@ -187,5 +187,37 @@ void main() {
       expect(restored.completedDates, ['2026-08-10']);
       expect(restored.repeatDays, monWedFri);
     });
+
+    test('HabitModel preserves currentStreak, longestStreak, and totalCompleted', () {
+      final h = HabitModel(
+        id: 'h1',
+        name: 'Daily Meditation',
+        category: 'Health',
+        repeatDays: List.filled(7, true),
+        createdAt: DateTime(2026, 1, 1),
+        completedDates: ['2026-08-14'],
+        skippedDates: [],
+        currentStreak: 30,
+        longestStreak: 45,
+        totalCompleted: 120,
+      );
+
+      final json = h.toJson();
+      final restored = HabitModel.fromJson(json);
+
+      expect(restored.currentStreak, 30);
+      expect(restored.longestStreak, 45);
+      expect(restored.totalCompleted, 120);
+      expect(calculateHabitStreak(restored), 30);
+    });
+
+    test('calculateLongestStreak respects custom from date', () {
+      final a = makeHabit(
+        id: 'a',
+        completedDates: ['2026-08-10', '2026-08-11'],
+      );
+      // Evaluated as of Aug 11: current=2, longest=2
+      expect(calculateLongestStreak([a], from: DateTime(2026, 8, 11)), 2);
+    });
   });
 }

@@ -398,7 +398,7 @@ class _AddGoalDialogState extends ConsumerState<AddGoalDialog> {
                                 fontSize: 13,
                                 fontWeight: isSelected
                                     ? FontWeight.w700
-                                    : FontWeight.w400,
+                                    : FontWeight.w500,
                                 color: isSelected ? color : AppColors.textSecondary,
                               ),
                             ),
@@ -440,6 +440,7 @@ class _AddGoalDialogState extends ConsumerState<AddGoalDialog> {
                               ? AppColors.textPrimary
                               : AppColors.textHint,
                           fontSize: 14,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ],

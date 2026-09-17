@@ -39,3 +39,12 @@ npm-debug.log*
 .freebuff/
 .DS_Store
 Thumbs.db
+.agents/
+
+# ─── Temporary inspection screenshots ─────────────────────────────────────────
+*.png
+*.jpg
+!track_me/assets/**
+!track_me/android/app/src/main/res/**
+!track_me/ios/Runner/Assets.xcassets/**
+!track_me/web/**

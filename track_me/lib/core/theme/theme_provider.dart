@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../widgets/home_widget_service.dart';
 import 'app_colors.dart';
 
 class ThemeNotifier extends StateNotifier<bool> {
@@ -15,6 +16,7 @@ class ThemeNotifier extends StateNotifier<bool> {
     await _storage.write(key: 'is_dark_mode', value: nextState.toString());
     AppColors.isDarkMode = nextState;
     state = nextState;
+    HomeWidgetService.instance.syncTheme(isDarkMode: nextState);
   }
 }
 

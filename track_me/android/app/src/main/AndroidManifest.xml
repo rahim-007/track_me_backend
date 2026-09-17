@@ -13,9 +13,10 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
 
     <application
-        android:label="track_me"
+        android:label="UrDay"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
@@ -37,6 +38,13 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            <!-- Deep link scheme for UrDay widgets and shortcuts -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="urday" />
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
@@ -69,6 +77,69 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
                 <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
                 <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+            </intent-filter>
+        </receiver>
+
+        <!-- UrDay Daily Progress & Streak Widget Provider -->
+        <receiver
+            android:name=".UrDayProgressWidgetProvider"
+            android:label="@string/widget_progress_name"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/urday_progress_widget_info" />
+        </receiver>
+
+        <!-- UrDay Today's Habits Widget Provider -->
+        <receiver
+            android:name=".UrDayHabitsWidgetProvider"
+            android:label="@string/widget_habits_name"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.trackme.track_me.ACTION_TOGGLE_HABIT" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/urday_habits_widget_info" />
+        </receiver>
+
+        <!-- UrDay Hero Focus Goal Widget Provider (2x2) -->
+        <receiver
+            android:name=".UrDayGoalWidgetProvider"
+            android:label="@string/widget_goal_name"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.trackme.track_me.ACTION_CYCLE_GOAL" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/urday_focus_goal_widget_info" />
+        </receiver>
+
+        <!-- UrDay Cash Flow / Net Flow Widget Provider (4x2 Medium) -->
+        <receiver
+            android:name=".UrDayCashFlowWidgetProvider"
+            android:label="@string/widget_cashflow_name"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/urday_cashflow_widget_info" />
+        </receiver>
+
+        <!-- HomeWidget Background Interactivity Receiver -->
+        <receiver
+            android:name="es.antonborri.home_widget.HomeWidgetBackgroundReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="es.antonborri.home_widget.action.BACKGROUND" />
             </intent-filter>
         </receiver>
     </application>

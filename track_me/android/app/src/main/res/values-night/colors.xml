@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#111118</color>
+    
+    <!-- UrDay Widget Palette - DARK MODE -->
+    <color name="widget_bg">#14141E</color>
+    <color name="widget_bg_elevated">#1E1E2C</color>
+    <color name="widget_border">#2A2A3D</color>
+    <color name="widget_primary">#6E49E6</color>
+    <color name="widget_primary_light">#8B6EF5</color>
+    <color name="widget_primary_container">#282046</color>
+    <color name="widget_text_primary">#EDEDF4</color>
+    <color name="widget_text_secondary">#9493A6</color>
+    <color name="widget_text_muted">#68677A</color>
+    <color name="widget_flame">#FF7A00</color>
+    <color name="widget_check_active">#10B981</color>
+
+    <!-- Circular Progress & Date Widget Design - DARK MODE -->
+    <color name="widget_circle_bg">#0D0E18</color>
+    <color name="widget_circle_border">#28283E</color>
+    <color name="widget_circle_track">#1C1B30</color>
+    <color name="widget_purple_accent">#A78BFA</color>
+    <color name="widget_purple_primary">#7C3AED</color>
+    <color name="widget_purple_glow">#338B5CF6</color>
+
+    <!-- UrDay Compact Habit Widget - DARK MODE -->
+    <color name="widget_compact_bg">#0E0F1A</color>
+    <color name="widget_compact_border">#382A5E</color>
+    <color name="widget_compact_icon_bg">#1E1A33</color>
+    <color name="widget_compact_icon_border">#3B2E5C</color>
+    <color name="widget_compact_pill_bg">#352563</color>
+    <color name="widget_compact_pill_border">#523A8C</color>
+    <color name="widget_compact_pill_text">#D8B4FE</color>
+    <color name="widget_compact_add_bg">#251C3B</color>
+    <color name="widget_compact_add_border">#4C377A</color>
+    <color name="widget_compact_add_icon">#FFFFFF</color>
+    <color name="widget_compact_check_inactive">#423C5E</color>
+
+    <!-- UrDay Cash Flow Widget - DARK MODE -->
+    <color name="widget_cashflow_bg">#121124</color>
+    <color name="widget_cashflow_border">#2C264D</color>
+    <color name="widget_cashflow_badge_bg">#251E4A</color>
+    <color name="widget_cashflow_badge_icon">#C084FC</color>
+    <color name="widget_cashflow_status_pos_bg">#064E3B</color>
+    <color name="widget_cashflow_status_pos_text">#34D399</color>
+    <color name="widget_cashflow_status_def_bg">#4C1D24</color>
+    <color name="widget_cashflow_status_def_text">#FB7185</color>
+    <color name="widget_cashflow_income_card_bg">#0A3428</color>
+    <color name="widget_cashflow_income_card_border">#065F46</color>
+    <color name="widget_cashflow_income_icon_bg">#10B981</color>
+    <color name="widget_cashflow_income_label">#34D399</color>
+    <color name="widget_cashflow_income_val">#A7F3D0</color>
+    <color name="widget_cashflow_outflow_card_bg">#3E1822</color>
+    <color name="widget_cashflow_outflow_card_border">#881337</color>
+    <color name="widget_cashflow_outflow_icon_bg">#F43F5E</color>
+    <color name="widget_cashflow_outflow_label">#FB7185</color>
+    <color name="widget_cashflow_outflow_val">#FECDD3</color>
+    <color name="widget_cashflow_pocket_bg">#1A1733</color>
+    <color name="widget_cashflow_pocket_border">#2F2959</color>
+    <color name="widget_cashflow_pocket_label">#9493A6</color>
+    <color name="widget_cashflow_pocket_val">#EDEDF4</color>
+    <color name="widget_cashflow_pocket_chevron">#8E8BA3</color>
+    <color name="widget_cashflow_btn_income_bg">#0D9488</color>
+    <color name="widget_cashflow_btn_outflow_bg">#F43F5E</color>
+</resources>

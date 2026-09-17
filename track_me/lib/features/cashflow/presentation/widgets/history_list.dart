@@ -6,10 +6,11 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shadows.dart';
 import '../../providers/cashflow_provider.dart';
 import '../../data/models/cashflow_models.dart';
+import 'add_entry_sheet.dart';
 
 enum TxnFilter {
   all('All'),
-  inflow('📈 Inflow'),
+  inflow('📈 Income'),
   outflow('📉 Outflow'),
   bank('🏦 Bank'),
   cash('💵 Cash'),
@@ -84,7 +85,7 @@ class HistoryList extends ConsumerWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                'Tap + to add your first inflow or outflow.',
+                'Tap + to add your first income or outflow.',
                 style: TextStyle(
                   color: AppColors.textSecondary,
                   fontSize: 12,
@@ -202,7 +203,6 @@ class _TxnTile extends ConsumerWidget {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1B162C) : Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -220,68 +220,180 @@ class _TxnTile extends ConsumerWidget {
           ),
         ],
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Text(
-              txn.category,
-              style: TextStyle(
-                fontWeight: FontWeight.w900,
-                fontSize: 14,
-                color: color,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: readOnly ? null : () => _openEdit(context),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
               children: [
-                Text(
-                  txn.note.isEmpty ? (isIncome ? 'Inflow' : 'Outflow') : txn.note,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 14,
-                    color: AppColors.textPrimary,
+                Container(
+                  width: 42,
+                  height: 42,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Text(
+                    txn.category,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 14,
+                      color: color,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  '${DateFormat('d MMM').format(DateTime.parse(txn.date))} · ${_accountBadge(txn.account)} · ${_categoryLabel(txn.category)}',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textSecondary,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        txn.note.isEmpty ? (isIncome ? 'Income' : 'Outflow') : txn.note,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${DateFormat('d MMM').format(DateTime.parse(txn.date))} · ${_accountBadge(txn.account)} · ${_categoryLabel(txn.category)}',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+                Text(
+                  '${isIncome ? '+' : '−'}₹${NumberFormat('#,##0.##').format(txn.amount)}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 14.5,
+                    color: color,
+                  ),
+                ),
+                if (!readOnly) ...[
+                  const SizedBox(width: 4),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.all(6),
+                    constraints: const BoxConstraints(),
+                    tooltip: 'Edit transaction',
+                    icon: Icon(Icons.edit_outlined,
+                        size: 18, color: AppColors.textHint),
+                    onPressed: () => _openEdit(context),
+                  ),
+                  const SizedBox(width: 2),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.all(6),
+                    constraints: const BoxConstraints(),
+                    tooltip: 'Delete transaction',
+                    icon: Icon(Icons.delete_outline_rounded,
+                        size: 19, color: AppColors.textHint),
+                    onPressed: () => _confirmDelete(context, ref, txn),
+                  ),
+                ],
               ],
             ),
           ),
-          Text(
-            '${isIncome ? '+' : '−'}₹${NumberFormat('#,##0.##').format(txn.amount)}',
-            style: TextStyle(
-              fontWeight: FontWeight.w900,
-              fontSize: 14.5,
-              color: color,
+        ),
+      ),
+    );
+  }
+
+  void _openEdit(BuildContext context) {
+    AddEntrySheet.show(context, initialTransaction: txn);
+  }
+
+  void _confirmDelete(
+    BuildContext context,
+    WidgetRef ref,
+    TransactionModel txn,
+  ) {
+    final isIncome = txn.kind == TxnKind.income;
+    final titleText =
+        txn.note.isEmpty ? (isIncome ? 'Income' : 'Outflow') : txn.note;
+    final amountFormatted =
+        '${isIncome ? '+' : '−'}₹${NumberFormat('#,##0.##').format(txn.amount)}';
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.error.withOpacity(0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.delete_outline_rounded,
+                color: AppColors.error,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Delete Transaction',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to delete this transaction ($titleText, $amountFormatted)? This action cannot be undone.',
+          style: TextStyle(
+            fontSize: 14,
+            color: AppColors.textSecondary,
+            height: 1.4,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+              ),
             ),
           ),
-          if (!readOnly)
-            IconButton(
-              visualDensity: VisualDensity.compact,
-              icon: Icon(Icons.delete_outline_rounded,
-                  size: 19, color: AppColors.textHint),
-              onPressed: () =>
-                  ref.read(cashFlowProvider.notifier).deleteTransaction(txn.id),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              ref.read(cashFlowProvider.notifier).deleteTransaction(txn.id);
+            },
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: Text(
+              'Delete',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: AppColors.error,
+              ),
             ),
+          ),
         ],
       ),
     );

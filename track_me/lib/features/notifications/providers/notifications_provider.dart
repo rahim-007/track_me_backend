@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/local/json_file_cache.dart';
 import '../../../core/network/dio_client.dart';
 import '../data/models/notification_model.dart';
 
@@ -14,7 +15,7 @@ abstract class NotificationsApi {
   Future<void> clearAll();
 }
 
-/// Real implementation backed by the Track Me backend.
+/// Real implementation backed by the UrDay backend.
 class DioNotificationsApi implements NotificationsApi {
   DioNotificationsApi();
 
@@ -111,6 +112,7 @@ class NotificationsState {
 class NotificationsNotifier extends StateNotifier<NotificationsState> {
   final NotificationsApi _api;
   final int pageSize;
+  static const String _cacheKey = 'notifications_cache';
 
   NotificationsNotifier({NotificationsApi? api, this.pageSize = 30})
       : _api = api ?? DioNotificationsApi(),
@@ -119,7 +121,31 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
   }
 
   Future<void> load() async {
-    state = state.copyWith(loading: true, clearError: true);
+    final isRealApi = _api is DioNotificationsApi;
+    if (isRealApi && state.items.isEmpty) {
+      try {
+        final cachedData = await JsonFileCache.read<Map<String, dynamic>>(
+          _cacheKey,
+          (raw) => raw as Map<String, dynamic>,
+        );
+        if (cachedData != null) {
+          final items = (cachedData['items'] as List<dynamic>?)
+                  ?.map((e) => NotificationModel.fromJson(e as Map<String, dynamic>))
+                  .toList() ??
+              [];
+          final unread = cachedData['unreadCount'] as int? ?? 0;
+          if (items.isNotEmpty) {
+            state = state.copyWith(
+              items: items,
+              unreadCount: unread,
+              loading: false,
+            );
+          }
+        }
+      } catch (_) {}
+    }
+
+    state = state.copyWith(loading: state.items.isEmpty, clearError: true);
     try {
       final results = await Future.wait([
         _api.fetch(pageSize, 0),
@@ -133,9 +159,34 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
         loading: false,
         hasMore: items.length == pageSize,
       );
+      if (isRealApi) {
+        await _persist();
+      }
     } catch (e) {
       state = state.copyWith(loading: false, error: e);
     }
+  }
+
+  Future<void> _persist() async {
+    try {
+      await JsonFileCache.write(_cacheKey, {
+        'items': state.items.map((n) => {
+          'id': n.id,
+          'title': n.title,
+          'body': n.message,
+          'type': n.type,
+          'isRead': n.isRead,
+          'sentAt': n.createdAt.toIso8601String(),
+          'data': {
+            'category': n.category.name,
+            'relatedId': n.relatedId,
+            'relatedType': n.relatedType,
+            'route': n.route,
+          },
+        }).toList(),
+        'unreadCount': state.unreadCount,
+      });
+    } catch (_) {}
   }
 
   Future<void> loadMore() async {

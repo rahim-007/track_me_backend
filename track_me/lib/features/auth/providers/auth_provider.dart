@@ -8,8 +8,12 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/local/isar_service.dart';
+import '../../../core/local/user_local_cache.dart';
+import '../../../core/network/dio_cache_interceptor.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/services/firebase_service.dart';
+import '../../../core/sync/sync_manager.dart';
+import '../../../core/sync/sync_queue.dart';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -60,6 +64,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = AuthSuccess(userId: responseData['user']['id'].toString());
       // Best-effort: register this device (FCM token + timezone) once logged in.
       unawaited(FirebaseService.registerDeviceWithBackend());
+      unawaited(SyncManager.instance.sync());
     } catch (e) {
       debugPrint('[AUTH] ❌ Login FAILED: $e');
       if (e is DioException) {
@@ -88,6 +93,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = AuthSuccess(userId: responseData['user']['id'].toString());
       // Best-effort: register this device (FCM token + timezone) once logged in.
       unawaited(FirebaseService.registerDeviceWithBackend());
+      unawaited(SyncManager.instance.sync());
     } catch (e) {
       state = AuthError(message: _parseError(e));
     }
@@ -118,6 +124,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = AuthSuccess(userId: responseData['user']['id'].toString());
       // Best-effort: register this device (FCM token + timezone) once logged in.
       unawaited(FirebaseService.registerDeviceWithBackend());
+      unawaited(SyncManager.instance.sync());
     } catch (e) {
       state = AuthError(message: _parseError(e));
     }
@@ -142,6 +149,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await _secureStorage.delete(key: AppConstants.refreshTokenKey);
     await _secureStorage.delete(key: AppConstants.userIdKey);
     await _googleSignIn.signOut();
+    await UserLocalCache.instance.clear();
+    DioCacheInterceptor().clear();
+    await SyncQueue.instance.clear();
+    if (IsarService.isAvailable) {
+      try {
+        await IsarService.clearAll();
+      } catch (e) {
+        debugPrint('[AUTH] Isar clearAll on logout failed (non-fatal): $e');
+      }
+    }
     state = AuthInitial();
   }
 
@@ -151,7 +168,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   ///
   /// 1. Calls DELETE /users/me on the backend (server-side deletion).
   /// 2. If the backend returns 404 (or 401 User not found), it means the account is already gone on the server.
-  /// 3. In all successful/already-deleted cases: cleans up local Isar DB, secure storage, Google session.
+  /// 3. In all successful/already-deleted cases: cleans up local Isar DB, secure storage, Google session, caches.
   /// 4. On network/unexpected errors: preserves local data and throws.
   ///
   /// Returns `true` on success.
@@ -180,7 +197,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
 
       // Server-side deletion succeeded (or was already deleted) — clean up locally.
-      // Clear all Isar local data (habits, goals, user cache, etc.)
       if (IsarService.isAvailable) {
         try {
           await IsarService.clearAll();
@@ -193,6 +209,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await _secureStorage.delete(key: AppConstants.accessTokenKey);
       await _secureStorage.delete(key: AppConstants.refreshTokenKey);
       await _secureStorage.delete(key: AppConstants.userIdKey);
+
+      // Clear caches and sync queues
+      await UserLocalCache.instance.clear();
+      DioCacheInterceptor().clear();
+      await SyncQueue.instance.clear();
 
       // Sign out of Google
       try {
@@ -251,6 +272,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       key: AppConstants.userIdKey,
       value: data['user']['id'].toString(),
     );
+    // Cache user profile for instant 0ms access across screens
+    await UserLocalCache.instance.saveRawAuthUser(data);
   }
 
   String _parseError(dynamic error) {

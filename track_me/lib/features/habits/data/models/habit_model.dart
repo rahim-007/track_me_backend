@@ -10,6 +10,9 @@ class HabitModel {
   final DateTime createdAt;
   List<String> completedDates;
   List<String> skippedDates;
+  final int currentStreak;
+  final int longestStreak;
+  final int totalCompleted;
 
   HabitModel({
     required this.id,
@@ -23,6 +26,9 @@ class HabitModel {
     required this.createdAt,
     required this.completedDates,
     required this.skippedDates,
+    this.currentStreak = 0,
+    this.longestStreak = 0,
+    this.totalCompleted = 0,
   });
 
   bool get isCompletedToday {
@@ -52,6 +58,9 @@ class HabitModel {
     DateTime? createdAt,
     List<String>? completedDates,
     List<String>? skippedDates,
+    int? currentStreak,
+    int? longestStreak,
+    int? totalCompleted,
   }) {
     return HabitModel(
       id: id ?? this.id,
@@ -65,6 +74,9 @@ class HabitModel {
       createdAt: createdAt ?? this.createdAt,
       completedDates: completedDates ?? this.completedDates,
       skippedDates: skippedDates ?? this.skippedDates,
+      currentStreak: currentStreak ?? this.currentStreak,
+      longestStreak: longestStreak ?? this.longestStreak,
+      totalCompleted: totalCompleted ?? this.totalCompleted,
     );
   }
 
@@ -95,6 +107,9 @@ class HabitModel {
               ?.map((e) => e as String)
               .toList() ??
           [],
+      currentStreak: json['currentStreak'] as int? ?? 0,
+      longestStreak: json['longestStreak'] as int? ?? 0,
+      totalCompleted: json['totalCompleted'] as int? ?? 0,
     );
   }
 
@@ -111,6 +126,9 @@ class HabitModel {
       'createdAt': createdAt.toIso8601String(),
       'completedDates': completedDates,
       'skippedDates': skippedDates,
+      'currentStreak': currentStreak,
+      'longestStreak': longestStreak,
+      'totalCompleted': totalCompleted,
     };
   }
 

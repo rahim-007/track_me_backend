@@ -30,16 +30,12 @@ class _MockProfileNotifier extends ProfileNotifier {
   _MockProfileNotifier(UserProfile initial) : super() {
     state = AsyncValue.data(initial);
   }
-  @override
-  Future<void> loadProfile() async {}
 }
 
 class _MockCashFlowNotifier extends CashFlowNotifier {
   _MockCashFlowNotifier(CashFlowState initial) : super() {
     state = initial;
   }
-  @override
-  Future<void> loadCashFlow() async {}
 }
 
 void main() {

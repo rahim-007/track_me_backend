@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">UrDay</string>
+    <string name="widget_progress_name">UrDay Daily Progress</string>
+    <string name="widget_progress_desc">Glanceable habit completion ring and current streak</string>
+    <string name="widget_habits_name">UrDay Today\'s Habits</string>
+    <string name="widget_habits_desc">Today\'s scheduled habits with quick check-off and quick add</string>
+    <string name="widget_goal_name">UrDay Focus Goal</string>
+    <string name="widget_goal_desc">Hero focus goal progress, target metrics, and urgency countdown</string>
+    <string name="widget_cashflow_name">UrDay Cash Flow</string>
+    <string name="widget_cashflow_desc">Glanceable net cash flow, account balances, and 1-tap quick capture</string>
+</resources>

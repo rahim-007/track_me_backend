@@ -12,4 +12,7 @@ class JsonFileCache {
     T Function(Object? json) fromJson,
   ) async =>
       null;
+
+  static Future<void> delete(String name) async {}
 }
+

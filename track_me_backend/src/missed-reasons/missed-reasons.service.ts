@@ -68,7 +68,10 @@ export class MissedReasonsService {
    * Check if reasons have already been submitted for a given date.
    * Used by the Flutter app to skip showing the popup.
    */
-  async hasSubmittedForDate(userId: string, missedDate: string): Promise<boolean> {
+  async hasSubmittedForDate(
+    userId: string,
+    missedDate: string,
+  ): Promise<boolean> {
     const count = await this.prisma.missedHabitReason.count({
       where: { userId, missedDate: new Date(missedDate) },
     });

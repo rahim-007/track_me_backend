@@ -43,6 +43,8 @@ Widget buildAvatarWidget(
       return Image.memory(
         bytes,
         fit: BoxFit.cover,
+        cacheWidth: 250,
+        cacheHeight: 250,
         errorBuilder: (_, __, ___) => Center(
           child: Text(
             name.isNotEmpty ? name[0].toUpperCase() : 'U',
@@ -71,6 +73,9 @@ Widget buildAvatarWidget(
   return CachedNetworkImage(
     imageUrl: url,
     fit: BoxFit.cover,
+    memCacheWidth: 250,
+    memCacheHeight: 250,
+    maxWidthDiskCache: 500,
     placeholder: (context, url) => const Center(
       child: CircularProgressIndicator(strokeWidth: 2),
     ),
@@ -135,7 +140,7 @@ class ProfileScreen extends ConsumerWidget {
           ],
         ),
         content: Text(
-          'Are you sure you want to log out of Track Me? Your offline data will be kept safe on this device.',
+          'Are you sure you want to log out of UrDay? Your offline data will be kept safe on this device.',
           style: TextStyle(
             fontSize: 14,
             color: AppColors.textSecondary,
@@ -494,13 +499,6 @@ class ProfileScreen extends ConsumerWidget {
               // ─── 3. Metrics Trio Row ─────────────────────────────────────────
               _ProfileMetricsRow(stats: stats),
 
-              const SizedBox(height: 20),
-
-              // ─── 4. Track Me Premium Promo Card ──────────────────────────────
-              _PremiumPromoBanner(
-                onTap: () => context.push(AppRoutes.premium),
-              ),
-
               const SizedBox(height: 24),
 
               // ─── 5. Achievements Section ─────────────────────────────────────
@@ -564,7 +562,7 @@ class ProfileScreen extends ConsumerWidget {
                       _showInfoDialog(
                         context,
                         'Privacy & Data Security',
-                        'Track Me uses Supabase Row Level Security (RLS). All habit entries, goals, and financial cashflow items are private and strictly accessible only to your authenticated user account.',
+                        'UrDay uses Supabase Row Level Security (RLS). All habit entries, goals, and financial cashflow items are private and strictly accessible only to your authenticated user account.',
                       );
                     },
                   ),
@@ -597,7 +595,7 @@ class ProfileScreen extends ConsumerWidget {
                       _showInfoDialog(
                         context,
                         'Offline First Sync',
-                        'Track Me functions seamlessly offline. Your changes are instantly written to your device storage and synchronized automatically when an active connection is available.',
+                        'UrDay functions seamlessly offline. Your changes are instantly written to your device storage and synchronized automatically when an active connection is available.',
                       );
                     },
                   ),
@@ -619,13 +617,13 @@ class ProfileScreen extends ConsumerWidget {
                       _showInfoDialog(
                         context,
                         'Help & Support',
-                        'Need assistance with Track Me?\n\n• Habits: Check in daily or record skip reasons.\n• Goals: Set target dates and adjust progress percentage.\n• Cash Flow: Record income and outflow to track net liquidity.\n\nFor support inquiries, reach out to support@trackme.app.',
+                        'Need assistance with UrDay?\n\n• Habits: Check in daily or record skip reasons.\n• Goals: Set target dates and adjust progress percentage.\n• Cash Flow: Record income and outflow to track net liquidity.\n\nFor support inquiries, reach out to support@urday.app.',
                       );
                     },
                   ),
                   _SettingsNavTile(
                     icon: Icons.info_outline_rounded,
-                    title: 'About Track Me',
+                    title: 'About UrDay',
                     subtitle: 'AI-Powered Productivity Application',
                     trailingWidget: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -645,8 +643,8 @@ class ProfileScreen extends ConsumerWidget {
                     onTap: () {
                       _showInfoDialog(
                         context,
-                        'Track Me v${versionAsync.valueOrNull ?? '1.0.1'}',
-                        'Track Me combines Habit Tracking, Goal Tracking, and Cash Flow Financial Management into one unified, offline-first productivity platform powered by Gemini AI.',
+                        'UrDay v${versionAsync.valueOrNull ?? '1.0.1'}',
+                        'UrDay combines Habit Tracking, Goal Tracking, and Cash Flow Financial Management into one unified, offline-first productivity platform powered by Gemini AI.',
                       );
                     },
                   ),
@@ -775,7 +773,7 @@ class _ProfileHeroCard extends StatelessWidget {
                             ),
                             const SizedBox(width: 5),
                             Text(
-                              'TRACK ME MEMBER',
+                              'UrDay MEMBER',
                               style: TextStyle(
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.w800,
@@ -1034,122 +1032,7 @@ class _ProfileMetricsRow extends StatelessWidget {
   }
 }
 
-// ─── 4. Track Me Premium Promo Card ──────────────────────────────────────────
-
-class _PremiumPromoBanner extends StatelessWidget {
-  final VoidCallback onTap;
-  const _PremiumPromoBanner({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = AppColors.isDarkMode;
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1A1434) : const Color(0xFFF3F0FF),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: isDark ? const Color(0xFF3B2F6E) : const Color(0xFFDED7FC),
-          ),
-          boxShadow: AppShadows.soft,
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFFFB800), Color(0xFFFF8A00)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFFFFB800).withOpacity(0.35),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: const Icon(Icons.star_rounded, color: Colors.white, size: 26),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          'Track Me Premium',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textPrimary,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF5848D6),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Text(
-                          'PRO',
-                          style: TextStyle(
-                            fontSize: 9.5,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    'Unlock AI Insights & Unlimited Habits',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.textSecondary,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                color: const Color(0xFF5848D6).withOpacity(0.12),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.arrow_forward_rounded,
-                size: 16,
-                color: Color(0xFF5848D6),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─── 5. Achievements Carousel ────────────────────────────────────────────────
+// ─── 4. Achievements Carousel ────────────────────────────────────────────────
 
 class _AchievementsCarousel extends StatelessWidget {
   final UserProfileStats stats;

@@ -15,14 +15,16 @@ import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../../features/splash/presentation/screens/splash_screen.dart';
 import '../../features/notifications/presentation/screens/notifications_screen.dart';
-import '../../features/subscription/presentation/screens/premium_screen.dart';
 import '../shell/main_shell.dart';
 
 part 'app_router.g.dart';
 
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
+
 @riverpod
 GoRouter appRouter(Ref ref) {
   return GoRouter(
+    navigatorKey: rootNavigatorKey,
     initialLocation: AppRoutes.splash,
     debugLogDiagnostics: false,
     routes: [
@@ -75,54 +77,55 @@ GoRouter appRouter(Ref ref) {
         ],
       ),
 
-      // Main Shell (Bottom Nav)
-      ShellRoute(
-        builder: (context, state, child) => MainShell(child: child),
-        routes: [
-          GoRoute(
-            path: AppRoutes.dashboard,
-            name: 'dashboard',
-            pageBuilder: (context, state) => _slidingTabPage(
-              state: state,
-              child: const DashboardScreen(),
-              targetIndex: 0,
-            ),
+      // Main Shell (Stateful Bottom Nav with IndexedStack)
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) =>
+            MainShell(navigationShell: navigationShell),
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.dashboard,
+                name: 'dashboard',
+                builder: (context, state) => const DashboardScreen(),
+              ),
+            ],
           ),
-          GoRoute(
-            path: AppRoutes.habits,
-            name: 'habits',
-            pageBuilder: (context, state) => _slidingTabPage(
-              state: state,
-              child: const HabitsScreen(),
-              targetIndex: 1,
-            ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.habits,
+                name: 'habits',
+                builder: (context, state) => const HabitsScreen(),
+              ),
+            ],
           ),
-          GoRoute(
-            path: AppRoutes.goals,
-            name: 'goals',
-            pageBuilder: (context, state) => _slidingTabPage(
-              state: state,
-              child: const GoalsScreen(),
-              targetIndex: 2,
-            ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.cashflow,
+                name: 'cashflow',
+                builder: (context, state) => const CashFlowScreen(),
+              ),
+            ],
           ),
-          GoRoute(
-            path: AppRoutes.cashflow,
-            name: 'cashflow',
-            pageBuilder: (context, state) => _slidingTabPage(
-              state: state,
-              child: const CashFlowScreen(),
-              targetIndex: 3,
-            ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.goals,
+                name: 'goals',
+                builder: (context, state) => const GoalsScreen(),
+              ),
+            ],
           ),
-          GoRoute(
-            path: AppRoutes.profile,
-            name: 'profile',
-            pageBuilder: (context, state) => _slidingTabPage(
-              state: state,
-              child: const ProfileScreen(),
-              targetIndex: 4,
-            ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.profile,
+                name: 'profile',
+                builder: (context, state) => const ProfileScreen(),
+              ),
+            ],
           ),
         ],
       ),
@@ -137,17 +140,6 @@ GoRouter appRouter(Ref ref) {
           transitionsBuilder: _slideTransition,
         ),
       ),
-
-      // Premium Subscription Screen (full-screen, with back button)
-      GoRoute(
-        path: AppRoutes.premium,
-        name: 'premium',
-        pageBuilder: (context, state) => CustomTransitionPage(
-          key: state.pageKey,
-          child: const PremiumScreen(),
-          transitionsBuilder: _slideTransition,
-        ),
-      ),
     ],
     errorBuilder: (context, state) => Scaffold(
       body: Center(
@@ -157,41 +149,6 @@ GoRouter appRouter(Ref ref) {
   );
 }
 
-int _lastNavIndex = 0;
-
-CustomTransitionPage<void> _slidingTabPage({
-  required GoRouterState state,
-  required Widget child,
-  required int targetIndex,
-}) {
-  final isForward = targetIndex >= _lastNavIndex;
-  _lastNavIndex = targetIndex;
-
-  return CustomTransitionPage<void>(
-    key: state.pageKey,
-    child: child,
-    transitionDuration: const Duration(milliseconds: 260),
-    reverseTransitionDuration: const Duration(milliseconds: 260),
-    transitionsBuilder: (context, animation, secondaryAnimation, child) {
-      final beginOffset = isForward
-          ? const Offset(1.0, 0.0)
-          : const Offset(-1.0, 0.0);
-
-      final slideAnimation = Tween<Offset>(
-        begin: beginOffset,
-        end: Offset.zero,
-      ).animate(CurvedAnimation(
-        parent: animation,
-        curve: Curves.easeOutCubic,
-      ));
-
-      return SlideTransition(
-        position: slideAnimation,
-        child: child,
-      );
-    },
-  );
-}
 
 Widget _fadeTransition(
   BuildContext context,
@@ -235,5 +192,4 @@ class AppRoutes {
 
   static const String profile = '/profile';
   static const String notifications = '/notifications';
-  static const String premium = '/premium';
 }

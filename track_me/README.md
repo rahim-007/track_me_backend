@@ -1,4 +1,4 @@
-# Track Me — Flutter App
+# UrDay — Flutter App
 
 > AI-Powered Productivity Application — Mobile Client
 

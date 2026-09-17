@@ -58,7 +58,10 @@ export class CreateGoalDto {
   @IsOptional()
   priority?: GoalPriority;
 
-  @ApiPropertyOptional({ example: 90, description: 'Goal duration in days (1 - 365)' })
+  @ApiPropertyOptional({
+    example: 90,
+    description: 'Goal duration in days (1 - 365)',
+  })
   @IsInt()
   @Min(1)
   @Max(365)
@@ -86,7 +89,7 @@ export class CreateGoalDto {
   })
   @IsOptional()
   @IsString()
-  @IsIn(GOAL_UNITS as unknown as string[])
+  @IsIn(GOAL_UNITS)
   unit?: string;
 
   @ApiPropertyOptional()
@@ -94,4 +97,3 @@ export class CreateGoalDto {
   @IsOptional()
   notes?: string;
 }
-

@@ -1,5 +1,14 @@
 import {
-  Controller, Post, Delete, Get, Body, Param, Request, UseGuards, HttpCode, HttpStatus
+  Controller,
+  Post,
+  Delete,
+  Get,
+  Body,
+  Param,
+  Request,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { HabitLogsService } from './habit-logs.service';
@@ -18,7 +27,11 @@ export class HabitLogsController {
     @Request() req: any,
     @Body() dto: { habitId: string; date: string },
   ) {
-    return this.habitLogsService.completeHabit(req.user.id, dto.habitId, dto.date);
+    return this.habitLogsService.completeHabit(
+      req.user.id,
+      dto.habitId,
+      dto.date,
+    );
   }
 
   @Post('skip')
@@ -27,9 +40,13 @@ export class HabitLogsController {
     @Request() req: any,
     @Body() dto: { habitId: string; date: string; reason: string },
   ) {
-    return this.habitLogsService.skipHabit(req.user.id, dto.habitId, dto.date, dto.reason);
+    return this.habitLogsService.skipHabit(
+      req.user.id,
+      dto.habitId,
+      dto.date,
+      dto.reason,
+    );
   }
-  
 
   @Delete(':habitId/:date')
   @HttpCode(HttpStatus.OK)

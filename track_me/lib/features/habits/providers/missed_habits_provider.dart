@@ -48,15 +48,26 @@ final shouldShowReflectionProvider = StateProvider<bool>((ref) => false);
 // ─── Missed habits check ──────────────────────────────────────────────────────
 
 /// Returns the list of habits that were missed yesterday and have not yet had
-/// a reason submitted. Returns empty list if nothing needs attention.
+/// a reason submitted or been marked completed. Returns empty list if nothing needs attention.
 final missedYesterdayHabitsProvider = FutureProvider<List<HabitModel>>((ref) async {
-  // 1. Determine yesterday's date string
-  final yesterday = DateTime.now().subtract(const Duration(days: 1));
+  // 1. Read habits reactively first — loads immediately from local cache or memory
+  final habitsState = ref.watch(habitsProvider);
+  final habits = habitsState.valueOrNull;
+
+  if (habits == null || habits.isEmpty) {
+    debugPrint('[MissedHabits] habits list is null or empty');
+    return [];
+  }
+
+  // 2. Determine yesterday's exact calendar date
+  final now = DateTime.now();
+  final yesterday = DateTime(now.year, now.month, now.day - 1);
   final yesterdayStr = DateFormat('yyyy-MM-dd').format(yesterday);
+  final yesterdayDateOnly = DateTime(yesterday.year, yesterday.month, yesterday.day);
 
   debugPrint('[MissedHabits] Checking missed habits for yesterday: $yesterdayStr');
 
-  // Collect IDs of habits for which the user has ALREADY submitted a reason for yesterday
+  // 3. Fast offline-first check for already reflected habits in local Isar DB (< 1ms)
   final alreadyReflectedIds = <String>{};
 
   if (IsarService.isAvailable) {
@@ -75,67 +86,82 @@ final missedYesterdayHabitsProvider = FutureProvider<List<HabitModel>>((ref) asy
     }
   }
 
-  try {
-    final client = DioClient();
-    final response = await client.dio.get(
-      '/missed-reasons',
-      queryParameters: {'date': yesterdayStr},
-    );
-    final data = response.data;
-    if (data is List) {
-      for (final item in data) {
-        if (item is Map && item['habitId'] != null) {
-          alreadyReflectedIds.add(item['habitId'].toString());
-        }
-      }
-    }
-    debugPrint('[MissedHabits] Total already reflected habits (local+backend): ${alreadyReflectedIds.length}');
-  } catch (e) {
-    debugPrint('[MissedHabits] Backend missed-reasons fetch failed ($e) — proceeding with local check');
-  }
-
-  // 4. Fetch habits list reactively
-  final habitsState = ref.watch(habitsProvider);
-  final habits = habitsState.valueOrNull;
-
-  if (habits == null || habits.isEmpty) {
-    debugPrint('[MissedHabits] habits list is null or empty: $habits');
-    return [];
-  }
-
-  final yesterdayStart = DateTime(yesterday.year, yesterday.month, yesterday.day);
+  // 4. Background non-blocking sync with backend for reasons submitted on other devices
+  unawaited(_syncBackendMissedReasons(ref, yesterdayStr, alreadyReflectedIds));
 
   // 5. Filter: missed = scheduled for yesterday AND created on/before yesterday AND not completed AND not skipped AND not already reflected
+  final dayIndex = yesterday.weekday - 1; // 0=Mon … 6=Sun
+
   final missed = habits.where((habit) {
-    // Exclude habits created after yesterday (e.g. created today)
-    final createdAtDate = DateTime(
-      habit.createdAt.year,
-      habit.createdAt.month,
-      habit.createdAt.day,
+    // 5a. Exclude habits created after yesterday (e.g. created today). Use .toLocal() for accurate comparison.
+    final localCreatedAt = habit.createdAt.toLocal();
+    final createdDateOnly = DateTime(
+      localCreatedAt.year,
+      localCreatedAt.month,
+      localCreatedAt.day,
     );
-    final isCreatedAfterYesterday = createdAtDate.isAfter(yesterdayStart);
-
-    final isCompleted = habit.completedDates.contains(yesterdayStr);
-    final isSkipped = habit.skippedDates.contains(yesterdayStr);
-    final isReflected = alreadyReflectedIds.contains(habit.id);
-
-    final dayIndex = yesterday.weekday - 1; // 0=Mon … 6=Sun
-    final wasScheduled = habit.repeatDays.length > dayIndex
-        ? habit.repeatDays[dayIndex]
-        : true;
-
-    debugPrint('[MissedHabits] Habit "${habit.name}": createdAt=${habit.createdAt} (afterYesterday=$isCreatedAfterYesterday), scheduled=$wasScheduled, completed=$isCompleted, skipped=$isSkipped, alreadyReflected=$isReflected');
+    final isCreatedAfterYesterday = createdDateOnly.isAfter(yesterdayDateOnly);
 
     if (isCreatedAfterYesterday) {
       return false;
     }
 
-    return wasScheduled && !isCompleted && !isSkipped && !isReflected;
+    // 5b. Schedule check: if no specific repeat day selected, treat as daily
+    final hasRepeatDay = habit.repeatDays.any((d) => d);
+    final wasScheduled = hasRepeatDay
+        ? (dayIndex >= 0 && dayIndex < habit.repeatDays.length && habit.repeatDays[dayIndex])
+        : true;
+
+    if (!wasScheduled) {
+      return false;
+    }
+
+    final isCompleted = habit.completedDates.contains(yesterdayStr);
+    final isSkipped = habit.skippedDates.contains(yesterdayStr);
+    final isReflected = alreadyReflectedIds.contains(habit.id);
+
+    debugPrint('[MissedHabits] Habit "${habit.name}": createdAt=${habit.createdAt.toLocal()} (afterYesterday=$isCreatedAfterYesterday), scheduled=$wasScheduled, completed=$isCompleted, skipped=$isSkipped, alreadyReflected=$isReflected');
+
+    return !isCompleted && !isSkipped && !isReflected;
   }).toList();
 
   debugPrint('[MissedHabits] Final missed habits count for $yesterdayStr: ${missed.length}');
   return missed;
 });
+
+/// Non-blocking sync to fetch external reasons from backend without stalling the UI.
+Future<void> _syncBackendMissedReasons(
+  Ref ref,
+  String dateStr,
+  Set<String> localReflectedIds,
+) async {
+  try {
+    final client = DioClient();
+    final response = await client.dio.get(
+      '/missed-reasons',
+      queryParameters: {'date': dateStr},
+    );
+    final data = response.data;
+    if (data is List) {
+      var hasNewReasons = false;
+      for (final item in data) {
+        if (item is Map && item['habitId'] != null) {
+          final hId = item['habitId'].toString();
+          if (!localReflectedIds.contains(hId)) {
+            localReflectedIds.add(hId);
+            hasNewReasons = true;
+          }
+        }
+      }
+      if (hasNewReasons) {
+        debugPrint('[MissedHabits] Found new reflected habits from backend, refreshing...');
+        ref.invalidateSelf();
+      }
+    }
+  } catch (e) {
+    debugPrint('[MissedHabits] Backend missed-reasons sync skipped/failed ($e)');
+  }
+}
 
 // ─── Save reasons notifier ────────────────────────────────────────────────────
 

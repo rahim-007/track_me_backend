@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_goal_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_goal_glass_bg"
+    android:paddingStart="12dp"
+    android:paddingTop="11dp"
+    android:paddingEnd="12dp"
+    android:paddingBottom="10dp">
+
+    <!-- 1. Active Goal Content Container -->
+    <RelativeLayout
+        android:id="@+id/view_goal_content"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <!-- Top Header Bar -->
+        <LinearLayout
+            android:id="@+id/header_goal_bar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_alignParentTop="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <!-- Squircle "U" App Icon Badge -->
+            <FrameLayout
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:background="@drawable/widget_goal_app_icon_bg">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
+                    android:text="U"
+                    android:textColor="#C084FC"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+            </FrameLayout>
+
+            <!-- Brand Title & Subtitle Column -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tv_goal_brand_name"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:includeFontPadding="false"
+                    android:text="UrDay"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tv_goal_brand_sub"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="1dp"
+                    android:includeFontPadding="false"
+                    android:text="Small Steps • Big You"
+                    android:textColor="#9CA3AF"
+                    android:textSize="9sp" />
+            </LinearLayout>
+
+            <!-- Goal Cycle / Options Button -->
+            <FrameLayout
+                android:id="@+id/btn_goal_cycle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="32dp"
+                android:minHeight="28dp">
+
+                <TextView
+                    android:id="@+id/tv_goal_options"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical|end"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
+                    android:paddingStart="4dp"
+                    android:paddingTop="2dp"
+                    android:paddingEnd="2dp"
+                    android:paddingBottom="2dp"
+                    android:text="•••"
+                    android:textColor="#9CA3AF"
+                    android:textSize="10.5sp"
+                    android:textStyle="bold" />
+            </FrameLayout>
+        </LinearLayout>
+
+        <!-- Dynamic Urgency Pill (Placed at bottom) -->
+        <LinearLayout
+            android:id="@+id/pill_urgency_container"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentBottom="true"
+            android:layout_centerHorizontal="true"
+            android:background="@drawable/widget_goal_urgency_pill_amber"
+            android:gravity="center"
+            android:paddingStart="10dp"
+            android:paddingTop="3dp"
+            android:paddingEnd="10dp"
+            android:paddingBottom="3dp">
+
+            <TextView
+                android:id="@+id/tv_goal_urgency"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:text="⏳ 14 days left"
+                android:textColor="#FBBF24"
+                android:textSize="10.5sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Goal Title Row (Above Urgency Pill) -->
+        <LinearLayout
+            android:id="@+id/row_goal_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_above="@id/pill_urgency_container"
+            android:layout_centerHorizontal="true"
+            android:layout_marginBottom="4dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/tv_goal_category_icon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="4dp"
+                android:includeFontPadding="false"
+                android:text="🏃"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/tv_goal_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:text="Run Half-Marathon"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Values Text (Above Goal Title Row) -->
+        <TextView
+            android:id="@+id/tv_goal_values"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_above="@id/row_goal_title"
+            android:layout_centerHorizontal="true"
+            android:layout_marginBottom="2dp"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="36 / 50 km"
+            android:textColor="#E0E7FF"
+            android:textSize="11.5sp" />
+
+        <!-- Center Circular Progress Ring & Percentage -->
+        <FrameLayout
+            android:id="@+id/ring_goal_container"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_above="@id/tv_goal_values"
+            android:layout_below="@id/header_goal_bar"
+            android:layout_centerInParent="true"
+            android:layout_marginTop="2dp"
+            android:layout_marginBottom="2dp">
+
+            <ImageView
+                android:id="@+id/iv_goal_ring"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_gravity="center"
+                android:contentDescription="Goal Progress Ring"
+                android:scaleType="fitCenter" />
+
+            <TextView
+                android:id="@+id/tv_goal_percent"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:includeFontPadding="false"
+                android:text="72%"
+                android:textColor="#FFFFFF"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+        </FrameLayout>
+
+        <!-- Subtle Watermark at Bottom Left -->
+        <TextView
+            android:id="@+id/tv_goal_watermark"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentStart="true"
+            android:layout_alignParentBottom="true"
+            android:alpha="0.25"
+            android:includeFontPadding="false"
+            android:lineSpacingExtra="1dp"
+            android:text="BETTER\nTHAN\nYESTERDAY"
+            android:textColor="#FFFFFF"
+            android:textSize="5.5sp" />
+    </RelativeLayout>
+
+    <!-- 2. Clean Empty State Container (Displayed when no active goal exists) -->
+    <LinearLayout
+        android:id="@+id/view_goal_empty"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:includeFontPadding="false"
+            android:text="🎯 UrDay"
+            android:textColor="#C084FC"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="Set Your\nFocus Goal"
+            android:textColor="#FFFFFF"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/btn_goal_empty_add"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/widget_goal_add_btn_bg"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:paddingStart="16dp"
+            android:paddingTop="7dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="7dp"
+            android:text="+ Add Goal"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+</RelativeLayout>

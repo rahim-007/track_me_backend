@@ -10,6 +10,7 @@ import '../../data/models/cashflow_models.dart';
 import '../../providers/cashflow_provider.dart';
 import '../widgets/add_entry_sheet.dart';
 import '../widgets/cashflow_hero_card.dart';
+import '../widgets/cashflow_quote_card.dart';
 import '../widgets/category_grid.dart';
 import '../widgets/debt_ledger_sheet.dart';
 import '../widgets/history_list.dart';
@@ -34,7 +35,10 @@ class CashFlowScreen extends ConsumerWidget {
     final viewedPast =
         viewedId != null && viewedId != state.current.valueOrNull?.id;
     final period = viewedPast
-        ? state.history.where((p) => p.id == viewedId).firstOrNull
+        ? state.history.where((p) =>
+            p.id == viewedId ||
+            '${p.month}_${p.year}' == viewedId ||
+            viewedId.endsWith('${p.month}_${p.year}')).firstOrNull
         : state.current.valueOrNull;
 
     return Scaffold(
@@ -67,7 +71,8 @@ class CashFlowScreen extends ConsumerWidget {
                     ),
                   ],
                 ),
-                child: const Icon(Icons.add_rounded, color: Colors.white, size: 28),
+                child: const Icon(Icons.add_rounded,
+                    color: Colors.white, size: 28),
               ),
             ),
       body: SafeArea(
@@ -117,7 +122,9 @@ class CashFlowScreen extends ConsumerWidget {
                         color: isDark ? const Color(0xFF1B162C) : Colors.white,
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: isDark ? const Color(0xFF2A2244) : const Color(0xFFEAE8F5),
+                          color: isDark
+                              ? const Color(0xFF2A2244)
+                              : const Color(0xFFEAE8F5),
                         ),
                         boxShadow: AppShadows.soft,
                       ),
@@ -131,7 +138,12 @@ class CashFlowScreen extends ConsumerWidget {
                 ],
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
+
+              // ─── Motivational Quote Card ──────────────────────────────────
+              const CashFlowQuoteCard(),
+
+              const SizedBox(height: 16),
 
               // ─── Loaded Body ──────────────────────────────────────────────
               state.current.when(
@@ -193,17 +205,20 @@ class CashFlowScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
             ListTile(
-              leading: const Icon(Icons.swap_horiz_rounded, color: Color(0xFF5848D6)),
+              leading: const Icon(Icons.swap_horiz_rounded,
+                  color: Color(0xFF5848D6)),
               title: const Text('All Entries'),
               onTap: () => Navigator.pop(context),
             ),
             ListTile(
-              leading: const Icon(Icons.trending_up_rounded, color: Color(0xFF10B981)),
-              title: const Text('Inflow Only'),
+              leading: const Icon(Icons.trending_up_rounded,
+                  color: Color(0xFF10B981)),
+              title: const Text('Income Only'),
               onTap: () => Navigator.pop(context),
             ),
             ListTile(
-              leading: const Icon(Icons.trending_down_rounded, color: Color(0xFFF0445F)),
+              leading: const Icon(Icons.trending_down_rounded,
+                  color: Color(0xFFF0445F)),
               title: const Text('Outflow Only'),
               onTap: () => Navigator.pop(context),
             ),
@@ -275,11 +290,13 @@ class _LoadedBody extends ConsumerWidget {
             if (details.primaryVelocity == null) return;
             if (details.primaryVelocity! < -200) {
               if (selectedSegment < 2) {
-                ref.read(_cashFlowSegmentProvider.notifier).state = selectedSegment + 1;
+                ref.read(_cashFlowSegmentProvider.notifier).state =
+                    selectedSegment + 1;
               }
             } else if (details.primaryVelocity! > 200) {
               if (selectedSegment > 0) {
-                ref.read(_cashFlowSegmentProvider.notifier).state = selectedSegment - 1;
+                ref.read(_cashFlowSegmentProvider.notifier).state =
+                    selectedSegment - 1;
               }
             }
           },
@@ -311,7 +328,8 @@ class _LoadedBody extends ConsumerWidget {
                   ] else if (selectedSegment == 1) ...[
                     const _SectionTitle('OUTFLOW CATEGORIES (ESDI)'),
                     const SizedBox(height: 10),
-                    CategoryGrid(income: false, totals: period.outflowByCategory),
+                    CategoryGrid(
+                        income: false, totals: period.outflowByCategory),
                   ] else ...[
                     const _SectionTitle('DEBT & RECEIVABLES'),
                     const SizedBox(height: 10),
@@ -427,7 +445,9 @@ class _CapsuleSegmentSlider extends StatelessWidget {
               fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
               color: isSelected
                   ? Colors.white
-                  : (isDark ? Colors.white.withOpacity(0.7) : const Color(0xFF71819B)),
+                  : (isDark
+                      ? Colors.white.withOpacity(0.7)
+                      : const Color(0xFF71819B)),
             ),
             child: Text(label),
           ),
@@ -451,7 +471,14 @@ class _PeriodSelector extends ConsumerWidget {
     final current = state.current.valueOrNull;
     final selected = viewedId == null || viewedId == current?.id
         ? current
-        : state.history.where((p) => p.id == viewedId).firstOrNull;
+        : state.history.where((p) =>
+            p.id == viewedId ||
+            '${p.month}_${p.year}' == viewedId ||
+            viewedId.endsWith('${p.month}_${p.year}')).firstOrNull ?? current;
+
+    final now = DateTime.now();
+    final defaultLabel =
+        '${CashFlowPeriodModel.monthName(now.month)} ${now.year}';
 
     return InkWell(
       borderRadius: BorderRadius.circular(20),
@@ -486,7 +513,7 @@ class _PeriodSelector extends ConsumerWidget {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                selected?.label ?? 'August 2026',
+                selected?.label ?? defaultLabel,
                 style: TextStyle(
                   fontWeight: FontWeight.w800,
                   fontSize: 16,
@@ -528,7 +555,11 @@ class _PeriodSelector extends ConsumerWidget {
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (_) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.75,
+        ),
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -536,12 +567,108 @@ class _PeriodSelector extends ConsumerWidget {
         child: Consumer(builder: (context, ref, _) {
           final state = ref.watch(cashFlowProvider);
           final viewedId = ref.watch(_viewedPeriodIdProvider);
-          final periods = [...state.history]
+          final current = state.current.valueOrNull;
+
+          final now = DateTime.now();
+          final currentMonth = now.month;
+          final currentYear = now.year;
+          final currentKey = currentYear * 100 + currentMonth;
+
+          final prevMonth = currentMonth == 1 ? 12 : currentMonth - 1;
+          final prevYear = currentMonth == 1 ? currentYear - 1 : currentYear;
+          final prevKey = prevYear * 100 + prevMonth;
+
+          // Combine state.history and current into a de-duplicated map,
+          // preserving current and previous month (August) and any authentic past months.
+          final Map<int, CashFlowPeriodModel> periodMap = {};
+          for (final p in state.history) {
+            final k = p.year * 100 + p.month;
+            if (k == currentKey ||
+                k == prevKey ||
+                p.isAuthentic(
+                    transactions: state.transactions,
+                    currentKey: currentKey)) {
+              periodMap[k] = p;
+            }
+          }
+          if (current != null) {
+            periodMap[current.year * 100 + current.month] = current;
+          }
+
+          // Ensure Previous Month (August) is present
+          if (!periodMap.containsKey(prevKey)) {
+            periodMap[prevKey] = CashFlowPeriodModel(
+              id: 'period_${prevMonth}_$prevYear',
+              month: prevMonth,
+              year: prevYear,
+              openingBank: 0,
+              openingCash: 0,
+              openingCreditCard: 0,
+              openingDebt: 0,
+              isCurrent: false,
+            );
+          }
+
+          // Ensure Current Month (September) is present
+          if (!periodMap.containsKey(currentKey)) {
+            periodMap[currentKey] = CashFlowPeriodModel(
+              id: 'local_${currentMonth}_$currentYear',
+              month: currentMonth,
+              year: currentYear,
+              openingBank: 0,
+              openingCash: 0,
+              openingCreditCard: 0,
+              openingDebt: 0,
+              isCurrent: true,
+            );
+          }
+
+          // Past months start from when user started using this app (at least prevKey: August 2026)
+          int startKey = prevKey;
+          for (final k in periodMap.keys) {
+            if (k < startKey) startKey = k;
+          }
+
+          // Fill all months from startKey up to currentKey
+          final startYear = startKey ~/ 100;
+          final startMonth = startKey % 100;
+          var cursor = DateTime(startYear, startMonth, 1);
+          final currentEnd = DateTime(currentYear, currentMonth, 1);
+
+          while (!cursor.isAfter(currentEnd)) {
+            final y = cursor.year;
+            final m = cursor.month;
+            final k = y * 100 + m;
+            final isCurr = (y == currentYear && m == currentMonth);
+
+            if (!periodMap.containsKey(k)) {
+              periodMap[k] = CashFlowPeriodModel(
+                id: isCurr ? 'local_${m}_$y' : 'period_${m}_$y',
+                month: m,
+                year: y,
+                openingBank: 0,
+                openingCash: 0,
+                openingCreditCard: 0,
+                openingDebt: 0,
+                isCurrent: isCurr,
+              );
+            }
+            cursor = DateTime(cursor.year, cursor.month + 1, 1);
+          }
+
+          // Strictly discard any period keys before startKey or after currentKey
+          final periods = periodMap.entries
+              .where((e) => e.key >= startKey && e.key <= currentKey)
+              .map((e) {
+                final p = e.value;
+                final isCurr =
+                    (p.month == currentMonth && p.year == currentYear);
+                return p.copyWith(isCurrent: isCurr);
+              })
+              .toList()
             ..sort((a, b) {
               if (a.isCurrent != b.isCurrent) return a.isCurrent ? -1 : 1;
-              final byDate = (b.year * 100 + b.month)
-                  .compareTo(a.year * 100 + a.month);
-              return byDate;
+              return (b.year * 100 + b.month).compareTo(a.year * 100 + a.month);
             });
           return SafeArea(
             child: ListView(
@@ -571,17 +698,26 @@ class _PeriodSelector extends ConsumerWidget {
                 ...periods.map((p) {
                   final isSelected = viewedId == null
                       ? p.isCurrent
-                      : p.id == viewedId;
+                      : (p.id == viewedId ||
+                          '${p.month}_${p.year}' == viewedId ||
+                          viewedId.endsWith('${p.month}_${p.year}'));
                   return ListTile(
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
+                    tileColor: isSelected
+                        ? const Color(0xFF5848D6).withOpacity(0.08)
+                        : null,
                     leading: Icon(
                       p.isCurrent
                           ? Icons.radio_button_checked_rounded
                           : Icons.history_rounded,
                       size: 20,
-                      color: p.isCurrent ? const Color(0xFF5848D6) : AppColors.textHint,
+                      color: isSelected
+                          ? const Color(0xFF5848D6)
+                          : (p.isCurrent
+                              ? const Color(0xFF5848D6)
+                              : AppColors.textHint),
                     ),
                     title: Text(
                       p.isCurrent ? '${p.label}  ·  Current' : p.label,
@@ -680,7 +816,8 @@ class _SetupPrompt extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.rocket_launch_outlined, size: 20, color: Color(0xFF5848D6)),
+          const Icon(Icons.rocket_launch_outlined,
+              size: 20, color: Color(0xFF5848D6)),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -804,7 +941,8 @@ class _DebtSummaryTile extends StatelessWidget {
                     children: [
                       Text(
                         'Receive ',
-                        style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                        style: TextStyle(
+                            fontSize: 11.5, color: AppColors.textSecondary),
                       ),
                       Text(
                         '+₹${NumberFormat.compact().format(yetToReceive)}',
@@ -816,7 +954,8 @@ class _DebtSummaryTile extends StatelessWidget {
                       ),
                       Text(
                         '   Give ',
-                        style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                        style: TextStyle(
+                            fontSize: 11.5, color: AppColors.textSecondary),
                       ),
                       Text(
                         '−₹${NumberFormat.compact().format(yetToGive)}',

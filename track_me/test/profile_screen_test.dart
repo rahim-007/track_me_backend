@@ -67,7 +67,7 @@ void main() {
     expect(find.text('Account, statistics & app preferences'), findsOneWidget);
 
     // 2. Signature Hero Card
-    expect(find.text('TRACK ME MEMBER'), findsOneWidget);
+    expect(find.text('UrDay MEMBER'), findsOneWidget);
     expect(find.text('Rahim Ali'), findsOneWidget);
     expect(find.text('rahim@example.com'), findsOneWidget);
     expect(find.text('Member since Jan 2025'), findsOneWidget);
@@ -79,11 +79,7 @@ void main() {
     expect(find.text('8'), findsWidgets); // In metric item + badge
     expect(find.text('25'), findsWidgets);
 
-    // 4. Promo Banner
-    expect(find.text('Track Me Premium'), findsOneWidget);
-    expect(find.text('PRO'), findsOneWidget);
-
-    // 5. Section Headers
+    // 4. Section Headers
     expect(find.text('ACHIEVEMENTS'), findsOneWidget);
     expect(find.text('LIFETIME STATISTICS'), findsOneWidget);
     expect(find.text('APP PREFERENCES'), findsOneWidget);

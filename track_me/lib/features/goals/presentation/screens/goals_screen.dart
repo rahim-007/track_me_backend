@@ -166,10 +166,10 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen> {
                               Text(
                                 'Goal Tracker 🎯',
                                 style: TextStyle(
-                                  fontSize: 24,
+                                  fontSize: 28,
                                   fontWeight: FontWeight.w800,
                                   color: AppColors.textPrimary,
-                                  letterSpacing: -0.5,
+                                  letterSpacing: -0.8,
                                 ),
                               ),
                               const SizedBox(height: 2),
@@ -178,7 +178,7 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen> {
                                 style: TextStyle(
                                   fontSize: 13,
                                   color: AppColors.textSecondary,
-                                  fontWeight: FontWeight.w400,
+                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
                             ],
@@ -398,8 +398,8 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen> {
                               child: Text(
                                 '${filteredGoals.length}',
                                 style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w800,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
                                   color: Color(0xFF5334EA),
                                 ),
                               ),
@@ -463,7 +463,7 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen> {
                               icon: const Icon(Icons.add_rounded, size: 18, color: Colors.white),
                               label: const Text(
                                 'Create Goal',
-                                style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white),
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white),
                               ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF5334EA),
@@ -574,11 +574,11 @@ class _FilterChipPill extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                fontSize: 12.5,
+                fontSize: 12,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
                 color: isSelected
                     ? Colors.white
-                    : (isDark ? Colors.white.withOpacity(0.8) : AppColors.textPrimary),
+                    : AppColors.textPrimary,
               ),
             ),
           ],
@@ -719,9 +719,10 @@ class _GoalCard extends ConsumerWidget {
                               Text(
                                 goal.category,
                                 style: TextStyle(
-                                  fontSize: 10.5,
+                                  fontSize: 11,
                                   fontWeight: FontWeight.w700,
                                   color: _categoryColor,
+                                  letterSpacing: 0.2,
                                 ),
                               ),
                             ],
@@ -737,9 +738,10 @@ class _GoalCard extends ConsumerWidget {
                           child: Text(
                             goal.priority,
                             style: TextStyle(
-                              fontSize: 10.5,
+                              fontSize: 11,
                               fontWeight: FontWeight.w700,
                               color: _priorityColor,
+                              letterSpacing: 0.2,
                             ),
                           ),
                         ),
@@ -818,6 +820,7 @@ class _GoalCard extends ConsumerWidget {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w500,
+                              letterSpacing: 0.1,
                               color: daysLeft < 0 ? const Color(0xFFEF4444) : AppColors.textSecondary,
                             ),
                             maxLines: 1,
@@ -947,8 +950,8 @@ class _GoalCard extends ConsumerWidget {
                         Text(
                           _getMotivationalSubtitle(effectiveCategory),
                           style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
                             color: AppColors.textSecondary,
                           ),
                           textAlign: TextAlign.center,
@@ -975,7 +978,7 @@ class _GoalCard extends ConsumerWidget {
                             Text(
                               _getUpdateLabel(effectiveCategory, parsed),
                               style: TextStyle(
-                                fontSize: 13,
+                                fontSize: 14,
                                 fontWeight: FontWeight.w700,
                                 color: AppColors.textPrimary,
                               ),
@@ -1023,7 +1026,8 @@ class _GoalCard extends ConsumerWidget {
                                         : '${formatGoalValue(parsed['current'])}%'),
                                 style: TextStyle(
                                   fontSize: 22,
-                                  fontWeight: FontWeight.w900,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.5,
                                   color: AppColors.textPrimary,
                                 ),
                               ),
@@ -1125,7 +1129,10 @@ class _GoalCard extends ConsumerWidget {
                             icon: const Icon(Icons.delete_outline_rounded, size: 18),
                             label: const Text(
                               'Delete Goal',
-                              style: TextStyle(fontWeight: FontWeight.w700),
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
                         ),
@@ -1434,7 +1441,14 @@ class _GoalCard extends ConsumerWidget {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.surface,
-        title: Text('Enter Custom Value', style: TextStyle(color: AppColors.onSurface)),
+        title: Text(
+          'Enter Custom Value',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: AppColors.textPrimary,
+          ),
+        ),
         content: TextField(
           controller: controller,
           keyboardType: allowsDecimals
@@ -1448,19 +1462,34 @@ class _GoalCard extends ConsumerWidget {
             }),
           ],
           autofocus: true,
-          style: TextStyle(color: AppColors.onSurface),
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textPrimary,
+          ),
           decoration: InputDecoration(
             labelText: suffix.isNotEmpty
                 ? 'Current $suffix'
                 : (prefix.isNotEmpty ? 'Amount' : 'Current value'),
             prefixText: prefix,
-            labelStyle: TextStyle(color: AppColors.textSecondary),
+            labelStyle: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textSecondary,
+            ),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+              ),
+            ),
           ),
           TextButton(
             onPressed: () {
@@ -1477,7 +1506,14 @@ class _GoalCard extends ConsumerWidget {
               }
               Navigator.pop(context);
             },
-            child: const Text('Apply'),
+            child: const Text(
+              'Apply',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: AppColors.primary,
+              ),
+            ),
           ),
         ],
       ),
@@ -1565,6 +1601,7 @@ class _GoalCard extends ConsumerWidget {
                   milestoneDesc,
                   style: TextStyle(
                     fontSize: 12,
+                    fontWeight: FontWeight.w500,
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -1626,14 +1663,14 @@ class _GoalCard extends ConsumerWidget {
             const SizedBox(height: 6),
             Text(
               label,
-              style: TextStyle(fontSize: 10, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+              style: TextStyle(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 2),
             Text(
               value,
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
@@ -1649,15 +1686,33 @@ class _GoalCard extends ConsumerWidget {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.surface,
-        title: Text('Delete Goal', style: TextStyle(color: AppColors.onSurface)),
+        title: Text(
+          'Delete Goal',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: AppColors.textPrimary,
+          ),
+        ),
         content: Text(
           'Are you sure you want to delete "${goal.name}"? This action cannot be undone.',
-          style: TextStyle(color: AppColors.textSecondary),
+          style: TextStyle(
+            fontSize: 14,
+            color: AppColors.textSecondary,
+            height: 1.4,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+              ),
+            ),
           ),
           TextButton(
             onPressed: () {
@@ -1665,7 +1720,14 @@ class _GoalCard extends ConsumerWidget {
               ref.read(goalsProvider.notifier).deleteGoal(goal.id);
             },
             style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('Delete'),
+            child: Text(
+              'Delete',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: AppColors.error,
+              ),
+            ),
           ),
         ],
       ),
@@ -1707,8 +1769,9 @@ class _StatusBadge extends StatelessWidget {
       child: Text(
         displayText,
         style: TextStyle(
-          fontSize: 10,
+          fontSize: 11,
           fontWeight: FontWeight.w700,
+          letterSpacing: 0.2,
           color: color,
         ),
       ),

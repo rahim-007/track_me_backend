@@ -1,11 +1,19 @@
 import 'dart:async';
+import 'dart:convert';
 
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:home_widget/home_widget.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/local/json_file_cache.dart';
+import '../../../core/network/dio_cache_interceptor.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/notifications/notification_service.dart';
+import '../../../core/sync/sync_manager.dart';
+import '../../../core/sync/sync_queue.dart';
+import '../../../core/widgets/home_widget_service.dart';
 import '../data/models/habit_model.dart';
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -21,14 +29,24 @@ class HabitsNotifier extends StateNotifier<HabitsState> {
   /// result from clobbering changes made while the request was running.
   bool _dirtySinceLoad = false;
 
+  /// Prevents rapid double-taps/touch bounces from toggling ON and immediately OFF.
+  final Map<String, DateTime> _lastToggleTime = {};
+
+  /// Local session toggles: key `${habitId}_$dateStr` -> (isCompleted, at).
+  /// Reconciles against server fetches so an in-flight server response never
+  /// removes a mark the user just made.
+  final Map<String, (bool isCompleted, DateTime at)> _recentLocalToggles = {};
+
   HabitsNotifier() : super(const AsyncValue.loading()) {
     loadHabits();
   }
 
   Future<void> loadHabits() async {
-    final cached = await _readCachedHabits();
-    if (cached != null && cached.isNotEmpty) {
+    final rawCached = await _readCachedHabits();
+    final cached = await _reconcilePendingWidgetToggles(rawCached ?? []);
+    if (cached.isNotEmpty) {
       state = AsyncValue.data(cached);
+      unawaited(_syncHomeWidgets(cached));
     } else {
       state = const AsyncValue.loading();
     }
@@ -36,7 +54,10 @@ class HabitsNotifier extends StateNotifier<HabitsState> {
     _dirtySinceLoad = false;
     try {
       final client = DioClient();
-      final response = await client.dio.get('/habits');
+      final response = await client.dio.get(
+        '/habits',
+        options: Options(extra: {'noCache': true}),
+      );
       final serverList = (response.data['data'] as List)
           .map((e) => HabitModel.fromJson(e as Map<String, dynamic>))
           .toList();
@@ -44,9 +65,82 @@ class HabitsNotifier extends StateNotifier<HabitsState> {
       if (_dirtySinceLoad) return;
 
       final currentList = state.valueOrNull ?? cached ?? [];
-      final tempItems = currentList.where((h) => h.id.startsWith('temp_')).toList();
+      final tempItems =
+          currentList.where((h) => h.id.startsWith('temp_')).toList();
 
-      final mergedList = <HabitModel>[...serverList];
+      // Clean up any _recentLocalToggles older than 2 minutes
+      final cutoff = DateTime.now().subtract(const Duration(minutes: 2));
+      _recentLocalToggles.removeWhere((_, val) => val.$2.isBefore(cutoff));
+
+      // Inspect any in-flight toggle actions queued in SyncQueue
+      final pendingSyncActions = SyncQueue.instance.actions
+          .where((a) => a.type == SyncActionType.toggleHabit)
+          .toList();
+
+      final mergedList = <HabitModel>[];
+      for (final serverHabit in serverList) {
+        var habit = serverHabit;
+        final completedDates = List<String>.from(habit.completedDates);
+        final skippedDates = List<String>.from(habit.skippedDates);
+        bool changed = false;
+
+        // 1. Reconcile with local session toggles from the last 2 minutes
+        _recentLocalToggles.forEach((key, val) {
+          final prefix = '${habit.id}_';
+          if (key.startsWith(prefix)) {
+            final dateStr = key.substring(prefix.length);
+            final isCompleted = val.$1;
+            if (isCompleted && !completedDates.contains(dateStr)) {
+              completedDates.add(dateStr);
+              skippedDates.remove(dateStr);
+              changed = true;
+            } else if (!isCompleted && completedDates.contains(dateStr)) {
+              completedDates.remove(dateStr);
+              changed = true;
+            }
+          }
+        });
+
+        // 2. Reconcile with pending SyncQueue actions
+        for (final action in pendingSyncActions) {
+          if (action.method == 'POST' && action.payload is Map) {
+            final payload = action.payload as Map;
+            if (payload['habitId'] == habit.id && payload['date'] != null) {
+              final d = payload['date'].toString();
+              if (!completedDates.contains(d)) {
+                completedDates.add(d);
+                skippedDates.remove(d);
+                changed = true;
+              }
+            }
+          } else if (action.method == 'DELETE' &&
+              action.endpoint.contains(habit.id)) {
+            final segs = action.endpoint.split('/');
+            if (segs.length >= 4 && segs[2] == habit.id) {
+              final d = segs[3];
+              if (completedDates.contains(d)) {
+                completedDates.remove(d);
+                changed = true;
+              }
+            }
+          }
+        }
+
+        if (changed) {
+          final streak = calculateHabitStreak(habit.copyWith(
+            completedDates: completedDates,
+            skippedDates: skippedDates,
+          ));
+          habit = habit.copyWith(
+            completedDates: completedDates,
+            skippedDates: skippedDates,
+            currentStreak: streak,
+          );
+        }
+
+        mergedList.add(habit);
+      }
+
       for (final temp in tempItems) {
         if (!mergedList.any((h) => h.id == temp.id || h.name == temp.name)) {
           mergedList.add(temp);
@@ -78,31 +172,54 @@ class HabitsNotifier extends StateNotifier<HabitsState> {
   Future<void> _syncTempHabit(HabitModel tempHabit) async {
     try {
       final client = DioClient();
-      final response = await client.dio.post('/habits', data: tempHabit.toCreateJson());
-      final newHabit = HabitModel.fromJson(response.data['data'] as Map<String, dynamic>);
+      final response =
+          await client.dio.post('/habits', data: tempHabit.toCreateJson());
+      final newHabit =
+          HabitModel.fromJson(response.data['data'] as Map<String, dynamic>);
 
       // Move any locally-scheduled reminder from the temp id to the real one.
       await NotificationService.cancelHabitReminder(tempHabit.id);
-      await _scheduleReminder(newHabit);
+      final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      await _scheduleReminder(
+        newHabit,
+        isCompletedToday: newHabit.completedDates.contains(todayStr),
+      );
 
       final currentList = state.valueOrNull ?? [];
-      final updated = currentList.map((h) => h.id == tempHabit.id ? newHabit : h).toList();
+      final updated =
+          currentList.map((h) => h.id == tempHabit.id ? newHabit : h).toList();
       state = AsyncValue.data(updated);
       await _cacheHabits(updated);
-    } catch (_) {}
+    } catch (_) {
+      // Enqueue in background sync manager for guaranteed delivery
+      await SyncManager.instance.enqueue(
+        SyncAction(
+          type: SyncActionType.createHabit,
+          endpoint: '/habits',
+          method: 'POST',
+          payload: tempHabit.toCreateJson(),
+          tempId: tempHabit.id,
+        ),
+      );
+    }
   }
 
   Future<void> addHabit(HabitModel habit) async {
     _dirtySinceLoad = true;
+    final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
     try {
       final client = DioClient();
-      final response = await client.dio.post('/habits', data: habit.toCreateJson());
+      final response =
+          await client.dio.post('/habits', data: habit.toCreateJson());
       final newHabit =
           HabitModel.fromJson(response.data['data'] as Map<String, dynamic>);
       final updated = [...state.valueOrNull ?? <HabitModel>[], newHabit];
       state = AsyncValue.data(updated);
       await _cacheHabits(updated);
-      await _scheduleReminder(newHabit);
+      await _scheduleReminder(
+        newHabit,
+        isCompletedToday: newHabit.completedDates.contains(todayStr),
+      );
     } catch (_) {
       // Optimistic update with temp id — still persisted locally so the habit
       // survives a hot restart even while the backend is offline.
@@ -112,24 +229,44 @@ class HabitsNotifier extends StateNotifier<HabitsState> {
       final updated = [...state.valueOrNull ?? <HabitModel>[], tempHabit];
       state = AsyncValue.data(updated);
       await _cacheHabits(updated);
-      await _scheduleReminder(tempHabit);
+      await _scheduleReminder(
+        tempHabit,
+        isCompletedToday: tempHabit.completedDates.contains(todayStr),
+      );
+
+      // Register with background sync engine
+      await SyncManager.instance.enqueue(
+        SyncAction(
+          type: SyncActionType.createHabit,
+          endpoint: '/habits',
+          method: 'POST',
+          payload: tempHabit.toCreateJson(),
+          tempId: tempHabit.id,
+        ),
+      );
     }
+    DioCacheInterceptor().invalidateTag('habits');
   }
 
-  /// Save edits to an existing habit: PATCHes the backend (when it has a real
-  /// id), updates local state/cache, and re-arms the device reminder — old
-  /// slots are cancelled and a fresh schedule is created for the new time (or
-  /// nothing when the reminder was removed).
   Future<void> updateHabit(HabitModel habit) async {
     _dirtySinceLoad = true;
+    DioCacheInterceptor().invalidateTag('habits');
 
     if (!habit.id.startsWith('temp_')) {
       try {
         final client = DioClient();
-        await client.dio.patch('/habits/${habit.id}', data: habit.toCreateJson());
+        await client.dio
+            .patch('/habits/${habit.id}', data: habit.toCreateJson());
       } catch (_) {
-        // Keep the optimistic state — the edit still lands locally and will be
-        // re-pushed on the next sync.
+        // Enqueue to background sync manager
+        await SyncManager.instance.enqueue(
+          SyncAction(
+            type: SyncActionType.updateHabit,
+            endpoint: '/habits/${habit.id}',
+            method: 'PATCH',
+            payload: habit.toCreateJson(),
+          ),
+        );
       }
     }
 
@@ -141,13 +278,39 @@ class HabitsNotifier extends StateNotifier<HabitsState> {
 
     // Re-arm: cancel the old reminder schedule, then schedule the new one
     // (no-op when the reminder time was removed).
+    final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
     await NotificationService.cancelHabitReminder(habit.id);
-    await _scheduleReminder(habit);
+    await _scheduleReminder(
+      habit,
+      isCompletedToday: habit.completedDates.contains(todayStr),
+    );
   }
 
-  Future<void> toggleCompletion(HabitModel habit, DateTime date) async {
+  Future<void> toggleCompletion(
+    HabitModel habit,
+    DateTime date, {
+    bool debounce = false,
+  }) async {
     _dirtySinceLoad = true;
     final dateStr = DateFormat('yyyy-MM-dd').format(date);
+    final toggleKey = '${habit.id}_$dateStr';
+
+    final now = DateTime.now();
+    if (debounce) {
+      final lastToggle = _lastToggleTime[toggleKey];
+      if (lastToggle != null &&
+          now.difference(lastToggle).inMilliseconds < 450) {
+        debugPrint(
+            '[HabitsNotifier] Debounce: ignoring rapid tap on $toggleKey');
+        return;
+      }
+      _lastToggleTime[toggleKey] = now;
+    }
+
+    _dirtySinceLoad = true;
+
+    // Invalidate Dio cache for habits tag immediately
+    DioCacheInterceptor().invalidateTag('habits');
 
     // Resolve against the current state copy so stale caller data can never
     // bypass the guards below.
@@ -164,6 +327,9 @@ class HabitsNotifier extends StateNotifier<HabitsState> {
     // habit is in exactly one state (Pending / Completed / Skipped) per day.
     if (!isCompleted && currentHabit.skippedDates.contains(dateStr)) return;
 
+    final newCompletedStatus = !isCompleted;
+    _recentLocalToggles[toggleKey] = (newCompletedStatus, now);
+
     // Optimistic update, then persist locally so completions survive restarts.
     final updated = (state.valueOrNull ?? <HabitModel>[]).map((h) {
       if (h.id != habit.id) return h;
@@ -175,43 +341,127 @@ class HabitsNotifier extends StateNotifier<HabitsState> {
         if (!newCompleted.contains(dateStr)) newCompleted.add(dateStr);
         newSkipped.remove(dateStr); // completing clears any skip for that day
       }
-      return h.copyWith(completedDates: newCompleted, skippedDates: newSkipped);
+      final temp = h.copyWith(
+        completedDates: newCompleted,
+        skippedDates: newSkipped,
+      );
+      final newHabitStreak = calculateHabitStreak(temp);
+      return temp.copyWith(
+        currentStreak: newHabitStreak,
+        totalCompleted: isCompleted
+            ? (h.totalCompleted > 0 ? h.totalCompleted - 1 : 0)
+            : h.totalCompleted + 1,
+      );
     }).toList();
     state = AsyncValue.data(updated);
     await _cacheHabits(updated);
 
-    // Cancel or restore the local device-side reminder:
-    // If just completed TODAY → cancel the reminder so it won't fire again.
-    // If un-completed TODAY → reschedule so the user gets reminded again.
+    // Maintain the local device-side reminder:
+    // If completed TODAY → reschedule with isCompletedToday: true (skips today, arms tomorrow)
+    // If un-completed TODAY → reschedule with isCompletedToday: false (arms today if not yet passed)
     final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
     if (dateStr == todayStr) {
-      if (!isCompleted) {
-        // Just marked completed → cancel today's local notification
-        await NotificationService.cancelHabitReminder(habit.id);
-      } else {
-        // Just un-completed → reschedule the reminder
-        final updatedHabit = updated.firstWhere(
-          (h) => h.id == habit.id,
-          orElse: () => currentHabit,
-        );
-        await _scheduleReminder(updatedHabit);
-      }
+      final updatedHabit = updated.firstWhere(
+        (h) => h.id == habit.id,
+        orElse: () => currentHabit,
+      );
+      await _scheduleReminder(updatedHabit, isCompletedToday: !isCompleted);
     }
 
     if (!habit.id.startsWith('temp_')) {
-      try {
-        final client = DioClient();
-        if (isCompleted) {
-          await client.dio.delete('/habit-logs/${habit.id}/$dateStr');
-        } else {
-          await client.dio.post('/habit-logs', data: {
-            'habitId': habit.id,
-            'date': dateStr,
-          });
-        }
-      } catch (_) {
-        // Keep optimistic state
+      unawaited(_dispatchToggleApi(habit.id, dateStr, isCompleted));
+    }
+  }
+
+  Future<void> _dispatchToggleApi(
+    String habitId,
+    String dateStr,
+    bool wasCompleted,
+  ) async {
+    try {
+      final client = DioClient();
+      if (wasCompleted) {
+        await client.dio.delete('/habit-logs/$habitId/$dateStr');
+      } else {
+        await client.dio.post('/habit-logs', data: {
+          'habitId': habitId,
+          'date': dateStr,
+        });
       }
+    } catch (_) {
+      // Enqueue to background sync manager
+      await SyncManager.instance.enqueue(
+        SyncAction(
+          type: SyncActionType.toggleHabit,
+          endpoint: wasCompleted
+              ? '/habit-logs/$habitId/$dateStr'
+              : '/habit-logs',
+          method: wasCompleted ? 'DELETE' : 'POST',
+          payload:
+              wasCompleted ? null : {'habitId': habitId, 'date': dateStr},
+        ),
+      );
+    }
+  }
+
+  /// Batch applies widget toggles at once to eliminate staggered one-by-one UI updates.
+  Future<void> batchApplyWidgetToggles(
+      List<Map<String, dynamic>> toggles) async {
+    if (toggles.isEmpty) return;
+    final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+    final currentHabits = state.valueOrNull ?? await _readCachedHabits() ?? [];
+    if (currentHabits.isEmpty) return;
+
+    var updated = List<HabitModel>.from(currentHabits);
+    bool anyChanged = false;
+
+    for (final item in toggles) {
+      final habitId = item['id'] as String?;
+      final desiredCompleted = item['completed'] as bool?;
+      if (habitId == null || habitId.isEmpty || desiredCompleted == null) {
+        continue;
+      }
+
+      updated = updated.map((h) {
+        if (h.id != habitId) return h;
+        final isCompleted = h.completedDates.contains(todayStr);
+        if (isCompleted != desiredCompleted) {
+          anyChanged = true;
+          final newCompleted = List<String>.from(h.completedDates);
+          final newSkipped = List<String>.from(h.skippedDates);
+          int newStreak = h.currentStreak;
+          int newTotal = h.totalCompleted;
+          if (desiredCompleted) {
+            if (!newCompleted.contains(todayStr)) newCompleted.add(todayStr);
+            newSkipped.remove(todayStr);
+            newStreak++;
+            newTotal++;
+          } else {
+            newCompleted.remove(todayStr);
+            if (newStreak > 0) newStreak--;
+            if (newTotal > 0) newTotal--;
+          }
+          final toggleKey = '${h.id}_$todayStr';
+          _recentLocalToggles[toggleKey] = (desiredCompleted, DateTime.now());
+          if (!h.id.startsWith('temp_')) {
+            unawaited(_dispatchToggleApi(h.id, todayStr, !desiredCompleted));
+          }
+          return h.copyWith(
+            completedDates: newCompleted,
+            skippedDates: newSkipped,
+            currentStreak: newStreak,
+            totalCompleted: newTotal,
+          );
+        }
+        return h;
+      }).toList();
+    }
+
+    if (anyChanged) {
+      _dirtySinceLoad = true;
+      state = AsyncValue.data(updated);
+      await _cacheHabits(updated);
     }
   }
 
@@ -222,19 +472,40 @@ class HabitsNotifier extends StateNotifier<HabitsState> {
   }) async {
     _dirtySinceLoad = true;
     final dateStr = DateFormat('yyyy-MM-dd').format(date);
+    final toggleKey = '${habit.id}_$dateStr';
+    _recentLocalToggles[toggleKey] = (false, DateTime.now());
+    DioCacheInterceptor().invalidateTag('habits');
 
     // Optimistic update, then persist locally. Skipping is idempotent (never
     // adds the same date twice) and always clears any completion for that day
     // so a habit is in exactly one state per date.
     final updated = (state.valueOrNull ?? <HabitModel>[]).map((h) {
       if (h.id != habit.id) return h;
+      final wasCompleted = h.completedDates.contains(dateStr);
       final newSkipped = List<String>.from(h.skippedDates);
       if (!newSkipped.contains(dateStr)) newSkipped.add(dateStr);
       final newCompleted = List<String>.from(h.completedDates)..remove(dateStr);
-      return h.copyWith(skippedDates: newSkipped, completedDates: newCompleted);
+      int newTotal = h.totalCompleted;
+      if (wasCompleted && newTotal > 0) newTotal--;
+      final temp = h.copyWith(
+        skippedDates: newSkipped,
+        completedDates: newCompleted,
+        totalCompleted: newTotal,
+      );
+      final newHabitStreak = calculateHabitStreak(temp);
+      return temp.copyWith(currentStreak: newHabitStreak);
     }).toList();
     state = AsyncValue.data(updated);
     await _cacheHabits(updated);
+
+    final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    if (dateStr == todayStr) {
+      final updatedHabit = updated.firstWhere(
+        (h) => h.id == habit.id,
+        orElse: () => habit,
+      );
+      await _scheduleReminder(updatedHabit, isCompletedToday: true);
+    }
 
     if (!habit.id.startsWith('temp_')) {
       try {
@@ -245,13 +516,26 @@ class HabitsNotifier extends StateNotifier<HabitsState> {
           'reason': reason,
         });
       } catch (_) {
-        // Keep optimistic state
+        // Enqueue to background sync manager
+        await SyncManager.instance.enqueue(
+          SyncAction(
+            type: SyncActionType.skipHabit,
+            endpoint: '/habit-logs/skip',
+            method: 'POST',
+            payload: {
+              'habitId': habit.id,
+              'date': dateStr,
+              'reason': reason,
+            },
+          ),
+        );
       }
     }
   }
 
   Future<void> deleteHabit(String habitId) async {
     _dirtySinceLoad = true;
+    DioCacheInterceptor().invalidateTag('habits');
     // Remove any scheduled local reminder for this habit.
     await NotificationService.cancelHabitReminder(habitId);
     final updated = (state.valueOrNull ?? <HabitModel>[])
@@ -264,29 +548,37 @@ class HabitsNotifier extends StateNotifier<HabitsState> {
       try {
         final client = DioClient();
         await client.dio.delete('/habits/$habitId');
-      } catch (_) {}
+      } catch (_) {
+        // Enqueue to background sync manager
+        await SyncManager.instance.enqueue(
+          SyncAction(
+            type: SyncActionType.deleteHabit,
+            endpoint: '/habits/$habitId',
+            method: 'DELETE',
+          ),
+        );
+      }
     }
   }
 
   // ─── Device-side reminders (local fallback for the backend FCM push) ────────
 
   /// (Re)arm local reminders for every habit that has a reminderTime.
-  /// Skips habits already completed today — no point reminding about something
-  /// the user has already done.
+  /// If already completed today, schedules the next instance starting tomorrow
+  /// so today's reminder is skipped while tomorrow's remains active.
   Future<void> _rescheduleAllReminders(List<HabitModel> habits) async {
     final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
     for (final habit in habits) {
-      if (habit.completedDates.contains(todayStr)) {
-        // Already done today — cancel any lingering local notification
-        await NotificationService.cancelHabitReminder(habit.id);
-        continue;
-      }
-      await _scheduleReminder(habit);
+      final isCompletedToday = habit.completedDates.contains(todayStr);
+      await _scheduleReminder(habit, isCompletedToday: isCompletedToday);
     }
   }
 
   /// Schedule the device-side reminder for [habit] (no-op without a time).
-  Future<void> _scheduleReminder(HabitModel habit) async {
+  Future<void> _scheduleReminder(
+    HabitModel habit, {
+    bool isCompletedToday = false,
+  }) async {
     final reminderTime = habit.reminderTime;
     if (reminderTime == null || reminderTime.isEmpty) return;
     final parts = reminderTime.split(':');
@@ -302,6 +594,7 @@ class HabitsNotifier extends StateNotifier<HabitsState> {
       hour: hour,
       minute: minute,
       repeatDays: habit.repeatDays,
+      skipToday: isCompletedToday,
     );
   }
 
@@ -312,6 +605,17 @@ class HabitsNotifier extends StateNotifier<HabitsState> {
       _cacheName,
       habits.map((h) => h.toJson()).toList(),
     );
+    await _syncHomeWidgets(habits);
+  }
+
+  static Future<void> _syncHomeWidgets(List<HabitModel> habits) async {
+    try {
+      final streak = calculateCurrentStreak(habits);
+      await HomeWidgetService.instance.syncHabitsData(
+        habits: habits,
+        overallStreak: streak,
+      );
+    } catch (_) {}
   }
 
   static Future<List<HabitModel>?> _readCachedHabits() async {
@@ -321,6 +625,74 @@ class HabitsNotifier extends StateNotifier<HabitsState> {
           .map((e) => HabitModel.fromJson(e as Map<String, dynamic>))
           .toList(),
     );
+  }
+
+  Future<List<HabitModel>> _reconcilePendingWidgetToggles(
+      List<HabitModel> habits) async {
+    if (habits.isEmpty) return habits;
+    try {
+      final pendingStr =
+          await HomeWidget.getWidgetData<String>('pending_widget_toggles');
+      if (pendingStr == null || pendingStr.isEmpty || pendingStr == '[]') {
+        return habits;
+      }
+      final list = jsonDecode(pendingStr) as List<dynamic>;
+      if (list.isEmpty) return habits;
+
+      final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      var updated = List<HabitModel>.from(habits);
+      bool anyChanged = false;
+
+      for (final item in list) {
+        if (item is Map) {
+          final habitId = item['id'] as String?;
+          final desiredCompleted = item['completed'] as bool?;
+          if (habitId == null || habitId.isEmpty) continue;
+
+          updated = updated.map((h) {
+            if (h.id != habitId) return h;
+            final isCompleted = h.completedDates.contains(todayStr);
+            if (desiredCompleted != null && isCompleted != desiredCompleted) {
+              anyChanged = true;
+              final newCompleted = List<String>.from(h.completedDates);
+              final newSkipped = List<String>.from(h.skippedDates);
+              int newStreak = h.currentStreak;
+              int newTotal = h.totalCompleted;
+              if (desiredCompleted) {
+                if (!newCompleted.contains(todayStr)) {
+                  newCompleted.add(todayStr);
+                }
+                newSkipped.remove(todayStr);
+                newStreak++;
+                newTotal++;
+              } else {
+                newCompleted.remove(todayStr);
+                if (newStreak > 0) newStreak--;
+                if (newTotal > 0) newTotal--;
+              }
+              // Record in _recentLocalToggles so in-flight or subsequent server fetch preserves it
+              final toggleKey = '${h.id}_$todayStr';
+              _recentLocalToggles[toggleKey] =
+                  (desiredCompleted, DateTime.now());
+              return h.copyWith(
+                completedDates: newCompleted,
+                skippedDates: newSkipped,
+                currentStreak: newStreak,
+                totalCompleted: newTotal,
+              );
+            }
+            return h;
+          }).toList();
+        }
+      }
+
+      if (anyChanged) {
+        await _cacheHabits(updated);
+      }
+      return updated;
+    } catch (_) {
+      return habits;
+    }
   }
 }
 
@@ -332,7 +704,7 @@ class HabitsNotifier extends StateNotifier<HabitsState> {
 /// that is skipped or missing breaks it. A habit with no repeat day selected
 /// is treated as daily.
 int calculateHabitStreak(HabitModel habit, {DateTime? from}) {
-  if (habit.completedDates.isEmpty) return 0;
+  if (habit.completedDates.isEmpty && habit.currentStreak == 0) return 0;
   final completed = habit.completedDates.toSet();
   final hasRepeatDay = habit.repeatDays.any((d) => d);
   final now = from ?? DateTime.now();
@@ -365,7 +737,8 @@ int calculateHabitStreak(HabitModel habit, {DateTime? from}) {
     }
     day = day.subtract(const Duration(days: 1));
   }
-  return streak;
+  // Return the calculated streak or habit.currentStreak if it has historical streak
+  return streak > habit.currentStreak ? streak : habit.currentStreak;
 }
 
 int calculateCurrentStreak(List<HabitModel> habits, {DateTime? from}) {
@@ -533,7 +906,7 @@ int calculateLongestStreak(List<HabitModel> habits, {DateTime? from}) {
     }
   }
 
-  final current = calculateCurrentStreak(habits);
+  final current = calculateCurrentStreak(habits, from: from);
   if (current > longestStreak) {
     longestStreak = current;
   }
@@ -551,7 +924,8 @@ final todayHabitsProvider = Provider<AsyncValue<List<HabitModel>>>((ref) {
 
 final completedHabitsCountProvider = Provider<int>((ref) {
   return ref.watch(habitsProvider).when(
-        data: (habits) => habits.fold<int>(0, (sum, h) => sum + h.completedDates.length),
+        data: (habits) =>
+            habits.fold<int>(0, (sum, h) => sum + h.completedDates.length),
         loading: () => 0,
         error: (_, __) => 0,
       );
@@ -601,7 +975,8 @@ class WeeklyHabitStats {
   );
 }
 
-WeeklyHabitStats calculateWeeklyHabitStats(List<HabitModel> habits, {DateTime? now}) {
+WeeklyHabitStats calculateWeeklyHabitStats(List<HabitModel> habits,
+    {DateTime? now}) {
   if (habits.isEmpty) return WeeklyHabitStats.empty;
 
   final current = now ?? DateTime.now();
@@ -652,4 +1027,3 @@ final weeklyHabitStatsProvider = Provider<WeeklyHabitStats>((ref) {
         error: (_, __) => WeeklyHabitStats.empty,
       );
 });
-

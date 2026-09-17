@@ -17,3 +17,7 @@ npm-debug.log*
 .DS_Store
 .idea/
 .vscode/
+
+# credentials
+service-account*.json
+*.pem

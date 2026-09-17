@@ -14,6 +14,11 @@ import { getMessaging } from 'firebase-admin/messaging';
  * Initialization is lazy and best-effort: if the vars are missing the service
  * simply logs once and skips sending, so the app works without push configured.
  */
+export interface FcmPushResult {
+  success: boolean;
+  isUnregistered: boolean;
+}
+
 @Injectable()
 export class FcmService {
   private readonly logger = new Logger(FcmService.name);
@@ -40,14 +45,23 @@ export class FcmService {
     }
 
     try {
-      // The private key arrives from .env with literal \n sequences; normalize
-      // them so the PEM block is valid.
-      const normalizedKey = privateKey.replace(/\n/g, '\n');
+      // Normalize private key:
+      // 1. Strip surrounding quotes if the user pasted them from JSON or .env
+      let cleanedKey = privateKey.trim();
+      if (
+        (cleanedKey.startsWith('"') && cleanedKey.endsWith('"')) ||
+        (cleanedKey.startsWith("'") && cleanedKey.endsWith("'"))
+      ) {
+        cleanedKey = cleanedKey.slice(1, -1);
+      }
+      // 2. Replace literal \n two-character sequences with real newlines
+      const normalizedKey = cleanedKey.replace(/\\n/g, '\n');
+
       if (getApps().length === 0) {
         initializeApp({
           credential: cert({
-            projectId,
-            clientEmail,
+            projectId: projectId.trim(),
+            clientEmail: clientEmail.trim(),
             privateKey: normalizedKey,
           }),
         });
@@ -55,7 +69,7 @@ export class FcmService {
         getApp();
       }
       this.initialized = true;
-      this.logger.log('Firebase Admin initialized for FCM');
+      this.logger.log('Firebase Admin initialized successfully for FCM');
       return true;
     } catch (e) {
       this.logger.error(`Firebase Admin init failed: ${(e as Error).message}`);
@@ -65,17 +79,17 @@ export class FcmService {
 
   /**
    * Send a push notification to a device token.
-   * @returns true if the message was accepted by FCM, false otherwise
-   * (including when FCM isn't configured or the token is invalid/revoked).
+   * @returns FcmPushResult detailing whether the message was delivered or token is unregistered.
    */
   async sendPush(params: {
     token: string;
     title: string;
     body: string;
     data?: Record<string, string>;
-  }): Promise<boolean> {
-    if (!this.ensureInitialized()) return false;
-    if (!params.token) return false;
+  }): Promise<FcmPushResult> {
+    if (!this.ensureInitialized())
+      return { success: false, isUnregistered: false };
+    if (!params.token) return { success: false, isUnregistered: false };
 
     try {
       const message = {
@@ -95,15 +109,24 @@ export class FcmService {
         data: params.data ?? {},
       };
       await getMessaging().send(message);
-      return true;
+      return { success: true, isUnregistered: false };
     } catch (e) {
-      // UNREGISTERED / INVALID_ARGUMENT means the token is dead — the caller
-      // can decide whether to clear it (handled by NotificationsService).
       const err = e as { code?: string; message?: string };
+      const code = err.code ?? '';
+      const message = err.message ?? '';
+      const isUnregistered =
+        code.includes('registration-token-not-registered') ||
+        code.includes('invalid-registration-token') ||
+        code.includes('UNREGISTERED') ||
+        code.includes('INVALID_ARGUMENT') ||
+        message.includes('not registered') ||
+        message.includes('Requested entity was not found') ||
+        message.includes('invalid registration token');
+
       this.logger.debug(
-        `FCM send failed (${err.code ?? 'unknown'}): ${err.message ?? e}`,
+        `FCM send failed (${code || 'unknown'}): ${message || e}`,
       );
-      return false;
+      return { success: false, isUnregistered };
     }
   }
 }

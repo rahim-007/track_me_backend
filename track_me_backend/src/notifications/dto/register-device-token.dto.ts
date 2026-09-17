@@ -6,4 +6,12 @@ export class RegisterDeviceTokenDto {
   @IsString()
   @IsOptional()
   token?: string;
+
+  @ApiProperty({
+    description: 'Device platform (e.g. android, ios, web)',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  platform?: string;
 }

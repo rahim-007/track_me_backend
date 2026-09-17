@@ -7,6 +7,10 @@ import 'app_colors.dart';
 class AppTheme {
   AppTheme._();
 
+  static final TextTheme _cachedTextTheme = _buildTextTheme();
+  static ThemeData? _cachedLightTheme;
+  static ThemeData? _cachedDarkTheme;
+
   // ─── Shared Text Theme Builder ─────────────────────────────────────────────
   static TextTheme _buildTextTheme() {
     return GoogleFonts.interTextTheme().copyWith(
@@ -356,6 +360,10 @@ class AppTheme {
   // ─── Light Theme ───────────────────────────────────────────────────────────
 
   static ThemeData get lightTheme {
+    return _cachedLightTheme ??= _createLightTheme();
+  }
+
+  static ThemeData _createLightTheme() {
     final colorScheme = ColorScheme.fromSeed(
       seedColor: AppColors.primary,
       brightness: Brightness.light,
@@ -373,7 +381,7 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
-      textTheme: _buildTextTheme(),
+      textTheme: _cachedTextTheme,
       scaffoldBackgroundColor: AppColors.background,
       appBarTheme: _lightAppBarTheme,
       cardTheme: _cardTheme,
@@ -397,6 +405,10 @@ class AppTheme {
   // ─── Dark Theme ────────────────────────────────────────────────────────────
 
   static ThemeData get darkTheme {
+    return _cachedDarkTheme ??= _createDarkTheme();
+  }
+
+  static ThemeData _createDarkTheme() {
     final colorScheme = ColorScheme.fromSeed(
       seedColor: AppColors.primary,
       brightness: Brightness.dark,
@@ -414,7 +426,7 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
-      textTheme: _buildTextTheme(),
+      textTheme: _cachedTextTheme,
       scaffoldBackgroundColor: AppColors.background,
       appBarTheme: _darkAppBarTheme,
       cardTheme: _cardTheme,

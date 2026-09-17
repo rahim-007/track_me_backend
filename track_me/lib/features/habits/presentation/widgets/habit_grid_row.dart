@@ -6,7 +6,6 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shadows.dart';
 import '../../data/models/habit_model.dart';
 import '../../providers/habits_provider.dart';
-import '../screens/habits_screen.dart';
 import 'add_habit_dialog.dart';
 import 'habit_3d_checkbox.dart';
 
@@ -17,12 +16,12 @@ class HabitGridRow extends ConsumerWidget {
   final void Function(DateTime date) onSkip;
 
   const HabitGridRow({
-    key,
+    super.key,
     required this.habit,
     required this.selectedDate,
     required this.onComplete,
     required this.onSkip,
-  }) : super(key: key);
+  });
 
   /// Per-habit streak: consecutive *scheduled* days completed (unscheduled
   /// days are ignored, so a Mon/Wed/Fri habit is never broken by Tue/Thu).
@@ -82,19 +81,19 @@ class HabitGridRow extends ConsumerWidget {
     final isSkipped = _isSkippedToday;
     final isFuture = _isFutureDate;
     final weeklyProgress = _weeklyCompletionRate;
-    final percentage = (weeklyProgress * 100).round();
     final streak = _streak;
 
-    return GestureDetector(
-      onTap: () => _showDetailsSheet(context, ref),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        height: 120,
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: AppShadows.raised,
-        ),
+    return RepaintBoundary(
+      child: GestureDetector(
+        onTap: () => _showDetailsSheet(context, ref),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          height: 120,
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: AppShadows.raised,
+          ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(24),
           child: Stack(
@@ -306,8 +305,9 @@ class HabitGridRow extends ConsumerWidget {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   void _showDetailsSheet(BuildContext context, WidgetRef ref) {
     final categoryColor = _getCategoryColor();

@@ -56,8 +56,8 @@ void main() {
     expect(find.text('Positive'), findsOneWidget);
     expect(find.text('+₹45,200'), findsOneWidget);
 
-    // 2. Inflow / Outflow
-    expect(find.text('Inflow'), findsOneWidget);
+    // 2. Income / Outflow
+    expect(find.text('Income'), findsOneWidget);
     expect(find.text('+₹65,000'), findsOneWidget);
     expect(find.text('Outflow'), findsOneWidget);
     expect(find.text('-₹19,800'), findsOneWidget);

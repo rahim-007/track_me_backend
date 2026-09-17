@@ -27,11 +27,8 @@ export class HabitLogsService {
       where: { habitId, date: parsedDate, userId },
     });
 
-    // Idempotent + state-safe: a repeated tap on an already-completed habit is
-    // a no-op, and an existing Skipped record must NEVER flip to Completed from
-    // a blind completion request. The app un-completes via DELETE first, so a
-    // fresh completion always creates a brand-new record here.
-    if (existing) {
+    // Idempotent: repeated tap on an already-completed habit is a no-op
+    if (existing && !existing.isSkipped) {
       return existing;
     }
 
@@ -51,19 +48,21 @@ export class HabitLogsService {
       },
     });
 
-    // totalCompleted counts distinct completed logs. Only increment when this
-    // is a brand-new completion (not when converting a skip back to complete).
-    if (!existing) {
-      await this.prisma.habit.update({
-        where: { id: habitId },
-        data: { totalCompleted: { increment: 1 } },
-      });
-    }
+    // Increment totalCompleted when converting from skip or creating a brand-new completion
+    await this.prisma.habit.update({
+      where: { id: habitId },
+      data: { totalCompleted: { increment: 1 } },
+    });
 
     return log;
   }
 
-  async skipHabit(userId: string, habitId: string, date: string, reason: string) {
+  async skipHabit(
+    userId: string,
+    habitId: string,
+    date: string,
+    reason: string,
+  ) {
     await this.assertOwnedHabit(userId, habitId);
     const parsedDate = new Date(date);
 
@@ -131,10 +130,18 @@ export class HabitLogsService {
     const [total, completed, skipped] = await Promise.all([
       this.prisma.habit.count({ where: { userId, isActive: true } }),
       this.prisma.habitLog.count({
-        where: { userId, isSkipped: false, date: { gte: weekStart, lte: weekEnd } },
+        where: {
+          userId,
+          isSkipped: false,
+          date: { gte: weekStart, lte: weekEnd },
+        },
       }),
       this.prisma.habitLog.count({
-        where: { userId, isSkipped: true, date: { gte: weekStart, lte: weekEnd } },
+        where: {
+          userId,
+          isSkipped: true,
+          date: { gte: weekStart, lte: weekEnd },
+        },
       }),
     ]);
 
@@ -142,7 +149,8 @@ export class HabitLogsService {
       totalHabits: total,
       completedThisWeek: completed,
       skippedThisWeek: skipped,
-      completionRate: total > 0 ? Math.round((completed / (total * 7)) * 100) : 0,
+      completionRate:
+        total > 0 ? Math.round((completed / (total * 7)) * 100) : 0,
     };
   }
 

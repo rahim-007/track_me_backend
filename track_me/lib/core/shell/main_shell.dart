@@ -2,14 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../router/app_router.dart';
 import '../theme/app_colors.dart';
 import '../theme/theme_provider.dart';
 
 class MainShell extends ConsumerStatefulWidget {
-  final Widget child;
+  final StatefulNavigationShell navigationShell;
 
-  const MainShell({super.key, required this.child});
+  const MainShell({super.key, required this.navigationShell});
 
   @override
   ConsumerState<MainShell> createState() => _MainShellState();
@@ -18,35 +17,11 @@ class MainShell extends ConsumerStatefulWidget {
 class _MainShellState extends ConsumerState<MainShell> {
   double _dragDistance = 0;
 
-  int _locationToIndex(String location) {
-    if (location.startsWith(AppRoutes.habits)) return 1;
-    if (location.startsWith(AppRoutes.goals)) return 2;
-    if (location.startsWith(AppRoutes.cashflow)) return 3;
-    if (location.startsWith(AppRoutes.profile)) return 4;
-    return 0;
-  }
-
-  void _onNavTap(BuildContext context, int index) {
-    final currentIndex = _locationToIndex(GoRouterState.of(context).uri.toString());
-    if (index == currentIndex) return;
-
-    switch (index) {
-      case 0:
-        context.go(AppRoutes.dashboard);
-        break;
-      case 1:
-        context.go(AppRoutes.habits);
-        break;
-      case 2:
-        context.go(AppRoutes.goals);
-        break;
-      case 3:
-        context.go(AppRoutes.cashflow);
-        break;
-      case 4:
-        context.go(AppRoutes.profile);
-        break;
-    }
+  void _onNavTap(int index) {
+    widget.navigationShell.goBranch(
+      index,
+      initialLocation: index == widget.navigationShell.currentIndex,
+    );
   }
 
   @override
@@ -54,8 +29,7 @@ class _MainShellState extends ConsumerState<MainShell> {
     // Watch themeProvider to rebuild MainShell instantly when dark mode is toggled
     ref.watch(themeProvider);
 
-    final location = GoRouterState.of(context).uri.toString();
-    final selectedIndex = _locationToIndex(location);
+    final selectedIndex = widget.navigationShell.currentIndex;
 
     return Scaffold(
       body: GestureDetector(
@@ -74,13 +48,13 @@ class _MainShellState extends ConsumerState<MainShell> {
           // Drag Left (finger moves right to left, negative delta) -> Navigate to Next Screen
           if (_dragDistance < -minDistance || velocity < -minVelocity) {
             if (selectedIndex < 4) {
-              _onNavTap(context, selectedIndex + 1);
+              _onNavTap(selectedIndex + 1);
             }
           }
           // Drag Right (finger moves left to right, positive delta) -> Navigate to Previous Screen
           else if (_dragDistance > minDistance || velocity > minVelocity) {
             if (selectedIndex > 0) {
-              _onNavTap(context, selectedIndex - 1);
+              _onNavTap(selectedIndex - 1);
             }
           }
           _dragDistance = 0;
@@ -88,11 +62,11 @@ class _MainShellState extends ConsumerState<MainShell> {
         onHorizontalDragCancel: () {
           _dragDistance = 0;
         },
-        child: widget.child,
+        child: widget.navigationShell,
       ),
       bottomNavigationBar: _ClayBottomNavBar(
         selectedIndex: selectedIndex,
-        onTap: (index) => _onNavTap(context, index),
+        onTap: _onNavTap,
       ),
     );
   }
@@ -144,16 +118,16 @@ class _ClayBottomNavBar extends StatelessWidget {
                 onTap: () => onTap(1),
               ),
               _ClayNavItem(
-                icon: Icons.flag_rounded,
-                unselectedIcon: Icons.flag_outlined,
-                label: 'Goals',
+                icon: Icons.account_balance_wallet_rounded,
+                unselectedIcon: Icons.account_balance_wallet_outlined,
+                label: 'Cash Flow',
                 isSelected: selectedIndex == 2,
                 onTap: () => onTap(2),
               ),
               _ClayNavItem(
-                icon: Icons.account_balance_wallet_rounded,
-                unselectedIcon: Icons.account_balance_wallet_outlined,
-                label: 'Cash Flow',
+                icon: Icons.flag_rounded,
+                unselectedIcon: Icons.flag_outlined,
+                label: 'Goals',
                 isSelected: selectedIndex == 3,
                 onTap: () => onTap(3),
               ),

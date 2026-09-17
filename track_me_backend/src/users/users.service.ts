@@ -1,15 +1,25 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { computeOverallStreaks } from '../streaks/streaks.util';
+import {
+  computeHabitStreaks,
+  computeOverallStreaks,
+  getUserNow,
+} from '../streaks/streaks.util';
 
 @Injectable()
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
   async calculateUserStreak(userId: string) {
-    const habits = await this.prisma.habit.findMany({
-      where: { userId },
-    });
+    const [user, habits] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { timezone: true },
+      }),
+      this.prisma.habit.findMany({
+        where: { userId },
+      }),
+    ]);
 
     if (habits.length === 0) {
       await this.prisma.user.update({
@@ -19,6 +29,8 @@ export class UsersService {
       return { currentStreak: 0, longestStreak: 0 };
     }
 
+    const userNow = getUserNow(user?.timezone);
+
     // Earliest habit creation date
     let earliestHabitDate: Date | null = null;
     for (const h of habits) {
@@ -27,34 +39,67 @@ export class UsersService {
       }
     }
     if (!earliestHabitDate) {
-      earliestHabitDate = new Date();
+      earliestHabitDate = userNow;
     }
 
     // Cap the scan window to one year so streak computation stays fast for
     // long-time users instead of walking every day since the first habit.
-    const windowStart = new Date();
+    const windowStart = new Date(userNow);
     windowStart.setUTCDate(windowStart.getUTCDate() - 366);
-    const scanStart = earliestHabitDate < windowStart ? windowStart : earliestHabitDate;
+    const scanStart =
+      earliestHabitDate < windowStart ? windowStart : earliestHabitDate;
 
     const logs = await this.prisma.habitLog.findMany({
       where: {
         userId,
         date: {
           gte: new Date(
-            Date.UTC(scanStart.getUTCFullYear(), scanStart.getUTCMonth(), scanStart.getUTCDate()),
+            Date.UTC(
+              scanStart.getUTCFullYear(),
+              scanStart.getUTCMonth(),
+              scanStart.getUTCDate(),
+            ),
           ),
         },
       },
     });
 
-    const { currentStreak, longestStreak } = computeOverallStreaks(habits, logs);
+    const { currentStreak, longestStreak } = computeOverallStreaks(
+      habits,
+      logs,
+      userNow,
+    );
+
+    // Also check max individual habit streak so users with completed habits don't get 0 overall streak
+    let maxHabitStreak = 0;
+    let maxHabitLongest = 0;
+    const completedByHabit = new Map<string, Set<string>>();
+    for (const log of logs) {
+      if (log.isSkipped) continue;
+      const dateStr = log.date.toISOString().split('T')[0];
+      const existing = completedByHabit.get(log.habitId);
+      if (existing) {
+        existing.add(dateStr);
+      } else {
+        completedByHabit.set(log.habitId, new Set([dateStr]));
+      }
+    }
+    for (const h of habits) {
+      const set = completedByHabit.get(h.id) ?? new Set<string>();
+      const res = computeHabitStreaks(h, set, userNow);
+      if (res.currentStreak > maxHabitStreak) maxHabitStreak = res.currentStreak;
+      if (res.longestStreak > maxHabitLongest) maxHabitLongest = res.longestStreak;
+    }
+
+    const finalCurrent = Math.max(currentStreak, maxHabitStreak);
+    const finalLongest = Math.max(longestStreak, maxHabitLongest);
 
     await this.prisma.user.update({
       where: { id: userId },
-      data: { currentStreak, longestStreak },
+      data: { currentStreak: finalCurrent, longestStreak: finalLongest },
     });
 
-    return { currentStreak, longestStreak };
+    return { currentStreak: finalCurrent, longestStreak: finalLongest };
   }
 
   async getProfile(userId: string) {
@@ -105,10 +150,31 @@ export class UsersService {
     });
   }
 
-  async updateFcmToken(userId: string, fcmToken: string) {
+  async updateFcmToken(userId: string, fcmToken: string, platform = 'android') {
+    if (!fcmToken || fcmToken.trim().length === 0) {
+      await this.prisma.device.deleteMany({ where: { userId } });
+      return this.prisma.user.update({
+        where: { id: userId },
+        data: { fcmToken: null },
+      });
+    }
+
+    await this.prisma.device.upsert({
+      where: { fcmToken: fcmToken.trim() },
+      create: {
+        userId,
+        fcmToken: fcmToken.trim(),
+        platform: platform || 'android',
+      },
+      update: {
+        userId,
+        platform: platform || 'android',
+      },
+    });
+
     return this.prisma.user.update({
       where: { id: userId },
-      data: { fcmToken },
+      data: { fcmToken: fcmToken.trim() },
     });
   }
 
@@ -152,9 +218,10 @@ export class UsersService {
       const user = await tx.user.findUnique({ where: { id: userId } });
       if (!user) return null;
 
-      // Defensive: clear FCM token before cascade so no stale push can be
-      // attempted between the moment the delete starts and when the row is gone.
+      // Defensive: clear FCM token and devices before cascade so no stale push
+      // can be attempted between the moment the delete starts and when the row is gone.
       if (user.fcmToken) {
+        await tx.device.deleteMany({ where: { userId } });
         await tx.user.update({
           where: { id: userId },
           data: { fcmToken: null },
@@ -168,4 +235,3 @@ export class UsersService {
     });
   }
 }
-

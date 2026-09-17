@@ -10,7 +10,9 @@ function makePrismaMock(now = new Date(2026, 7, 15)) {
   const periods: any[] = [];
   const txns: any[] = [];
 
-  const mkPeriod = (p: Partial<any> & { userId: string; month: number; year: number }) => {
+  const mkPeriod = (
+    p: Partial<any> & { userId: string; month: number; year: number },
+  ) => {
     const row = {
       id: `p${++seq}`,
       openingBank: 0,
@@ -46,7 +48,11 @@ function makePrismaMock(now = new Date(2026, 7, 15)) {
           );
         }
         if (where.id && where.userId) {
-          return periods.find((p) => p.id === where.id && p.userId === where.userId) ?? null;
+          return (
+            periods.find(
+              (p) => p.id === where.id && p.userId === where.userId,
+            ) ?? null
+          );
         }
         if (where.id !== undefined && where.userId === undefined) {
           return periods.find((p) => p.id === where.id) ?? null;
@@ -61,11 +67,20 @@ function makePrismaMock(now = new Date(2026, 7, 15)) {
       findMany: async ({ where, orderBy }: any) => {
         const rows = periods.filter((p) => p.userId === where.userId);
         return rows.sort((a, b) =>
-          orderBy?.[0]?.year === 'asc' ? a.year - b.year || a.month - b.month : b.year - a.year || b.month - a.month,
+          orderBy?.[0]?.year === 'asc'
+            ? a.year - b.year || a.month - b.month
+            : b.year - a.year || b.month - a.month,
         );
       },
       create: async ({ data }: any) => {
-        if (periods.some((p) => p.userId === data.userId && p.month === data.month && p.year === data.year)) {
+        if (
+          periods.some(
+            (p) =>
+              p.userId === data.userId &&
+              p.month === data.month &&
+              p.year === data.year,
+          )
+        ) {
           throw new Error('Unique constraint failed');
         }
         return mkPeriod(data);
@@ -79,7 +94,10 @@ function makePrismaMock(now = new Date(2026, 7, 15)) {
       upsert: async ({ where, create }: any) => {
         const key = where.userId_month_year;
         const existing = periods.find(
-          (p) => p.userId === key.userId && p.month === key.month && p.year === key.year,
+          (p) =>
+            p.userId === key.userId &&
+            p.month === key.month &&
+            p.year === key.year,
         );
         if (existing) return existing;
         return mkPeriod({ userId: key.userId, ...create });
@@ -97,13 +115,21 @@ function makePrismaMock(now = new Date(2026, 7, 15)) {
       },
       findMany: async ({ where, select }: any) => {
         const rows = txns
-          .filter((t) => (where.periodId ? t.periodId === where.periodId : true))
-          .map((t) => (select ? ((t as any).__picked = true, t) : t));
+          .filter((t) =>
+            where.periodId ? t.periodId === where.periodId : true,
+          )
+          .map((t) => (select ? ((t.__picked = true), t) : t));
         return rows;
       },
       create: async ({ data }: any) => {
         const row = { id: `t${++seq}`, createdAt: now, note: null, ...data };
         txns.push(row);
+        return row;
+      },
+      update: async ({ where, data }: any) => {
+        const row = txns.find((t) => t.id === where.id);
+        if (!row) throw new Error('not found');
+        Object.assign(row, data);
         return row;
       },
       delete: async ({ where }: any) => {
@@ -141,8 +167,20 @@ describe('CashFlowPeriodService — month rollover & carry-forward', () => {
       openingBank: 40000,
     });
     prisma.txns.push(
-      { id: 't1', periodId: july.id, kind: 'INCOME', amount: 30000, category: 'E' },
-      { id: 't2', periodId: july.id, kind: 'OUTFLOW', amount: 12500.75, category: 'E' },
+      {
+        id: 't1',
+        periodId: july.id,
+        kind: 'INCOME',
+        amount: 30000,
+        category: 'E',
+      },
+      {
+        id: 't2',
+        periodId: july.id,
+        kind: 'OUTFLOW',
+        amount: 12500.75,
+        category: 'E',
+      },
     );
 
     const current = await svc.getCurrentPeriod('u1');
@@ -313,4 +351,93 @@ describe('CashFlowPeriodService — month rollover & carry-forward', () => {
     const currentAfter = await svc.getCurrentPeriod('u1');
     expect(currentAfter.openingBank).toBe(6000);
   });
+
+  it('correctly handles Decimal values from database', async () => {
+    const prisma = makePrismaMock();
+    const svc = new CashFlowPeriodService(prisma as any, () => FIXED_AUG_2026);
+
+    const period = prisma.mkPeriod({
+      userId: 'u1',
+      month: 8,
+      year: 2026,
+      openingBank: '1000.50',
+      openingCash: '200.25',
+    });
+    prisma.txns.push({
+      id: 't1',
+      periodId: period.id,
+      kind: 'INCOME',
+      amount: '500.50' as any,
+      category: 'E',
+    });
+
+    const serialized = await svc.getCurrentPeriod('u1');
+    expect(typeof serialized.openingBank).toBe('number');
+    expect(serialized.openingBank).toBe(1000.5);
+    expect(serialized.totalIncome).toBe(500.5);
+    expect(serialized.closingBank).toBe(1501);
+  });
+
+  it('updates an existing transaction and recalculates period balances without changing ID', async () => {
+    const prisma = makePrismaMock();
+    const svc = new CashFlowPeriodService(prisma as any, () => FIXED_AUG_2026);
+
+    const created = await svc.createTransaction('u1', {
+      kind: 'INCOME',
+      category: 'E',
+      account: 'BANK',
+      amount: 1000,
+      note: 'Original note',
+      date: '2026-08-05',
+    } as any);
+
+    expect(created.amount).toBe(1000);
+    expect(created.note).toBe('Original note');
+
+    const periodBefore = await svc.getCurrentPeriod('u1');
+    expect(periodBefore.totalIncome).toBe(1000);
+    expect(periodBefore.closingBank).toBe(1000);
+
+    const updated = await svc.updateTransaction('u1', created.id, {
+      amount: 1500,
+      note: 'Updated note',
+      account: 'CASH',
+    });
+
+    expect(updated.id).toBe(created.id);
+    expect(updated.amount).toBe(1500);
+    expect(updated.note).toBe('Updated note');
+    expect(updated.account).toBe('CASH');
+
+    const periodAfter = await svc.getCurrentPeriod('u1');
+    expect(periodAfter.totalIncome).toBe(1500);
+    expect(periodAfter.closingCash).toBe(1500);
+    expect(periodAfter.closingBank).toBe(0);
+  });
+
+  it('rejects update with invalid category or INCOME on CREDIT_CARD', async () => {
+    const prisma = makePrismaMock();
+    const svc = new CashFlowPeriodService(prisma as any, () => FIXED_AUG_2026);
+
+    const created = await svc.createTransaction('u1', {
+      kind: 'INCOME',
+      category: 'E',
+      account: 'BANK',
+      amount: 1000,
+      date: '2026-08-05',
+    } as any);
+
+    await expect(
+      svc.updateTransaction('u1', created.id, {
+        category: 'D' as any, // D is outflow only
+      }),
+    ).rejects.toThrow(BadRequestException);
+
+    await expect(
+      svc.updateTransaction('u1', created.id, {
+        account: 'CREDIT_CARD',
+      }),
+    ).rejects.toThrow(BadRequestException);
+  });
 });
+

@@ -1,4 +1,11 @@
-import { IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import {
+  IsNumber,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /**
@@ -9,7 +16,10 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
  * which knows the goal's unit (e.g. 2.5 books is rejected, 2.5 km is allowed).
  */
 export class UpdateGoalProgressDto {
-  @ApiProperty({ example: 0.5, description: 'Goal progress as a 0.0 - 1.0 ratio' })
+  @ApiProperty({
+    example: 0.5,
+    description: 'Goal progress as a 0.0 - 1.0 ratio',
+  })
   @IsNumber({ allowNaN: false, allowInfinity: false })
   @Min(0)
   @Max(1)

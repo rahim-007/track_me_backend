@@ -2,6 +2,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/local/json_file_cache.dart';
 import '../../../core/network/dio_client.dart';
+import '../../../core/sync/sync_manager.dart';
+import '../../../core/sync/sync_queue.dart';
+import '../../../core/widgets/home_widget_service.dart';
 import '../data/models/goal_model.dart';
 
 typedef GoalsState = AsyncValue<List<GoalModel>>;
@@ -21,6 +24,7 @@ class GoalsNotifier extends StateNotifier<GoalsState> {
     final cached = await _readCachedGoals();
     if (cached != null && cached.isNotEmpty) {
       state = AsyncValue.data(cached);
+      await HomeWidgetService.instance.syncGoalsData(goals: cached);
     } else {
       state = const AsyncValue.loading();
     }
@@ -36,7 +40,8 @@ class GoalsNotifier extends StateNotifier<GoalsState> {
       if (_dirtySinceLoad) return;
 
       final currentList = state.valueOrNull ?? cached ?? [];
-      final tempItems = currentList.where((g) => g.id.startsWith('temp_')).toList();
+      final tempItems =
+          currentList.where((g) => g.id.startsWith('temp_')).toList();
 
       final mergedList = <GoalModel>[...serverList];
       for (final temp in tempItems) {
@@ -64,20 +69,35 @@ class GoalsNotifier extends StateNotifier<GoalsState> {
   Future<void> _syncTempGoal(GoalModel tempGoal) async {
     try {
       final client = DioClient();
-      final response = await client.dio.post('/goals', data: tempGoal.toCreateJson());
-      final newGoal = GoalModel.fromJson(response.data['data'] as Map<String, dynamic>);
+      final response =
+          await client.dio.post('/goals', data: tempGoal.toCreateJson());
+      final newGoal =
+          GoalModel.fromJson(response.data['data'] as Map<String, dynamic>);
       final currentList = state.valueOrNull ?? [];
-      final updated = currentList.map((g) => g.id == tempGoal.id ? newGoal : g).toList();
+      final updated =
+          currentList.map((g) => g.id == tempGoal.id ? newGoal : g).toList();
       state = AsyncValue.data(updated);
       await _cacheGoals(updated);
-    } catch (_) {}
+    } catch (_) {
+      // Enqueue to background sync manager
+      await SyncManager.instance.enqueue(
+        SyncAction(
+          type: SyncActionType.createGoal,
+          endpoint: '/goals',
+          method: 'POST',
+          payload: tempGoal.toCreateJson(),
+          tempId: tempGoal.id,
+        ),
+      );
+    }
   }
 
   Future<void> addGoal(GoalModel goal) async {
     _dirtySinceLoad = true;
     try {
       final client = DioClient();
-      final response = await client.dio.post('/goals', data: goal.toCreateJson());
+      final response =
+          await client.dio.post('/goals', data: goal.toCreateJson());
       final newGoal =
           GoalModel.fromJson(response.data['data'] as Map<String, dynamic>);
       final updated = [...state.valueOrNull ?? <GoalModel>[], newGoal];
@@ -92,6 +112,17 @@ class GoalsNotifier extends StateNotifier<GoalsState> {
       final updated = [...state.valueOrNull ?? <GoalModel>[], tempGoal];
       state = AsyncValue.data(updated);
       await _cacheGoals(updated);
+
+      // Register with background sync manager
+      await SyncManager.instance.enqueue(
+        SyncAction(
+          type: SyncActionType.createGoal,
+          endpoint: '/goals',
+          method: 'POST',
+          payload: tempGoal.toCreateJson(),
+          tempId: tempGoal.id,
+        ),
+      );
     }
   }
 
@@ -120,8 +151,15 @@ class GoalsNotifier extends StateNotifier<GoalsState> {
         state = AsyncValue.data(reconciled);
         await _cacheGoals(reconciled);
       } catch (_) {
-        // Keep the optimistic local update; the backend keeps its old values
-        // until the next sync.
+        // Enqueue to background sync manager
+        await SyncManager.instance.enqueue(
+          SyncAction(
+            type: SyncActionType.updateGoal,
+            endpoint: '/goals/${goal.id}',
+            method: 'PATCH',
+            payload: goal.toUpdateJson(),
+          ),
+        );
       }
     }
   }
@@ -144,7 +182,17 @@ class GoalsNotifier extends StateNotifier<GoalsState> {
         await client.dio.patch('/goals/$goalId/progress', data: {
           'progress': progress,
         });
-      } catch (_) {}
+      } catch (_) {
+        // Enqueue to background sync manager
+        await SyncManager.instance.enqueue(
+          SyncAction(
+            type: SyncActionType.updateGoalProgress,
+            endpoint: '/goals/$goalId/progress',
+            method: 'PATCH',
+            payload: {'progress': progress},
+          ),
+        );
+      }
     }
   }
 
@@ -160,7 +208,16 @@ class GoalsNotifier extends StateNotifier<GoalsState> {
       try {
         final client = DioClient();
         await client.dio.delete('/goals/$goalId');
-      } catch (_) {}
+      } catch (_) {
+        // Enqueue to background sync manager
+        await SyncManager.instance.enqueue(
+          SyncAction(
+            type: SyncActionType.deleteGoal,
+            endpoint: '/goals/$goalId',
+            method: 'DELETE',
+          ),
+        );
+      }
     }
   }
 
@@ -171,6 +228,7 @@ class GoalsNotifier extends StateNotifier<GoalsState> {
       _cacheName,
       goals.map((g) => g.toJson()).toList(),
     );
+    await HomeWidgetService.instance.syncGoalsData(goals: goals);
   }
 
   static Future<List<GoalModel>?> _readCachedGoals() async {
@@ -189,13 +247,23 @@ final goalsProvider = StateNotifierProvider<GoalsNotifier, GoalsState>(
 
 final activeGoalsProvider = Provider<AsyncValue<List<GoalModel>>>((ref) {
   return ref.watch(goalsProvider).whenData(
-        (goals) => goals.where((g) => g.status != 'completed' && g.status != 'archived' && g.status != 'cancelled').toList(),
+        (goals) => goals
+            .where((g) =>
+                g.status != 'completed' &&
+                g.status != 'archived' &&
+                g.status != 'cancelled')
+            .toList(),
       );
 });
 
 final activeGoalsCountProvider = Provider<int>((ref) {
   return ref.watch(goalsProvider).when(
-        data: (goals) => goals.where((g) => g.status != 'completed' && g.status != 'archived' && g.status != 'cancelled').length,
+        data: (goals) => goals
+            .where((g) =>
+                g.status != 'completed' &&
+                g.status != 'archived' &&
+                g.status != 'cancelled')
+            .length,
         loading: () => 0,
         error: (_, __) => 0,
       );

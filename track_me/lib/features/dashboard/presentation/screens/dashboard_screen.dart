@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../notifications/presentation/widgets/notification_bell.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../core/sync/sync_manager.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shadows.dart';
 import '../../../../core/theme/theme_provider.dart';
@@ -24,7 +26,7 @@ import '../../../habits/data/models/habit_model.dart';
 import '../../../goals/data/models/goal_model.dart';
 
 String _formatGreetingName(String? raw) {
-  if (raw == null || raw.trim().isEmpty) return 'Hariharan Dilli';
+  if (raw == null || raw.trim().isEmpty) return 'UrDay User';
   final words = raw.trim().split(' ');
   return words.map((w) {
     if (w.isEmpty) return '';
@@ -51,8 +53,46 @@ class DashboardScreen extends ConsumerStatefulWidget {
   ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+class _DashboardScreenState extends ConsumerState<DashboardScreen>
+    with WidgetsBindingObserver {
   bool _hasShownReflection = false;
+  late DateTime _lastActiveDate;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _lastActiveDate = DateTime.now();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Trigger background sync when app comes to foreground
+      unawaited(SyncManager.instance.sync());
+
+      final now = DateTime.now();
+      final isNewDay = now.year != _lastActiveDate.year ||
+          now.month != _lastActiveDate.month ||
+          now.day != _lastActiveDate.day;
+
+      _lastActiveDate = now;
+
+      if (isNewDay) {
+        // Date changed across midnight while app was in background — refresh reflection
+        _hasShownReflection = false;
+        ref.invalidate(missedYesterdayHabitsProvider);
+        ref.invalidate(habitsProvider);
+        ref.invalidate(todayHabitsProvider);
+      }
+    }
+  }
 
   String get _greeting {
     final hour = DateTime.now().hour;
@@ -181,7 +221,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             loading: () =>
                                 const ShimmerBox(width: 140, height: 26),
                             error: (_, __) => Text(
-                              'Hariharan Dilli',
+                              _formatGreetingName(null),
                               style: TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.w800,
@@ -251,7 +291,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         child: ClipOval(
                           child: buildAvatarWidget(
                             user?.avatarUrl,
-                            name: user?.name ?? 'Hariharan Dilli',
+                            name: user?.name ?? 'UrDay User',
                             fontSize: 16,
                             iconColor: AppColors.primary,
                           ),
@@ -308,18 +348,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   Builder(
                     builder: (context) {
                       final habits = habitsAsync.value ?? [];
-                      int maxHabitStreak = 0;
-                      for (final h in habits) {
-                        final s = calculateHabitStreak(h);
-                        if (s > maxHabitStreak) maxHabitStreak = s;
-                      }
-                      final profileStreak = profile.value?.currentStreak ?? 0;
-                      final effectiveStreak = maxHabitStreak > profileStreak ? maxHabitStreak : profileStreak;
+                      final profileStats = ref.watch(userProfileStatsProvider);
+                      final userStreak = profileStats.currentStreak;
 
-                      return _MetricsStatsRow(
-                        streakCount: effectiveStreak,
-                        habitsCount: habits.where((h) => h.isCompletedToday).length,
-                        goalsCount: goalsAsync.value?.length ?? 0,
+                      return RepaintBoundary(
+                        child: _MetricsStatsRow(
+                          streakCount: userStreak,
+                          habitsCount: habits.where((h) => h.isCompletedToday).length,
+                          goalsCount: goalsAsync.value?.length ?? 0,
+                        ),
                       );
                     },
                   ),
@@ -327,31 +364,39 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   const SizedBox(height: 24),
 
                   // ─── 4. Today's Habits Section ────────────────────────────
-                  _TodaysHabitsSection(
-                    habits: habitsAsync.value ?? [],
+                  RepaintBoundary(
+                    child: _TodaysHabitsSection(
+                      habits: habitsAsync.value ?? [],
+                    ),
                   ),
 
                   const SizedBox(height: 24),
 
                   // ─── 5. Cash Flow Hero Card Section ───────────────────────
-                  _CashFlowSnapshotCard(cashFlowState: cashFlow),
+                  RepaintBoundary(
+                    child: _CashFlowSnapshotCard(cashFlowState: cashFlow),
+                  ),
 
                   const SizedBox(height: 24),
 
                   // ─── 6. Active Goals Section ──────────────────────────────
-                  _ActiveGoalsSection(
-                    goals: goalsAsync.value ?? [],
-                    onAddGoal: _showAddGoalModal,
+                  RepaintBoundary(
+                    child: _ActiveGoalsSection(
+                      goals: goalsAsync.value ?? [],
+                      onAddGoal: _showAddGoalModal,
+                    ),
                   ),
 
                   const SizedBox(height: 24),
 
                   // ─── 7. Quick Action Row ───────────────────────────────────
-                  _QuickActionsRow(
-                    onAddHabit: _showAddHabitModal,
-                    onAddGoal: _showAddGoalModal,
-                    onAddExpense: _showAddExpenseModal,
-                    onAddIncome: _showAddIncomeModal,
+                  RepaintBoundary(
+                    child: _QuickActionsRow(
+                      onAddHabit: _showAddHabitModal,
+                      onAddGoal: _showAddGoalModal,
+                      onAddExpense: _showAddExpenseModal,
+                      onAddIncome: _showAddIncomeModal,
+                    ),
                   ),
                 ]),
               ),
@@ -997,7 +1042,7 @@ class _TodaysHabitsSection extends ConsumerWidget {
                         onTap: () {
                           ref
                               .read(habitsProvider.notifier)
-                              .toggleCompletion(habit, DateTime.now());
+                              .toggleCompletion(habit, DateTime.now(), debounce: true);
                         },
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),

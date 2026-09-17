@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
@@ -22,7 +21,6 @@ void main() {
   final today = DateTime.now();
   final yesterday = today.subtract(const Duration(days: 1));
   final yesterdayStr = DateFormat('yyyy-MM-dd').format(yesterday);
-  final todayStr = DateFormat('yyyy-MM-dd').format(today);
 
   HabitModel buildTestHabit({
     required String id,
@@ -195,6 +193,96 @@ void main() {
 
       final missedList = await container.read(missedYesterdayHabitsProvider.future);
       expect(missedList, isEmpty);
+    });
+
+    test('treats habit with empty/all-false repeatDays as scheduled daily', () async {
+      final pastDate = yesterday.subtract(const Duration(days: 4));
+      final allFalseHabit = buildTestHabit(
+        id: 'all-false-1',
+        name: 'Daily Stretch',
+        createdAt: pastDate,
+        repeatDays: List.filled(7, false),
+      );
+
+      final container = ProviderContainer(
+        overrides: [
+          habitsProvider.overrideWith(
+            (ref) => _FakeHabitsNotifier([allFalseHabit]),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(habitsProvider.notifier).loadHabits();
+
+      final missedList = await container.read(missedYesterdayHabitsProvider.future);
+      expect(missedList.length, 1);
+      expect(missedList.first.id, 'all-false-1');
+    });
+
+    test('excludes habit not scheduled for yesterday weekday', () async {
+      final pastDate = yesterday.subtract(const Duration(days: 4));
+      final yesterdayWeekdayIndex = yesterday.weekday - 1;
+
+      // Repeat days where yesterday is false, but another day is true
+      final repeatDays = List.filled(7, false);
+      final otherDayIndex = (yesterdayWeekdayIndex + 1) % 7;
+      repeatDays[otherDayIndex] = true;
+
+      final unscheduledHabit = buildTestHabit(
+        id: 'unscheduled-1',
+        name: 'Weekend Only Habit',
+        createdAt: pastDate,
+        repeatDays: repeatDays,
+      );
+
+      final container = ProviderContainer(
+        overrides: [
+          habitsProvider.overrideWith(
+            (ref) => _FakeHabitsNotifier([unscheduledHabit]),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(habitsProvider.notifier).loadHabits();
+
+      final missedList = await container.read(missedYesterdayHabitsProvider.future);
+      expect(missedList, isEmpty);
+    });
+
+    test('correctly handles createdAt with UTC time offsets', () async {
+      // Habit created yesterday in UTC
+      final habitCreatedYesterdayUtc = buildTestHabit(
+        id: 'utc-yesterday',
+        name: 'Yesterday Habit',
+        createdAt: yesterday.toUtc(),
+      );
+
+      // Habit created today in UTC
+      final habitCreatedTodayUtc = buildTestHabit(
+        id: 'utc-today',
+        name: 'Today Habit',
+        createdAt: today.toUtc(),
+      );
+
+      final container = ProviderContainer(
+        overrides: [
+          habitsProvider.overrideWith(
+            (ref) => _FakeHabitsNotifier([
+              habitCreatedYesterdayUtc,
+              habitCreatedTodayUtc,
+            ]),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(habitsProvider.notifier).loadHabits();
+
+      final missedList = await container.read(missedYesterdayHabitsProvider.future);
+      expect(missedList.length, 1);
+      expect(missedList.first.id, 'utc-yesterday');
     });
   });
 }

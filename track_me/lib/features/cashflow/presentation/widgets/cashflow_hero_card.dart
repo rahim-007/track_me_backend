@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import '../../data/models/cashflow_models.dart';
 
 /// Signature Gradient Hero Financial Card with wave texture, net balance,
-/// inflow/outflow metrics, and sub-account breakdown (Bank, Cash, Credit Card).
+/// income/outflow metrics, and sub-account breakdown (Bank, Cash, Credit Card).
 ///
 /// Supports [isCompact] = true for dense dashboard placement, and [isCompact] = false
 /// for full hero view on the Cash Flow screen.
@@ -31,7 +31,7 @@ class CashFlowHeroCard extends StatelessWidget {
       );
     }
 
-    return card;
+    return RepaintBoundary(child: card);
   }
 
   // ─── Compact Mode (Optimized for Dashboard) ──────────────────────────────────
@@ -128,7 +128,7 @@ class CashFlowHeroCard extends StatelessWidget {
 
                   const SizedBox(height: 11),
 
-                  // Middle Row: Amount on Left, Inflow/Outflow badges on Right
+                  // Middle Row: Amount on Left, Income/Outflow badges on Right
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
@@ -372,16 +372,16 @@ class CashFlowHeroCard extends StatelessWidget {
 
                   const SizedBox(height: 16),
 
-                  // Inflow & Outflow Summary Row
+                  // Income & Outflow Summary Row
                   Row(
                     children: [
-                      // Inflow
+                      // Income
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Inflow',
+                              'Income',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,

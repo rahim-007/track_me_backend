@@ -1,0 +1,745 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_habits_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_card_bg"
+    android:orientation="vertical"
+    android:clipChildren="false"
+    android:clipToPadding="false"
+    android:paddingStart="12dp"
+    android:paddingEnd="12dp"
+    android:paddingTop="9dp"
+    android:paddingBottom="9dp">
+
+    <!-- Header: UrDay Title + Progress Pill + Quick Add Button -->
+    <LinearLayout
+        android:id="@+id/layout_header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:layout_marginBottom="4dp">
+
+        <LinearLayout
+            android:id="@+id/btn_header_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:id="@+id/iv_habits_sparkle"
+                android:layout_width="14dp"
+                android:layout_height="14dp"
+                android:src="@drawable/ic_widget_sparkle"
+                android:contentDescription="UrDay" />
+
+            <TextView
+                android:id="@+id/tv_habits_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="5dp"
+                android:singleLine="true"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:includeFontPadding="false"
+                android:text="UrDay · Today's Habits"
+                android:textColor="@color/widget_text_primary"
+                android:textSize="12.5sp"
+                android:textStyle="bold" />
+
+            <!-- Legacy view preserved as gone -->
+            <TextView
+                android:id="@+id/tv_last_updated"
+                android:layout_width="1dp"
+                android:layout_height="1dp"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <!-- Progress Score Pill -->
+        <LinearLayout
+            android:id="@+id/layout_progress_pill"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/widget_compact_pill_bg"
+            android:gravity="center"
+            android:paddingStart="8dp"
+            android:paddingTop="3.5dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="3.5dp">
+
+            <TextView
+                android:id="@+id/tv_habits_progress_badge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:text="0/0 (0%)"
+                android:textColor="@color/widget_compact_pill_text"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Quick Add Habit Circular Button -->
+        <ImageView
+            android:id="@+id/btn_quick_add"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:background="@drawable/widget_compact_add_btn"
+            android:contentDescription="Quick add habit"
+            android:padding="6.5dp"
+            android:src="@drawable/ic_widget_add" />
+    </LinearLayout>
+
+    <!-- 1. Vertical Habit Rows View (Large & Medium Modes) -->
+    <LinearLayout
+        android:id="@+id/layout_habits_list"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <!-- Slot 1 -->
+        <LinearLayout
+            android:id="@+id/row_habit_1"
+            android:layout_width="match_parent"
+            android:layout_height="26dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <FrameLayout
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:background="@drawable/widget_icon_circle_bg">
+
+                <TextView
+                    android:id="@+id/tv_emoji_1"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:includeFontPadding="false"
+                    android:text="⚡"
+                    android:textSize="11sp" />
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/tv_title_1"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:singleLine="true"
+                android:text="Habit 1"
+                android:textColor="@color/widget_text_primary"
+                android:textSize="11.5sp" />
+
+            <TextView
+                android:id="@+id/tv_streak_1"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:includeFontPadding="false"
+                android:text="🔥 0"
+                android:textColor="@color/widget_flame"
+                android:textSize="10.5sp"
+                android:textStyle="bold" />
+
+            <FrameLayout
+                android:id="@+id/btn_check_1"
+                android:layout_width="32dp"
+                android:layout_height="26dp"
+                android:layout_gravity="center_vertical">
+
+                <ImageView
+                    android:id="@+id/iv_check_1"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Toggle habit 1"
+                    android:src="@drawable/ic_widget_uncheck" />
+            </FrameLayout>
+        </LinearLayout>
+
+        <ImageView
+            android:id="@+id/divider_1"
+            android:layout_width="match_parent"
+            android:layout_height="0.6dp"
+            android:layout_marginTop="2dp"
+            android:layout_marginBottom="2dp"
+            android:background="@color/widget_border"
+            android:contentDescription="Divider"
+            android:visibility="gone" />
+
+        <!-- Slot 2 -->
+        <LinearLayout
+            android:id="@+id/row_habit_2"
+            android:layout_width="match_parent"
+            android:layout_height="26dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <FrameLayout
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:background="@drawable/widget_icon_circle_bg">
+
+                <TextView
+                    android:id="@+id/tv_emoji_2"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:includeFontPadding="false"
+                    android:text="⚡"
+                    android:textSize="11sp" />
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/tv_title_2"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:singleLine="true"
+                android:text="Habit 2"
+                android:textColor="@color/widget_text_primary"
+                android:textSize="11.5sp" />
+
+            <TextView
+                android:id="@+id/tv_streak_2"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:includeFontPadding="false"
+                android:text="🔥 0"
+                android:textColor="@color/widget_flame"
+                android:textSize="10.5sp"
+                android:textStyle="bold" />
+
+            <FrameLayout
+                android:id="@+id/btn_check_2"
+                android:layout_width="32dp"
+                android:layout_height="26dp"
+                android:layout_gravity="center_vertical">
+
+                <ImageView
+                    android:id="@+id/iv_check_2"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Toggle habit 2"
+                    android:src="@drawable/ic_widget_uncheck" />
+            </FrameLayout>
+        </LinearLayout>
+
+        <ImageView
+            android:id="@+id/divider_2"
+            android:layout_width="match_parent"
+            android:layout_height="0.6dp"
+            android:layout_marginTop="2dp"
+            android:layout_marginBottom="2dp"
+            android:background="@color/widget_border"
+            android:contentDescription="Divider"
+            android:visibility="gone" />
+
+        <!-- Slot 3 -->
+        <LinearLayout
+            android:id="@+id/row_habit_3"
+            android:layout_width="match_parent"
+            android:layout_height="26dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <FrameLayout
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:background="@drawable/widget_icon_circle_bg">
+
+                <TextView
+                    android:id="@+id/tv_emoji_3"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:includeFontPadding="false"
+                    android:text="⚡"
+                    android:textSize="11sp" />
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/tv_title_3"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:singleLine="true"
+                android:text="Habit 3"
+                android:textColor="@color/widget_text_primary"
+                android:textSize="11.5sp" />
+
+            <TextView
+                android:id="@+id/tv_streak_3"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:includeFontPadding="false"
+                android:text="🔥 0"
+                android:textColor="@color/widget_flame"
+                android:textSize="10.5sp"
+                android:textStyle="bold" />
+
+            <FrameLayout
+                android:id="@+id/btn_check_3"
+                android:layout_width="32dp"
+                android:layout_height="26dp"
+                android:layout_gravity="center_vertical">
+
+                <ImageView
+                    android:id="@+id/iv_check_3"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Toggle habit 3"
+                    android:src="@drawable/ic_widget_uncheck" />
+            </FrameLayout>
+        </LinearLayout>
+
+        <ImageView
+            android:id="@+id/divider_3"
+            android:layout_width="match_parent"
+            android:layout_height="0.6dp"
+            android:layout_marginTop="2dp"
+            android:layout_marginBottom="2dp"
+            android:background="@color/widget_border"
+            android:contentDescription="Divider"
+            android:visibility="gone" />
+
+        <!-- Slot 4 -->
+        <LinearLayout
+            android:id="@+id/row_habit_4"
+            android:layout_width="match_parent"
+            android:layout_height="26dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <FrameLayout
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:background="@drawable/widget_icon_circle_bg">
+
+                <TextView
+                    android:id="@+id/tv_emoji_4"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:includeFontPadding="false"
+                    android:text="⚡"
+                    android:textSize="11sp" />
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/tv_title_4"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:singleLine="true"
+                android:text="Habit 4"
+                android:textColor="@color/widget_text_primary"
+                android:textSize="11.5sp" />
+
+            <TextView
+                android:id="@+id/tv_streak_4"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:includeFontPadding="false"
+                android:text="🔥 0"
+                android:textColor="@color/widget_flame"
+                android:textSize="10.5sp"
+                android:textStyle="bold" />
+
+            <FrameLayout
+                android:id="@+id/btn_check_4"
+                android:layout_width="32dp"
+                android:layout_height="26dp"
+                android:layout_gravity="center_vertical">
+
+                <ImageView
+                    android:id="@+id/iv_check_4"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Toggle habit 4"
+                    android:src="@drawable/ic_widget_uncheck" />
+            </FrameLayout>
+        </LinearLayout>
+
+        <ImageView
+            android:id="@+id/divider_4"
+            android:layout_width="match_parent"
+            android:layout_height="0.6dp"
+            android:layout_marginTop="2dp"
+            android:layout_marginBottom="2dp"
+            android:background="@color/widget_border"
+            android:contentDescription="Divider"
+            android:visibility="gone" />
+
+        <!-- Slot 5 -->
+        <LinearLayout
+            android:id="@+id/row_habit_5"
+            android:layout_width="match_parent"
+            android:layout_height="26dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <FrameLayout
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:background="@drawable/widget_icon_circle_bg">
+
+                <TextView
+                    android:id="@+id/tv_emoji_5"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:includeFontPadding="false"
+                    android:text="⚡"
+                    android:textSize="11sp" />
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/tv_title_5"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:singleLine="true"
+                android:text="Habit 5"
+                android:textColor="@color/widget_text_primary"
+                android:textSize="11.5sp" />
+
+            <TextView
+                android:id="@+id/tv_streak_5"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:includeFontPadding="false"
+                android:text="🔥 0"
+                android:textColor="@color/widget_flame"
+                android:textSize="10.5sp"
+                android:textStyle="bold" />
+
+            <FrameLayout
+                android:id="@+id/btn_check_5"
+                android:layout_width="32dp"
+                android:layout_height="26dp"
+                android:layout_gravity="center_vertical">
+
+                <ImageView
+                    android:id="@+id/iv_check_5"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Toggle habit 5"
+                    android:src="@drawable/ic_widget_uncheck" />
+            </FrameLayout>
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- 2. Compact Horizontal Habit Grid View (Small Mode) -->
+    <LinearLayout
+        android:id="@+id/layout_habits_compact"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="2dp"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:visibility="gone">
+
+        <!-- Compact Col 1 -->
+        <LinearLayout
+            android:id="@+id/col_compact_1"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:visibility="gone">
+
+            <FrameLayout
+                android:id="@+id/frame_compact_emoji_1"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:background="@drawable/widget_compact_icon_circle">
+
+                <TextView
+                    android:id="@+id/tv_compact_emoji_1"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:singleLine="true"
+                    android:maxLines="1"
+                    android:ellipsize="none"
+                    android:textColor="@color/widget_text_primary"
+                    android:text="⚡"
+                    android:textSize="17.5sp" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:id="@+id/btn_compact_check_1"
+                android:layout_width="26dp"
+                android:layout_height="20dp"
+                android:layout_marginTop="2.5dp">
+
+                <ImageView
+                    android:id="@+id/iv_compact_check_1"
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Check 1"
+                    android:src="@drawable/ic_widget_uncheck" />
+            </FrameLayout>
+        </LinearLayout>
+
+        <!-- Compact Col 2 -->
+        <LinearLayout
+            android:id="@+id/col_compact_2"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:visibility="gone">
+
+            <FrameLayout
+                android:id="@+id/frame_compact_emoji_2"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:background="@drawable/widget_compact_icon_circle">
+
+                <TextView
+                    android:id="@+id/tv_compact_emoji_2"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:singleLine="true"
+                    android:maxLines="1"
+                    android:ellipsize="none"
+                    android:textColor="@color/widget_text_primary"
+                    android:text="⚡"
+                    android:textSize="17.5sp" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:id="@+id/btn_compact_check_2"
+                android:layout_width="26dp"
+                android:layout_height="20dp"
+                android:layout_marginTop="2.5dp">
+
+                <ImageView
+                    android:id="@+id/iv_compact_check_2"
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Check 2"
+                    android:src="@drawable/ic_widget_uncheck" />
+            </FrameLayout>
+        </LinearLayout>
+
+        <!-- Compact Col 3 -->
+        <LinearLayout
+            android:id="@+id/col_compact_3"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:visibility="gone">
+
+            <FrameLayout
+                android:id="@+id/frame_compact_emoji_3"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:background="@drawable/widget_compact_icon_circle">
+
+                <TextView
+                    android:id="@+id/tv_compact_emoji_3"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:singleLine="true"
+                    android:maxLines="1"
+                    android:ellipsize="none"
+                    android:textColor="@color/widget_text_primary"
+                    android:text="⚡"
+                    android:textSize="17.5sp" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:id="@+id/btn_compact_check_3"
+                android:layout_width="26dp"
+                android:layout_height="20dp"
+                android:layout_marginTop="2.5dp">
+
+                <ImageView
+                    android:id="@+id/iv_compact_check_3"
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Check 3"
+                    android:src="@drawable/ic_widget_uncheck" />
+            </FrameLayout>
+        </LinearLayout>
+
+        <!-- Compact Col 4 -->
+        <LinearLayout
+            android:id="@+id/col_compact_4"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:visibility="gone">
+
+            <FrameLayout
+                android:id="@+id/frame_compact_emoji_4"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:background="@drawable/widget_compact_icon_circle">
+
+                <TextView
+                    android:id="@+id/tv_compact_emoji_4"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:singleLine="true"
+                    android:maxLines="1"
+                    android:ellipsize="none"
+                    android:textColor="@color/widget_text_primary"
+                    android:text="⚡"
+                    android:textSize="17.5sp" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:id="@+id/btn_compact_check_4"
+                android:layout_width="26dp"
+                android:layout_height="20dp"
+                android:layout_marginTop="2.5dp">
+
+                <ImageView
+                    android:id="@+id/iv_compact_check_4"
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Check 4"
+                    android:src="@drawable/ic_widget_uncheck" />
+            </FrameLayout>
+        </LinearLayout>
+
+        <!-- Compact Col 5 -->
+        <LinearLayout
+            android:id="@+id/col_compact_5"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:visibility="gone">
+
+            <FrameLayout
+                android:id="@+id/frame_compact_emoji_5"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:background="@drawable/widget_compact_icon_circle">
+
+                <TextView
+                    android:id="@+id/tv_compact_emoji_5"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:singleLine="true"
+                    android:maxLines="1"
+                    android:ellipsize="none"
+                    android:textColor="@color/widget_text_primary"
+                    android:text="⚡"
+                    android:textSize="17.5sp" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:id="@+id/btn_compact_check_5"
+                android:layout_width="26dp"
+                android:layout_height="20dp"
+                android:layout_marginTop="2.5dp">
+
+                <ImageView
+                    android:id="@+id/iv_compact_check_5"
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Check 5"
+                    android:src="@drawable/ic_widget_uncheck" />
+            </FrameLayout>
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- More habits footer when > 5 habits -->
+    <TextView
+        android:id="@+id/tv_more_habits"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:paddingTop="2dp"
+        android:text="+ more habits in UrDay →"
+        android:textColor="@color/widget_purple_accent"
+        android:textSize="10sp"
+        android:visibility="gone" />
+
+    <!-- Empty State View -->
+    <TextView
+        android:id="@+id/tv_empty_habits"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:gravity="center"
+        android:text="Open UrDay to schedule today\'s habits ✨"
+        android:textColor="@color/widget_text_muted"
+        android:textSize="11sp"
+        android:visibility="visible" />
+
+</LinearLayout>

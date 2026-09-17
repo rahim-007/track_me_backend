@@ -5,6 +5,10 @@ describe('UsersService', () => {
     habit: { findMany: jest.fn().mockResolvedValue([]) },
     habitLog: { findMany: jest.fn().mockResolvedValue([]) },
     user: { update: jest.fn(), findUnique: jest.fn() },
+    device: {
+      upsert: jest.fn().mockResolvedValue({}),
+      deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
     goal: { count: jest.fn().mockResolvedValue(0) },
     $transaction: jest.fn(),
   };
@@ -14,6 +18,8 @@ describe('UsersService', () => {
     prisma.habit.findMany.mockResolvedValue([]);
     prisma.habitLog.findMany.mockResolvedValue([]);
     prisma.goal.count.mockResolvedValue(0);
+    prisma.device.upsert.mockResolvedValue({});
+    prisma.device.deleteMany.mockResolvedValue({ count: 1 });
   });
 
   it('updateProfile persists the timezone and returns it', async () => {
@@ -26,7 +32,9 @@ describe('UsersService', () => {
     });
     const service = new UsersService(prisma as any);
 
-    const result = await service.updateProfile('u1', { timezone: 'Asia/Kolkata' });
+    const result = await service.updateProfile('u1', {
+      timezone: 'Asia/Kolkata',
+    });
 
     expect(prisma.user.update).toHaveBeenCalledWith({
       where: { id: 'u1' },
@@ -64,6 +72,40 @@ describe('UsersService', () => {
     expect(result?.timezone).toBe('America/New_York');
   });
 
+  describe('updateFcmToken', () => {
+    it('upserts device and updates user when fcmToken provided', async () => {
+      prisma.user.update.mockResolvedValue({ id: 'u1', fcmToken: 'tok123' });
+      const service = new UsersService(prisma as any);
+
+      await service.updateFcmToken('u1', 'tok123', 'ios');
+
+      expect(prisma.device.upsert).toHaveBeenCalledWith({
+        where: { fcmToken: 'tok123' },
+        create: { userId: 'u1', fcmToken: 'tok123', platform: 'ios' },
+        update: { userId: 'u1', platform: 'ios' },
+      });
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'u1' },
+        data: { fcmToken: 'tok123' },
+      });
+    });
+
+    it('clears devices and nulls user fcmToken when empty', async () => {
+      prisma.user.update.mockResolvedValue({ id: 'u1', fcmToken: null });
+      const service = new UsersService(prisma as any);
+
+      await service.updateFcmToken('u1', '');
+
+      expect(prisma.device.deleteMany).toHaveBeenCalledWith({
+        where: { userId: 'u1' },
+      });
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'u1' },
+        data: { fcmToken: null },
+      });
+    });
+  });
+
   // ─── deleteAccount ──────────────────────────────────────────────────────────
 
   describe('deleteAccount', () => {
@@ -75,6 +117,9 @@ describe('UsersService', () => {
           findUnique: jest.fn(),
           update: jest.fn(),
           delete: jest.fn(),
+        },
+        device: {
+          deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
         },
       };
       prisma.$transaction = jest.fn((cb: (t: any) => any) => cb(tx));
@@ -94,7 +139,10 @@ describe('UsersService', () => {
       const result = await service.deleteAccount('u1');
 
       expect(result).toBe(true);
-      // FCM token should be cleared before deletion
+      // FCM token and devices should be cleared before deletion
+      expect(tx.device.deleteMany).toHaveBeenCalledWith({
+        where: { userId: 'u1' },
+      });
       expect(tx.user.update).toHaveBeenCalledWith({
         where: { id: 'u1' },
         data: { fcmToken: null },

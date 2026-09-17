@@ -39,8 +39,8 @@ export class CashFlowDebtService {
       }),
     ]);
     return {
-      yetToGive: round2(give._sum.amount ?? 0),
-      yetToReceive: round2(receive._sum.amount ?? 0),
+      yetToGive: round2(Number(give._sum.amount ?? 0)),
+      yetToReceive: round2(Number(receive._sum.amount ?? 0)),
     };
   }
 
@@ -95,7 +95,7 @@ export class CashFlowDebtService {
     userId: string;
     direction: string;
     person: string;
-    amount: number;
+    amount: number | any;
     note: string | null;
     date: Date;
     settled: boolean;
@@ -104,6 +104,7 @@ export class CashFlowDebtService {
   }) {
     return {
       ...d,
+      amount: Number(d.amount),
       date: d.date.toISOString().slice(0, 10),
       ...(d.settledAt ? { settledAt: d.settledAt.toISOString() } : {}),
     };

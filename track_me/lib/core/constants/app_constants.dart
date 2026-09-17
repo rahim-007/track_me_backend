@@ -2,7 +2,7 @@ class AppConstants {
   AppConstants._();
 
   // App Info
-  static const String appName = 'Track Me';
+  static const String appName = 'UrDay';
   static const String appVersion = '1.0.0';
   static const String bundleId = 'com.trackme.app';
 

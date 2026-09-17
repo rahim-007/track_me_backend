@@ -32,7 +32,7 @@ class CategoryGrid extends StatelessWidget {
           physics: const NeverScrollableScrollPhysics(),
           mainAxisSpacing: 12,
           crossAxisSpacing: 12,
-          childAspectRatio: 2.25,
+          childAspectRatio: 2.05,
           children: tiles,
         ),
       ],
@@ -71,7 +71,7 @@ class _CategoryTile extends StatelessWidget {
     final isDark = AppColors.isDarkMode;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1B162C) : Colors.white,
         borderRadius: BorderRadius.circular(20),

@@ -58,11 +58,25 @@ class FirebaseService {
       final title = message.notification?.title ?? message.data['title'];
       final body = message.notification?.body ?? message.data['body'];
       if (title == null && body == null) return;
+
+      // Habit reminders are managed by the device-side local alarm scheduler.
+      // Skip duplicate foreground display if an FCM push is marked as a habit reminder.
+      final type = message.data['type']?.toString().toLowerCase();
+      final category = message.data['category']?.toString().toLowerCase();
+      if (type == 'habit_reminder' || type == 'habit' || category == 'habit') {
+        debugPrint('[FCM] Skipping habit push in foreground (managed by local scheduler)');
+        return;
+      }
+
+      final channelId = message.data['channelId'] as String? ?? NotificationService.generalChannelId;
+      final notificationId = message.messageId?.hashCode ?? (DateTime.now().millisecondsSinceEpoch ~/ 1000);
+
       debugPrint('[FCM] Foreground message received: $title');
       NotificationService.showInstantNotification(
-        title: title ?? 'Track Me',
+        id: notificationId,
+        title: title ?? 'UrDay',
         body: body ?? '',
-        channelId: NotificationService.habitChannelId,
+        channelId: channelId,
       );
     });
 

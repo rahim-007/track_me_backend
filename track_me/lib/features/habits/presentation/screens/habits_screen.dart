@@ -10,6 +10,7 @@ import '../../data/models/habit_model.dart';
 import '../../data/quotes_data.dart';
 import '../../providers/habits_provider.dart';
 import '../../providers/missed_habits_provider.dart';
+import '../../../profile/providers/profile_provider.dart';
 import '../widgets/add_habit_dialog.dart';
 import '../widgets/missed_habits_reflection_dialog.dart';
 import '../widgets/skip_reason_dialog.dart';
@@ -106,7 +107,8 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                 color: const Color(0xFF8B5CF6).withOpacity(0.16),
                 shape: BoxShape.circle,
               ),
-              child: const Center(child: Text('📝', style: TextStyle(fontSize: 18))),
+              child: const Center(
+                  child: Text('📝', style: TextStyle(fontSize: 18))),
             ),
             const SizedBox(width: 10),
             const Expanded(
@@ -132,7 +134,8 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
               decoration: BoxDecoration(
                 color: AppColors.surfaceVariant,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFF8B5CF6).withOpacity(0.2)),
+                border:
+                    Border.all(color: const Color(0xFF8B5CF6).withOpacity(0.2)),
               ),
               child: Text(
                 '"$reason"',
@@ -201,7 +204,8 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                 const SizedBox(height: 16),
                 const Divider(),
                 ListTile(
-                  leading: const Icon(Icons.edit_outlined, color: Color(0xFF5334EA)),
+                  leading:
+                      const Icon(Icons.edit_outlined, color: Color(0xFF5334EA)),
                   title: const Text('Edit Habit'),
                   onTap: () {
                     Navigator.pop(context);
@@ -215,10 +219,13 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                   builder: (context) {
                     final now = DateTime.now();
                     final nowDay = DateTime(now.year, now.month, now.day);
-                    final yesterdayDay = nowDay.subtract(const Duration(days: 1));
-                    final selectedDay = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
+                    final yesterdayDay =
+                        nowDay.subtract(const Duration(days: 1));
+                    final selectedDay = DateTime(_selectedDate.year,
+                        _selectedDate.month, _selectedDate.day);
                     final isFuture = selectedDay.isAfter(nowDay);
-                    final isHistoricalLocked = selectedDay.isBefore(yesterdayDay);
+                    final isHistoricalLocked =
+                        selectedDay.isBefore(yesterdayDay);
 
                     return ListTile(
                       leading: Icon(
@@ -241,7 +248,8 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                           ScaffoldMessenger.of(context).hideCurrentSnackBar();
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Habits for future dates are locked.'),
+                              content:
+                                  Text('Habits for future dates are locked.'),
                               behavior: SnackBarBehavior.floating,
                             ),
                           );
@@ -251,7 +259,8 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                           ScaffoldMessenger.of(context).hideCurrentSnackBar();
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Records older than 24 hours are locked to preserve streak integrity.'),
+                              content: Text(
+                                  'Records older than 24 hours are locked to preserve streak integrity.'),
                               behavior: SnackBarBehavior.floating,
                             ),
                           );
@@ -263,8 +272,10 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444)),
-                  title: const Text('Delete Habit', style: TextStyle(color: Color(0xFFEF4444))),
+                  leading: const Icon(Icons.delete_outline_rounded,
+                      color: Color(0xFFEF4444)),
+                  title: const Text('Delete Habit',
+                      style: TextStyle(color: Color(0xFFEF4444))),
                   onTap: () {
                     Navigator.pop(context);
                     ref.read(habitsProvider.notifier).deleteHabit(habit.id);
@@ -338,14 +349,18 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                   h.repeatDays[weekdayIndex];
             }).toList();
 
-            final selectedDateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
-            final missedReasons = ref.watch(missedReasonsForDateProvider(selectedDateStr)).valueOrNull ?? {};
+            final selectedDateStr =
+                DateFormat('yyyy-MM-dd').format(_selectedDate);
+            final missedReasons = ref
+                    .watch(missedReasonsForDateProvider(selectedDateStr))
+                    .valueOrNull ??
+                {};
             final completedCount = visibleHabits
                 .where((h) => h.completedDates.contains(selectedDateStr))
                 .length;
             final totalCount = visibleHabits.length;
             final progress = totalCount > 0 ? completedCount / totalCount : 0.0;
-            final streak = _calculateMaxStreak(habits);
+            final streak = ref.watch(userProfileStatsProvider).currentStreak;
             final weeklyStats = calculateWeeklyHabitStats(habits);
 
             return CustomScrollView(
@@ -410,7 +425,8 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                           borderRadius: BorderRadius.circular(24),
                           child: LayoutBuilder(
                             builder: (context, constraints) {
-                              final currentQuote = kHabitQuotes[_currentQuoteIndex];
+                              final currentQuote =
+                                  kHabitQuotes[_currentQuoteIndex];
                               final cleanAuthor = currentQuote.author
                                   .replaceAll('Inspired by ', '')
                                   .trim();
@@ -423,7 +439,8 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                                       'assets/images/habit_hero_banner.png',
                                       fit: BoxFit.cover,
                                       alignment: Alignment.centerRight,
-                                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                                      errorBuilder: (_, __, ___) =>
+                                          const SizedBox.shrink(),
                                     ),
                                   ),
                                   // Left Accent Vertical Line
@@ -443,11 +460,14 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                                     bottom: 14,
                                     right: constraints.maxWidth * 0.44,
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
                                         Row(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             const Text(
                                               '“',
@@ -469,7 +489,8 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                                         ),
                                         const SizedBox(height: 8),
                                         Padding(
-                                          padding: const EdgeInsets.only(left: 20),
+                                          padding:
+                                              const EdgeInsets.only(left: 20),
                                           child: Text(
                                             '– $cleanAuthor',
                                             style: const TextStyle(
@@ -551,7 +572,8 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                         // 3. Current Streak
                         Expanded(
                           child: _OverviewStatCard(
-                            iconWidget: const Text('🔥', style: TextStyle(fontSize: 16)),
+                            iconWidget: const Text('🔥',
+                                style: TextStyle(fontSize: 16)),
                             value: '$streak',
                             valueColor: const Color(0xFFFF6B00),
                             title: 'Current Streak',
@@ -635,13 +657,17 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: List.generate(7, (index) {
-                            final date = _weekStartDate.add(Duration(days: index));
-                            final isSelected = DateUtils.isSameDay(date, _selectedDate);
-                            final dateStr = DateFormat('yyyy-MM-dd').format(date);
+                            final date =
+                                _weekStartDate.add(Duration(days: index));
+                            final isSelected =
+                                DateUtils.isSameDay(date, _selectedDate);
+                            final dateStr =
+                                DateFormat('yyyy-MM-dd').format(date);
 
                             // Check if all scheduled habits were completed on this date
                             final dayCompleted = habits.isNotEmpty &&
-                                habits.any((h) => h.completedDates.contains(dateStr));
+                                habits.any(
+                                    (h) => h.completedDates.contains(dateStr));
 
                             return GestureDetector(
                               behavior: HitTestBehavior.opaque,
@@ -652,7 +678,8 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                               },
                               child: Container(
                                 color: Colors.transparent,
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 4),
                                 child: Column(
                                   children: [
                                     Text(
@@ -670,7 +697,9 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                                       '${date.day}',
                                       style: TextStyle(
                                         fontSize: 15,
-                                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                                        fontWeight: isSelected
+                                            ? FontWeight.w800
+                                            : FontWeight.w600,
                                         color: isSelected
                                             ? AppColors.primary
                                             : AppColors.textPrimary,
@@ -745,23 +774,33 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Builder(
                       builder: (context) {
-                        final nowDay = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
-                        final yesterdayDay = nowDay.subtract(const Duration(days: 1));
-                        final selectedDay = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
+                        final nowDay = DateTime(DateTime.now().year,
+                            DateTime.now().month, DateTime.now().day);
+                        final yesterdayDay =
+                            nowDay.subtract(const Duration(days: 1));
+                        final selectedDay = DateTime(_selectedDate.year,
+                            _selectedDate.month, _selectedDate.day);
                         final isFutureDate = selectedDay.isAfter(nowDay);
-                        final isHistoricalLocked = selectedDay.isBefore(yesterdayDay);
+                        final isHistoricalLocked =
+                            selectedDay.isBefore(yesterdayDay);
 
                         String sectionTitle = "Today's Habits";
-                        if (DateUtils.isSameDay(_selectedDate, DateTime.now().add(const Duration(days: 1)))) {
+                        if (DateUtils.isSameDay(_selectedDate,
+                            DateTime.now().add(const Duration(days: 1)))) {
                           sectionTitle = "Tomorrow's Habits 🔒";
                         } else if (isFutureDate) {
-                          sectionTitle = "${DateFormat('EEEE').format(_selectedDate)}'s Habits 🔒";
-                        } else if (DateUtils.isSameDay(_selectedDate, yesterdayDay)) {
+                          sectionTitle =
+                              "${DateFormat('EEEE').format(_selectedDate)}'s Habits 🔒";
+                        } else if (DateUtils.isSameDay(
+                            _selectedDate, yesterdayDay)) {
                           sectionTitle = "Yesterday's Habits";
                         } else if (isHistoricalLocked) {
-                          sectionTitle = "${DateFormat('MMM d').format(_selectedDate)} Habits 🔒";
-                        } else if (!DateUtils.isSameDay(_selectedDate, DateTime.now())) {
-                          sectionTitle = "${DateFormat('MMM d').format(_selectedDate)} Habits";
+                          sectionTitle =
+                              "${DateFormat('MMM d').format(_selectedDate)} Habits 🔒";
+                        } else if (!DateUtils.isSameDay(
+                            _selectedDate, DateTime.now())) {
+                          sectionTitle =
+                              "${DateFormat('MMM d').format(_selectedDate)} Habits";
                         }
 
                         return Row(
@@ -783,7 +822,8 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                             if (isFutureDate)
                               Row(
                                 children: [
-                                  Icon(Icons.lock_outline_rounded, size: 14, color: AppColors.textSecondary),
+                                  Icon(Icons.lock_outline_rounded,
+                                      size: 14, color: AppColors.textSecondary),
                                   const SizedBox(width: 4),
                                   Text(
                                     'Unlocks ${DateFormat('MMM d').format(_selectedDate)}',
@@ -798,7 +838,8 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                             else if (isHistoricalLocked)
                               Row(
                                 children: [
-                                  Icon(Icons.lock_clock_rounded, size: 14, color: AppColors.textSecondary),
+                                  Icon(Icons.lock_clock_rounded,
+                                      size: 14, color: AppColors.textSecondary),
                                   const SizedBox(width: 4),
                                   Text(
                                     'Archived ($completedCount of $totalCount done)',
@@ -847,9 +888,13 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
 
                 Builder(
                   builder: (context) {
-                    final yesterdayDay = DateTime.now().subtract(const Duration(days: 1));
-                    final isYesterday = DateUtils.isSameDay(_selectedDate, yesterdayDay);
-                    final missedYesterday = ref.watch(missedYesterdayHabitsProvider).valueOrNull ?? [];
+                    final yesterdayDay =
+                        DateTime.now().subtract(const Duration(days: 1));
+                    final isYesterday =
+                        DateUtils.isSameDay(_selectedDate, yesterdayDay);
+                    final missedYesterday =
+                        ref.watch(missedYesterdayHabitsProvider).valueOrNull ??
+                            [];
 
                     if (isYesterday && missedYesterday.isNotEmpty) {
                       return SliverToBoxAdapter(
@@ -858,22 +903,29 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                           child: Material(
                             color: Colors.transparent,
                             child: InkWell(
-                              onTap: () => _showReflectionDialog(missedYesterday),
+                              onTap: () =>
+                                  _showReflectionDialog(missedYesterday),
                               borderRadius: BorderRadius.circular(16),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 12),
                                 decoration: BoxDecoration(
-                                  color: isDark ? const Color(0xFF261D10) : const Color(0xFFFFFBEB),
+                                  color: isDark
+                                      ? const Color(0xFF261D10)
+                                      : const Color(0xFFFFFBEB),
                                   borderRadius: BorderRadius.circular(16),
                                   border: Border.all(
-                                    color: isDark ? const Color(0xFF854D0E) : const Color(0xFFFDE68A),
+                                    color: isDark
+                                        ? const Color(0xFF854D0E)
+                                        : const Color(0xFFFDE68A),
                                     width: 1.5,
                                   ),
                                   boxShadow: AppShadows.soft,
                                 ),
                                 child: Row(
                                   children: [
-                                    const Text('📝', style: TextStyle(fontSize: 20)),
+                                    const Text('📝',
+                                        style: TextStyle(fontSize: 20)),
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: Text(
@@ -881,15 +933,20 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                                         style: TextStyle(
                                           fontSize: 12.5,
                                           fontWeight: FontWeight.w600,
-                                          color: isDark ? const Color(0xFFFDE68A) : const Color(0xFF92400E),
+                                          color: isDark
+                                              ? const Color(0xFFFDE68A)
+                                              : const Color(0xFF92400E),
                                         ),
                                       ),
                                     ),
                                     const SizedBox(width: 8),
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 5),
                                       decoration: BoxDecoration(
-                                        color: isDark ? const Color(0xFFB45309) : const Color(0xFFF59E0B),
+                                        color: isDark
+                                            ? const Color(0xFFB45309)
+                                            : const Color(0xFFF59E0B),
                                         borderRadius: BorderRadius.circular(10),
                                       ),
                                       child: const Text(
@@ -919,7 +976,8 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                 visibleHabits.isEmpty
                     ? SliverToBoxAdapter(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 20),
                           child: Container(
                             padding: const EdgeInsets.all(24),
                             decoration: BoxDecoration(
@@ -930,7 +988,8 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                             ),
                             child: Column(
                               children: [
-                                const Text('🌱', style: TextStyle(fontSize: 36)),
+                                const Text('🌱',
+                                    style: TextStyle(fontSize: 36)),
                                 const SizedBox(height: 12),
                                 Text(
                                   'No Habits Scheduled for This Day',
@@ -960,15 +1019,19 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                           delegate: SliverChildBuilderDelegate(
                             (context, index) {
                               final habit = visibleHabits[index];
-                              final isDone = habit.completedDates.contains(selectedDateStr);
-                              final isSkipped = habit.skippedDates.contains(selectedDateStr);
+                              final isDone = habit.completedDates
+                                  .contains(selectedDateStr);
+                              final isSkipped =
+                                  habit.skippedDates.contains(selectedDateStr);
                               final missedReason = missedReasons[habit.id];
-                              final isMissed = missedReason != null && !isDone && !isSkipped;
+                              final isMissed =
+                                  missedReason != null && !isDone && !isSkipped;
                               final accentColor = isMissed
                                   ? const Color(0xFF8B5CF6)
                                   : _getCategoryAccentColor(habit.category);
 
-                              debugPrint('[HabitsScreen] index=$index, habit="${habit.name}", habit.id="${habit.id}", missedReasons keys=${missedReasons.keys.toList()}, isMissed=$isMissed');
+                              debugPrint(
+                                  '[HabitsScreen] index=$index, habit="${habit.name}", habit.id="${habit.id}", missedReasons keys=${missedReasons.keys.toList()}, isMissed=$isMissed');
 
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 12),
@@ -978,9 +1041,11 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                                     borderRadius: BorderRadius.circular(20),
                                     border: Border.all(
                                       color: isDone
-                                          ? const Color(0xFF10B981).withOpacity(0.3)
+                                          ? const Color(0xFF10B981)
+                                              .withOpacity(0.3)
                                           : isMissed
-                                              ? const Color(0xFF8B5CF6).withOpacity(0.4)
+                                              ? const Color(0xFF8B5CF6)
+                                                  .withOpacity(0.4)
                                               : AppColors.borderLine,
                                     ),
                                     boxShadow: AppShadows.soft,
@@ -997,7 +1062,8 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                                           ),
                                           Expanded(
                                             child: Padding(
-                                              padding: const EdgeInsets.symmetric(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
                                                 horizontal: 14,
                                                 vertical: 14,
                                               ),
@@ -1008,18 +1074,25 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                                                     width: 48,
                                                     height: 48,
                                                     decoration: BoxDecoration(
-                                                      color: accentColor.withOpacity(
+                                                      color: accentColor
+                                                          .withOpacity(
                                                         isDark ? 0.16 : 0.10,
                                                       ),
-                                                      borderRadius: BorderRadius.circular(16),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              16),
                                                     ),
                                                     child: Center(
                                                       child: Text(
                                                         (habit.emoji != null &&
-                                                                habit.emoji!.trim().isNotEmpty)
+                                                                habit.emoji!
+                                                                    .trim()
+                                                                    .isNotEmpty)
                                                             ? habit.emoji!
-                                                            : _getCategoryEmoji(habit.category),
-                                                        style: const TextStyle(fontSize: 24),
+                                                            : _getCategoryEmoji(
+                                                                habit.category),
+                                                        style: const TextStyle(
+                                                            fontSize: 24),
                                                       ),
                                                     ),
                                                   ),
@@ -1027,74 +1100,133 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                                                   // Middle Info Column
                                                   Expanded(
                                                     child: Column(
-                                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                                      mainAxisAlignment: MainAxisAlignment.center,
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment
+                                                              .center,
                                                       children: [
                                                         Text(
                                                           habit.name,
                                                           style: TextStyle(
                                                             fontSize: 16,
-                                                            fontWeight: FontWeight.w800,
-                                                            color: AppColors.textPrimary,
+                                                            fontWeight:
+                                                                FontWeight.w800,
+                                                            color: AppColors
+                                                                .textPrimary,
                                                             decoration: isDone
-                                                                ? TextDecoration.lineThrough
+                                                                ? TextDecoration
+                                                                    .lineThrough
                                                                 : null,
                                                           ),
                                                           maxLines: 1,
-                                                          overflow: TextOverflow.ellipsis,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
                                                         ),
-                                                        const SizedBox(height: 3),
+                                                        const SizedBox(
+                                                            height: 3),
                                                         Text(
-                                                          _getHabitSubtitle(habit),
+                                                          _getHabitSubtitle(
+                                                              habit),
                                                           style: TextStyle(
                                                             fontSize: 12,
-                                                            fontWeight: FontWeight.w500,
-                                                            color: AppColors.textSecondary,
+                                                            fontWeight:
+                                                                FontWeight.w500,
+                                                            color: AppColors
+                                                                .textSecondary,
                                                           ),
                                                           maxLines: 1,
-                                                          overflow: TextOverflow.ellipsis,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
                                                         ),
-                                                        const SizedBox(height: 4),
+                                                        const SizedBox(
+                                                            height: 4),
                                                         Row(
                                                           children: [
-                                                            const Text('🔥', style: TextStyle(fontSize: 11)),
-                                                            const SizedBox(width: 4),
+                                                            const Text('🔥',
+                                                                style: TextStyle(
+                                                                    fontSize:
+                                                                        11)),
+                                                            const SizedBox(
+                                                                width: 4),
                                                             Text(
                                                               '${calculateHabitStreak(habit)} day streak',
                                                               style: TextStyle(
                                                                 fontSize: 11,
-                                                                fontWeight: FontWeight.w600,
-                                                                color: AppColors.textSecondary,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w600,
+                                                                color: AppColors
+                                                                    .textSecondary,
                                                               ),
                                                             ),
                                                           ],
                                                         ),
-                                                        if (isMissed && missedReason.isNotEmpty) ...[
-                                                          const SizedBox(height: 5),
+                                                        if (isMissed &&
+                                                            missedReason
+                                                                .isNotEmpty) ...[
+                                                          const SizedBox(
+                                                              height: 5),
                                                           GestureDetector(
-                                                            onTap: () => _showMissedReasonDetails(habit, missedReason),
+                                                            onTap: () =>
+                                                                _showMissedReasonDetails(
+                                                                    habit,
+                                                                    missedReason),
                                                             child: Container(
-                                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                                              decoration: BoxDecoration(
-                                                                color: const Color(0xFF8B5CF6).withOpacity(0.12),
-                                                                borderRadius: BorderRadius.circular(8),
-                                                                border: Border.all(color: const Color(0xFF8B5CF6).withOpacity(0.35)),
+                                                              padding:
+                                                                  const EdgeInsets
+                                                                      .symmetric(
+                                                                      horizontal:
+                                                                          8,
+                                                                      vertical:
+                                                                          3),
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: const Color(
+                                                                        0xFF8B5CF6)
+                                                                    .withOpacity(
+                                                                        0.12),
+                                                                borderRadius:
+                                                                    BorderRadius
+                                                                        .circular(
+                                                                            8),
+                                                                border: Border.all(
+                                                                    color: const Color(
+                                                                            0xFF8B5CF6)
+                                                                        .withOpacity(
+                                                                            0.35)),
                                                               ),
                                                               child: Row(
-                                                                mainAxisSize: MainAxisSize.min,
+                                                                mainAxisSize:
+                                                                    MainAxisSize
+                                                                        .min,
                                                                 children: [
-                                                                  const Icon(Icons.rate_review_rounded, size: 12, color: Color(0xFF8B5CF6)),
-                                                                  const SizedBox(width: 5),
+                                                                  const Icon(
+                                                                      Icons
+                                                                          .rate_review_rounded,
+                                                                      size: 12,
+                                                                      color: Color(
+                                                                          0xFF8B5CF6)),
+                                                                  const SizedBox(
+                                                                      width: 5),
                                                                   Flexible(
                                                                     child: Text(
                                                                       'Reflected: "$missedReason"',
-                                                                      style: const TextStyle(
-                                                                        fontSize: 11,
-                                                                        fontWeight: FontWeight.w600,
-                                                                        color: Color(0xFF8B5CF6),
+                                                                      style:
+                                                                          const TextStyle(
+                                                                        fontSize:
+                                                                            11,
+                                                                        fontWeight:
+                                                                            FontWeight.w600,
+                                                                        color: Color(
+                                                                            0xFF8B5CF6),
                                                                       ),
-                                                                      maxLines: 1,
-                                                                      overflow: TextOverflow.ellipsis,
+                                                                      maxLines:
+                                                                          1,
+                                                                      overflow:
+                                                                          TextOverflow
+                                                                              .ellipsis,
                                                                     ),
                                                                   ),
                                                                 ],
@@ -1109,65 +1241,124 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                                                   // Right Action Button (Completed, Mark Done, Locked Past, or Locked Future)
                                                   Builder(
                                                     builder: (context) {
-                                                      final nowDay = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
-                                                      final yesterdayDay = nowDay.subtract(const Duration(days: 1));
-                                                      final selectedDay = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
-                                                      final isFutureDate = selectedDay.isAfter(nowDay);
-                                                      final isHistoricalLocked = selectedDay.isBefore(yesterdayDay);
+                                                      final nowDay = DateTime(
+                                                          DateTime.now().year,
+                                                          DateTime.now().month,
+                                                          DateTime.now().day);
+                                                      final yesterdayDay =
+                                                          nowDay.subtract(
+                                                              const Duration(
+                                                                  days: 1));
+                                                      final selectedDay =
+                                                          DateTime(
+                                                              _selectedDate
+                                                                  .year,
+                                                              _selectedDate
+                                                                  .month,
+                                                              _selectedDate
+                                                                  .day);
+                                                      final isFutureDate =
+                                                          selectedDay
+                                                              .isAfter(nowDay);
+                                                      final isHistoricalLocked =
+                                                          selectedDay.isBefore(
+                                                              yesterdayDay);
 
                                                       // 1. Future Date: Locked
                                                       if (isFutureDate) {
                                                         return GestureDetector(
                                                           onTap: () {
-                                                            ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                                                            ScaffoldMessenger.of(context).showSnackBar(
+                                                            ScaffoldMessenger
+                                                                    .of(context)
+                                                                .hideCurrentSnackBar();
+                                                            ScaffoldMessenger
+                                                                    .of(context)
+                                                                .showSnackBar(
                                                               SnackBar(
                                                                 content: Row(
                                                                   children: [
-                                                                    const Icon(Icons.lock_rounded, color: Colors.white, size: 18),
-                                                                    const SizedBox(width: 8),
+                                                                    const Icon(
+                                                                        Icons
+                                                                            .lock_rounded,
+                                                                        color: Colors
+                                                                            .white,
+                                                                        size:
+                                                                            18),
+                                                                    const SizedBox(
+                                                                        width:
+                                                                            8),
                                                                     Expanded(
-                                                                      child: Text(
+                                                                      child:
+                                                                          Text(
                                                                         'Habits for future dates are locked. Complete them on ${DateFormat('EEEE, MMM d').format(_selectedDate)}!',
-                                                                        style: const TextStyle(fontWeight: FontWeight.w600),
+                                                                        style: const TextStyle(
+                                                                            fontWeight:
+                                                                                FontWeight.w600),
                                                                       ),
                                                                     ),
                                                                   ],
                                                                 ),
-                                                                backgroundColor: const Color(0xFF5334EA),
-                                                                behavior: SnackBarBehavior.floating,
-                                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                                                duration: const Duration(seconds: 2),
+                                                                backgroundColor:
+                                                                    const Color(
+                                                                        0xFF5334EA),
+                                                                behavior:
+                                                                    SnackBarBehavior
+                                                                        .floating,
+                                                                shape: RoundedRectangleBorder(
+                                                                    borderRadius:
+                                                                        BorderRadius.circular(
+                                                                            12)),
+                                                                duration:
+                                                                    const Duration(
+                                                                        seconds:
+                                                                            2),
                                                               ),
                                                             );
                                                           },
                                                           child: Column(
-                                                            mainAxisAlignment: MainAxisAlignment.center,
+                                                            mainAxisAlignment:
+                                                                MainAxisAlignment
+                                                                    .center,
                                                             children: [
                                                               Container(
                                                                 width: 36,
                                                                 height: 36,
-                                                                decoration: BoxDecoration(
-                                                                  color: isDark ? const Color(0xFF282836) : const Color(0xFFF1EFF8),
-                                                                  shape: BoxShape.circle,
-                                                                  border: Border.all(
-                                                                    color: AppColors.borderLine,
+                                                                decoration:
+                                                                    BoxDecoration(
+                                                                  color: isDark
+                                                                      ? const Color(
+                                                                          0xFF282836)
+                                                                      : const Color(
+                                                                          0xFFF1EFF8),
+                                                                  shape: BoxShape
+                                                                      .circle,
+                                                                  border: Border
+                                                                      .all(
+                                                                    color: AppColors
+                                                                        .borderLine,
                                                                     width: 1.5,
                                                                   ),
                                                                 ),
                                                                 child: Icon(
-                                                                  Icons.lock_rounded,
-                                                                  color: AppColors.textSecondary,
+                                                                  Icons
+                                                                      .lock_rounded,
+                                                                  color: AppColors
+                                                                      .textSecondary,
                                                                   size: 18,
                                                                 ),
                                                               ),
-                                                              const SizedBox(height: 3),
+                                                              const SizedBox(
+                                                                  height: 3),
                                                               Text(
                                                                 'Locked',
-                                                                style: TextStyle(
+                                                                style:
+                                                                    TextStyle(
                                                                   fontSize: 10,
-                                                                  fontWeight: FontWeight.w700,
-                                                                  color: AppColors.textSecondary,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w700,
+                                                                  color: AppColors
+                                                                      .textSecondary,
                                                                 ),
                                                               ),
                                                             ],
@@ -1179,59 +1370,118 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                                                       if (isHistoricalLocked) {
                                                         return GestureDetector(
                                                           onTap: () {
-                                                            ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                                                            ScaffoldMessenger.of(context).showSnackBar(
+                                                            ScaffoldMessenger
+                                                                    .of(context)
+                                                                .hideCurrentSnackBar();
+                                                            ScaffoldMessenger
+                                                                    .of(context)
+                                                                .showSnackBar(
                                                               SnackBar(
-                                                                content: const Row(
+                                                                content:
+                                                                    const Row(
                                                                   children: [
-                                                                    Icon(Icons.history_rounded, color: Colors.white, size: 18),
-                                                                    SizedBox(width: 8),
+                                                                    Icon(
+                                                                        Icons
+                                                                            .history_rounded,
+                                                                        color: Colors
+                                                                            .white,
+                                                                        size:
+                                                                            18),
+                                                                    SizedBox(
+                                                                        width:
+                                                                            8),
                                                                     Expanded(
-                                                                      child: Text(
+                                                                      child:
+                                                                          Text(
                                                                         'Records older than 24 hours are locked to preserve your streak integrity.',
-                                                                        style: TextStyle(fontWeight: FontWeight.w600),
+                                                                        style: TextStyle(
+                                                                            fontWeight:
+                                                                                FontWeight.w600),
                                                                       ),
                                                                     ),
                                                                   ],
                                                                 ),
-                                                                backgroundColor: const Color(0xFF5334EA),
-                                                                behavior: SnackBarBehavior.floating,
-                                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                                                duration: const Duration(seconds: 2),
+                                                                backgroundColor:
+                                                                    const Color(
+                                                                        0xFF5334EA),
+                                                                behavior:
+                                                                    SnackBarBehavior
+                                                                        .floating,
+                                                                shape: RoundedRectangleBorder(
+                                                                    borderRadius:
+                                                                        BorderRadius.circular(
+                                                                            12)),
+                                                                duration:
+                                                                    const Duration(
+                                                                        seconds:
+                                                                            2),
                                                               ),
                                                             );
                                                           },
                                                           child: Column(
-                                                            mainAxisAlignment: MainAxisAlignment.center,
+                                                            mainAxisAlignment:
+                                                                MainAxisAlignment
+                                                                    .center,
                                                             children: [
                                                               Container(
                                                                 width: 36,
                                                                 height: 36,
-                                                                decoration: BoxDecoration(
+                                                                decoration:
+                                                                    BoxDecoration(
                                                                   color: isDone
-                                                                      ? const Color(0xFF10B981).withOpacity(0.85)
-                                                                      : (isDark ? const Color(0xFF282836) : const Color(0xFFF1EFF8)),
-                                                                  shape: BoxShape.circle,
+                                                                      ? const Color(0xFF10B981)
+                                                                          .withOpacity(
+                                                                              0.85)
+                                                                      : (isDark
+                                                                          ? const Color(
+                                                                              0xFF282836)
+                                                                          : const Color(
+                                                                              0xFFF1EFF8)),
+                                                                  shape: BoxShape
+                                                                      .circle,
                                                                   border: isDone
                                                                       ? null
-                                                                      : Border.all(
-                                                                          color: AppColors.borderLine,
-                                                                          width: 1.5,
+                                                                      : Border
+                                                                          .all(
+                                                                          color:
+                                                                              AppColors.borderLine,
+                                                                          width:
+                                                                              1.5,
                                                                         ),
                                                                 ),
                                                                 child: Icon(
-                                                                  isDone ? Icons.check_rounded : Icons.lock_clock_rounded,
-                                                                  color: isDone ? Colors.white : AppColors.textSecondary,
-                                                                  size: isDone ? 20 : 17,
+                                                                  isDone
+                                                                      ? Icons
+                                                                          .check_rounded
+                                                                      : Icons
+                                                                          .lock_clock_rounded,
+                                                                  color: isDone
+                                                                      ? Colors
+                                                                          .white
+                                                                      : AppColors
+                                                                          .textSecondary,
+                                                                  size: isDone
+                                                                      ? 20
+                                                                      : 17,
                                                                 ),
                                                               ),
-                                                              const SizedBox(height: 3),
+                                                              const SizedBox(
+                                                                  height: 3),
                                                               Text(
-                                                                isDone ? 'Completed' : 'Locked',
-                                                                style: TextStyle(
+                                                                isDone
+                                                                    ? 'Completed'
+                                                                    : 'Locked',
+                                                                style:
+                                                                    TextStyle(
                                                                   fontSize: 10,
-                                                                  fontWeight: FontWeight.w700,
-                                                                  color: isDone ? const Color(0xFF10B981) : AppColors.textSecondary,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w700,
+                                                                  color: isDone
+                                                                      ? const Color(
+                                                                          0xFF10B981)
+                                                                      : AppColors
+                                                                          .textSecondary,
                                                                 ),
                                                               ),
                                                             ],
@@ -1242,34 +1492,54 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                                                       // 2.5 Missed with Reflection Reason
                                                       if (isMissed) {
                                                         return GestureDetector(
-                                                          onTap: () => _showMissedReasonDetails(habit, missedReason),
+                                                          onTap: () =>
+                                                              _showMissedReasonDetails(
+                                                                  habit,
+                                                                  missedReason),
                                                           child: Column(
-                                                            mainAxisAlignment: MainAxisAlignment.center,
+                                                            mainAxisAlignment:
+                                                                MainAxisAlignment
+                                                                    .center,
                                                             children: [
                                                               Container(
                                                                 width: 36,
                                                                 height: 36,
-                                                                decoration: BoxDecoration(
-                                                                  color: const Color(0xFF8B5CF6).withOpacity(0.16),
-                                                                  shape: BoxShape.circle,
-                                                                  border: Border.all(
-                                                                    color: const Color(0xFF8B5CF6),
+                                                                decoration:
+                                                                    BoxDecoration(
+                                                                  color: const Color(
+                                                                          0xFF8B5CF6)
+                                                                      .withOpacity(
+                                                                          0.16),
+                                                                  shape: BoxShape
+                                                                      .circle,
+                                                                  border: Border
+                                                                      .all(
+                                                                    color: const Color(
+                                                                        0xFF8B5CF6),
                                                                     width: 2,
                                                                   ),
                                                                 ),
-                                                                child: const Icon(
-                                                                  Icons.rate_review_rounded,
-                                                                  color: Color(0xFF8B5CF6),
+                                                                child:
+                                                                    const Icon(
+                                                                  Icons
+                                                                      .rate_review_rounded,
+                                                                  color: Color(
+                                                                      0xFF8B5CF6),
                                                                   size: 18,
                                                                 ),
                                                               ),
-                                                              const SizedBox(height: 3),
+                                                              const SizedBox(
+                                                                  height: 3),
                                                               const Text(
                                                                 'Missed',
-                                                                style: TextStyle(
+                                                                style:
+                                                                    TextStyle(
                                                                   fontSize: 10,
-                                                                  fontWeight: FontWeight.w700,
-                                                                  color: Color(0xFF8B5CF6),
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w700,
+                                                                  color: Color(
+                                                                      0xFF8B5CF6),
                                                                 ),
                                                               ),
                                                             ],
@@ -1281,44 +1551,68 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                                                       return GestureDetector(
                                                         onTap: () {
                                                           ref
-                                                              .read(habitsProvider.notifier)
-                                                              .toggleCompletion(habit, _selectedDate);
+                                                              .read(
+                                                                  habitsProvider
+                                                                      .notifier)
+                                                              .toggleCompletion(
+                                                                  habit,
+                                                                  _selectedDate,
+                                                                  debounce:
+                                                                      true);
                                                         },
                                                         child: Column(
-                                                          mainAxisAlignment: MainAxisAlignment.center,
+                                                          mainAxisAlignment:
+                                                              MainAxisAlignment
+                                                                  .center,
                                                           children: [
                                                             Container(
                                                               width: 36,
                                                               height: 36,
-                                                              decoration: BoxDecoration(
+                                                              decoration:
+                                                                  BoxDecoration(
                                                                 color: isDone
-                                                                    ? const Color(0xFF10B981)
-                                                                    : Colors.transparent,
-                                                                shape: BoxShape.circle,
+                                                                    ? const Color(
+                                                                        0xFF10B981)
+                                                                    : Colors
+                                                                        .transparent,
+                                                                shape: BoxShape
+                                                                    .circle,
                                                                 border: isDone
                                                                     ? null
-                                                                    : Border.all(
-                                                                        color: const Color(0xFF5334EA),
-                                                                        width: 2,
+                                                                    : Border
+                                                                        .all(
+                                                                        color: const Color(
+                                                                            0xFF5334EA),
+                                                                        width:
+                                                                            2,
                                                                       ),
                                                               ),
                                                               child: isDone
                                                                   ? const Icon(
-                                                                      Icons.check_rounded,
-                                                                      color: Colors.white,
+                                                                      Icons
+                                                                          .check_rounded,
+                                                                      color: Colors
+                                                                          .white,
                                                                       size: 20,
                                                                     )
                                                                   : null,
                                                             ),
-                                                            const SizedBox(height: 3),
+                                                            const SizedBox(
+                                                                height: 3),
                                                             Text(
-                                                              isDone ? 'Completed' : 'Mark Done',
+                                                              isDone
+                                                                  ? 'Completed'
+                                                                  : 'Mark Done',
                                                               style: TextStyle(
                                                                 fontSize: 10,
-                                                                fontWeight: FontWeight.w700,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w700,
                                                                 color: isDone
-                                                                    ? const Color(0xFF10B981)
-                                                                    : const Color(0xFF5334EA),
+                                                                    ? const Color(
+                                                                        0xFF10B981)
+                                                                    : const Color(
+                                                                        0xFF5334EA),
                                                               ),
                                                             ),
                                                           ],
@@ -1331,12 +1625,16 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                                                   IconButton(
                                                     icon: Icon(
                                                       Icons.more_vert_rounded,
-                                                      color: AppColors.textSecondary,
+                                                      color: AppColors
+                                                          .textSecondary,
                                                       size: 20,
                                                     ),
-                                                    onPressed: () => _showHabitOptionsMenu(habit),
+                                                    onPressed: () =>
+                                                        _showHabitOptionsMenu(
+                                                            habit),
                                                     padding: EdgeInsets.zero,
-                                                    constraints: const BoxConstraints(),
+                                                    constraints:
+                                                        const BoxConstraints(),
                                                   ),
                                                 ],
                                               ),
@@ -1444,7 +1742,9 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                                   borderRadius: BorderRadius.circular(6),
                                   child: LinearProgressIndicator(
                                     value: weeklyStats.scheduledCount > 0
-                                        ? (weeklyStats.completedCount / weeklyStats.scheduledCount).clamp(0.0, 1.0)
+                                        ? (weeklyStats.completedCount /
+                                                weeklyStats.scheduledCount)
+                                            .clamp(0.0, 1.0)
                                         : 0.0,
                                     minHeight: 4,
                                     backgroundColor: isDark
@@ -1526,10 +1826,34 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
 
   Widget _buildHighlightedQuote(String text, bool isDark) {
     final highlightWords = [
-      'habit', 'habits', 'routine', 'routines', 'consistency', 'discipline',
-      'well-being', 'choices', 'investment', 'health', 'care', 'natural', 'body', 'rest',
-      'goal', 'goals', 'progress', 'strong', 'future', 'practice', 'small', 'healthy',
-      'protect', 'responds', 'move', 'ordinary', 'easier', 'living'
+      'habit',
+      'habits',
+      'routine',
+      'routines',
+      'consistency',
+      'discipline',
+      'well-being',
+      'choices',
+      'investment',
+      'health',
+      'care',
+      'natural',
+      'body',
+      'rest',
+      'goal',
+      'goals',
+      'progress',
+      'strong',
+      'future',
+      'practice',
+      'small',
+      'healthy',
+      'protect',
+      'responds',
+      'move',
+      'ordinary',
+      'easier',
+      'living'
     ];
 
     final words = text.split(' ');
@@ -1537,7 +1861,8 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
 
     for (int i = 0; i < words.length; i++) {
       final rawWord = words[i];
-      final cleanWord = rawWord.replaceAll(RegExp(r'[^\w\-]'), '').toLowerCase();
+      final cleanWord =
+          rawWord.replaceAll(RegExp(r'[^\w\-]'), '').toLowerCase();
       final isHighlight = highlightWords.contains(cleanWord);
 
       spans.add(
@@ -1545,9 +1870,7 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
           text: rawWord + (i < words.length - 1 ? ' ' : ''),
           style: TextStyle(
             fontWeight: isHighlight ? FontWeight.w900 : FontWeight.w600,
-            color: isHighlight
-                ? Colors.white
-                : Colors.white.withOpacity(0.92),
+            color: isHighlight ? Colors.white : Colors.white.withOpacity(0.92),
           ),
         ),
       );

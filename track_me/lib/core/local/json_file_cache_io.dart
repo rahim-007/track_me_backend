@@ -57,4 +57,16 @@ class JsonFileCache {
       return null;
     }
   }
+
+  /// Deletes a cached JSON file if it exists.
+  static Future<void> delete(String name) async {
+    if (kIsWeb) return;
+    try {
+      final file = await _file(name);
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (_) {}
+  }
 }
+

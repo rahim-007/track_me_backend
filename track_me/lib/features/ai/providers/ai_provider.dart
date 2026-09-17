@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/local/json_file_cache.dart';
 import '../../../core/network/dio_client.dart';
 
 class AiInsightsModel {
@@ -16,6 +17,14 @@ class AiInsightsModel {
     required this.weaknesses,
     required this.recommendations,
   });
+
+  Map<String, dynamic> toJson() => {
+        'productivityScore': productivityScore,
+        'weeklyReport': weeklyReport,
+        'strengths': strengths,
+        'weaknesses': weaknesses,
+        'recommendations': recommendations,
+      };
 
   factory AiInsightsModel.fromJson(Map<String, dynamic> json) {
     return AiInsightsModel(
@@ -37,12 +46,25 @@ class AiInsightsModel {
   }
 }
 
+const String _aiCacheKey = 'ai_insights_cache';
+
 final aiInsightsProvider = FutureProvider<AiInsightsModel>((ref) async {
+  // 1. Try reading from persistent local cache
+  final cached = await JsonFileCache.read<AiInsightsModel>(
+    _aiCacheKey,
+    (json) => AiInsightsModel.fromJson(json as Map<String, dynamic>),
+  );
+
   try {
     final client = DioClient();
     final response = await client.dio.get('/ai/insights');
-    return AiInsightsModel.fromJson(response.data as Map<String, dynamic>);
+    final insights = AiInsightsModel.fromJson(response.data as Map<String, dynamic>);
+    await JsonFileCache.write(_aiCacheKey, insights.toJson());
+    return insights;
   } catch (_) {
+    if (cached != null) {
+      return cached;
+    }
     // Return predefined insights for MVP/offline mode
     return const AiInsightsModel(
       productivityScore: 0,

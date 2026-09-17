@@ -148,12 +148,6 @@ class _ProductivityScoreCard extends StatelessWidget {
   final int score;
   const _ProductivityScoreCard({required this.score});
 
-  Color get _scoreColor {
-    if (score >= 80) return AppColors.success;
-    if (score >= 60) return AppColors.warning;
-    return AppColors.error;
-  }
-
   String get _scoreLabel {
     if (score >= 80) return 'Excellent!';
     if (score >= 60) return 'Good Progress';
