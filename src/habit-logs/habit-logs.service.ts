@@ -99,6 +99,72 @@ export class HabitLogsService {
     return log;
   }
 
+  async logProgress(
+    userId: string,
+    habitId: string,
+    date: string,
+    increment: number,
+  ) {
+    await this.assertOwnedHabit(userId, habitId);
+    const parsedDate = new Date(date);
+
+    const [habit, existing] = await Promise.all([
+      this.prisma.habit.findUnique({
+        where: { id: habitId },
+        select: { targetValue: true },
+      }),
+      this.prisma.habitLog.findFirst({
+        where: { habitId, date: parsedDate, userId },
+      }),
+    ]);
+
+    const oldVal = existing?.currentValue ? Number(existing.currentValue) : 0;
+    const newVal = Math.max(0, oldVal + increment);
+
+    const target = habit?.targetValue ? Number(habit.targetValue) : 1;
+    const isNowCompleted = newVal >= target;
+    const wasCompleted =
+      existing ? !existing.isSkipped && !!existing.completedAt : false;
+
+    const log = await this.prisma.habitLog.upsert({
+      where: { habitId_date: { habitId, date: parsedDate } },
+      update: {
+        currentValue: newVal,
+        isSkipped: false,
+        skipReason: null,
+        completedAt: isNowCompleted
+          ? existing?.completedAt ?? new Date()
+          : null,
+      },
+      create: {
+        habitId,
+        userId,
+        date: parsedDate,
+        currentValue: newVal,
+        completedAt: isNowCompleted ? new Date() : null,
+        isSkipped: false,
+      },
+    });
+
+    if (isNowCompleted && !wasCompleted) {
+      await this.prisma.habit.update({
+        where: { id: habitId },
+        data: { totalCompleted: { increment: 1 } },
+      });
+    } else if (!isNowCompleted && wasCompleted) {
+      await this.prisma.habit.update({
+        where: { id: habitId },
+        data: { totalCompleted: { decrement: 1 } },
+      });
+    }
+
+    return {
+      log,
+      currentValue: newVal,
+      isCompleted: isNowCompleted,
+    };
+  }
+
   async uncomplete(userId: string, habitId: string, date: string) {
     await this.assertOwnedHabit(userId, habitId);
     const parsedDate = new Date(date);

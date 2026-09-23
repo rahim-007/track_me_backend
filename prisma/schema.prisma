@@ -145,6 +145,13 @@ model Habit {
   color        String?
   repeatDays   Boolean[]     @default([true, true, true, true, true, true, true])
   reminderTime String?       // "HH:MM" format
+  isInterval      Boolean       @default(false)
+  intervalMinutes Int?
+  windowStartTime String?       // "HH:MM" format
+  windowEndTime   String?       // "HH:MM" format
+  targetValue     Float?
+  unit            String?
+  rollingInterval Boolean       @default(false)
   notes        String?
   isActive     Boolean       @default(true)
   currentStreak Int          @default(0)
@@ -175,6 +182,7 @@ model HabitLog {
   completedAt DateTime?
   isSkipped   Boolean   @default(false)
   skipReason  String?
+  currentValue Float    @default(0)
   notes       String?
   createdAt   DateTime  @default(now())
 
