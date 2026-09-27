@@ -48,6 +48,20 @@ export class HabitLogsController {
     );
   }
 
+  @Post('progress')
+  @ApiOperation({ summary: 'Log incremental progress for an interval habit' })
+  progress(
+    @Request() req: any,
+    @Body() dto: { habitId: string; date: string; increment: number },
+  ) {
+    return this.habitLogsService.logProgress(
+      req.user.id,
+      dto.habitId,
+      dto.date,
+      dto.increment,
+    );
+  }
+
   @Delete(':habitId/:date')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Uncomplete a habit for a date' })

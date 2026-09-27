@@ -49,7 +49,13 @@ describe('ReminderSchedulerService.tick (habits)', () => {
     expect(sent).toBe(1);
     // Queries ALL habits with a reminder time — per-user tz matching is in JS.
     expect(prisma.habit.findMany).toHaveBeenCalledWith({
-      where: { isActive: true, reminderTime: { not: null } },
+      where: {
+        isActive: true,
+        OR: [
+          { reminderTime: { not: null } },
+          { isInterval: true },
+        ],
+      },
       select: {
         id: true,
         userId: true,
@@ -57,6 +63,12 @@ describe('ReminderSchedulerService.tick (habits)', () => {
         emoji: true,
         repeatDays: true,
         reminderTime: true,
+        isInterval: true,
+        intervalMinutes: true,
+        windowStartTime: true,
+        windowEndTime: true,
+        targetValue: true,
+        unit: true,
         user: { select: { timezone: true } },
       },
     });

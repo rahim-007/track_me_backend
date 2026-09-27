@@ -133,13 +133,14 @@ export class ReminderSchedulerService implements OnModuleInit, OnModuleDestroy {
   // ───────────────────────────────────────────────────────────────────────────
 
   private async checkHabitReminders(now: Date): Promise<number> {
-    // Every active habit that has a reminder time. Per-user timezone matching
-    // happens in JS below — a single global HH:MM filter would miss users in
-    // other timezones.
+    // Active habits with either a fixed reminderTime or an interval configuration.
     const habits = await this.prisma.habit.findMany({
       where: {
         isActive: true,
-        reminderTime: { not: null },
+        OR: [
+          { reminderTime: { not: null } },
+          { isInterval: true },
+        ],
       },
       select: {
         id: true,
@@ -148,35 +149,67 @@ export class ReminderSchedulerService implements OnModuleInit, OnModuleDestroy {
         emoji: true,
         repeatDays: true,
         reminderTime: true,
+        isInterval: true,
+        intervalMinutes: true,
+        windowStartTime: true,
+        windowEndTime: true,
+        targetValue: true,
+        unit: true,
         user: { select: { timezone: true } },
       },
     });
 
+    const parseMins = (hhmmStr: string) => {
+      const parts = hhmmStr.split(':');
+      return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+    };
+
     // Due = reminder time matches the user's local clock AND the weekday is
-    // scheduled. Grouped by effective timezone so "today" (for the idempotency
-    // and completion checks below) is each user's local calendar day.
-    const groups = new Map<string, HabitRow[]>();
+    // scheduled. Grouped by effective timezone so "today" is each user's local calendar day.
+    const groups = new Map<string, { habit: HabitRow; slot: string }[]>();
     for (const h of habits) {
       const tz = this.effectiveTz(h.user?.timezone);
       const { hhmm, weekday } = this.timeParts(now, tz);
-      if (h.reminderTime !== hhmm) continue;
       if (!Array.isArray(h.repeatDays) || h.repeatDays[weekday] !== true)
         continue;
+
+      let isDue = false;
+      if (
+        h.isInterval &&
+        h.windowStartTime &&
+        h.windowEndTime &&
+        h.intervalMinutes &&
+        h.intervalMinutes > 0
+      ) {
+        const nowMins = parseMins(hhmm);
+        const startMins = parseMins(h.windowStartTime);
+        const endMins = parseMins(h.windowEndTime);
+        if (nowMins >= startMins && nowMins <= endMins) {
+          const diff = nowMins - startMins;
+          if (diff % h.intervalMinutes === 0) {
+            isDue = true;
+          }
+        }
+      } else if (h.reminderTime === hhmm) {
+        isDue = true;
+      }
+
+      if (!isDue) continue;
       const list = groups.get(tz) ?? [];
-      list.push(h);
+      list.push({ habit: h, slot: hhmm });
       groups.set(tz, list);
     }
     if (groups.size === 0) return 0;
 
     let sent = 0;
-    for (const [tz, due] of groups) {
+    for (const [tz, dueList] of groups) {
       const { dateStr } = this.timeParts(now, tz);
       const startOfToday = new Date(`${dateStr}T00:00:00.000Z`);
-      const userIds = [...new Set(due.map((h) => h.userId))];
-      const habitIds = due.map((h) => h.id);
+      const userIds = [...new Set(dueList.map((d) => d.habit.userId))];
+      const habitIds = [...new Set(dueList.map((d) => d.habit.id))];
 
-      const [sentToday, completedToday] = await Promise.all([
-        // Idempotency: what has already been pushed today (restart-safe).
+      const [sentToday, logsToday] = await Promise.all([
+        // Idempotency: notifications pushed today
         this.prisma.notification.findMany({
           where: {
             userId: { in: userIds },
@@ -185,38 +218,68 @@ export class ReminderSchedulerService implements OnModuleInit, OnModuleDestroy {
           },
           select: { userId: true, data: true },
         }),
-        // Don't remind for something already done today.
+        // Don't remind for habits already completed today or target met
         this.prisma.habitLog.findMany({
           where: {
             habitId: { in: habitIds },
             date: startOfToday,
             isSkipped: false,
           },
-          select: { habitId: true },
+          select: { habitId: true, completedAt: true, currentValue: true },
         }),
       ]);
 
-      const alreadySent = new Set(
-        sentToday
-          .map((n) => `${n.userId}:${(n.data as any)?.relatedId}`)
-          .filter((k) => !k.endsWith('undefined')),
-      );
-      const completed = new Set(completedToday.map((l) => l.habitId));
+      const alreadySent = new Set<string>();
+      for (const n of sentToday) {
+        const data = n.data as any;
+        const relId = data?.relatedId;
+        const slot = data?.slot;
+        if (relId) {
+          alreadySent.add(`${n.userId}:${relId}`);
+          if (slot) {
+            alreadySent.add(`${n.userId}:${relId}:${slot}`);
+          }
+        }
+      }
 
-      for (const habit of due) {
-        if (alreadySent.has(`${habit.userId}:${habit.id}`)) continue;
-        if (completed.has(habit.id)) continue;
+      const completedHabits = new Set<string>();
+      for (const log of logsToday) {
+        const item = dueList.find((d) => d.habit.id === log.habitId)?.habit;
+        if (item?.isInterval && item?.targetValue && item.targetValue > 0) {
+          if (
+            log.completedAt != null ||
+            Number(log.currentValue ?? 0) >= Number(item.targetValue)
+          ) {
+            completedHabits.add(log.habitId);
+          }
+        } else {
+          completedHabits.add(log.habitId);
+        }
+      }
+
+      for (const { habit, slot } of dueList) {
+        const sendKey = habit.isInterval
+          ? `${habit.userId}:${habit.id}:${slot}`
+          : `${habit.userId}:${habit.id}`;
+
+        if (alreadySent.has(sendKey)) continue;
+        if (completedHabits.has(habit.id)) continue;
 
         try {
+          const bodyText = habit.targetValue
+            ? `Target: ${habit.targetValue} ${habit.unit ?? ''}. Keep your streak alive!`
+            : 'Time to complete this habit. Keep your streak alive!';
+
           await this.notifications.create({
             userId: habit.userId,
             type: 'HABIT_REMINDER',
             title: `⏰ ${habit.emoji ? habit.emoji + ' ' : ''}${habit.name}`,
-            body: 'Time to complete this habit. Keep your streak alive!',
+            body: bodyText,
             data: {
               category: 'habit',
               relatedId: habit.id,
               relatedType: 'habit',
+              ...(habit.isInterval ? { slot } : {}),
               route: '/habits',
             },
           });
@@ -445,6 +508,12 @@ type HabitRow = {
   emoji: string | null;
   repeatDays: boolean[];
   reminderTime: string | null;
+  isInterval?: boolean;
+  intervalMinutes?: number | null;
+  windowStartTime?: string | null;
+  windowEndTime?: string | null;
+  targetValue?: number | null;
+  unit?: string | null;
   user?: { timezone: string | null } | null;
 };
 

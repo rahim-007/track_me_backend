@@ -229,9 +229,14 @@ export class CashFlowPeriodService {
       if (current.month === month && current.year === year) {
         period = current;
       } else {
-        throw new BadRequestException(
-          `Entry date must fall inside a valid period (${current.month}/${current.year})`,
-        );
+        period = await this.upsertPeriod(userId, {
+          month,
+          year,
+          openingBank: 0,
+          openingCash: 0,
+          openingCreditCard: 0,
+          openingDebt: 0,
+        });
       }
     }
 
@@ -324,9 +329,14 @@ export class CashFlowPeriodService {
           if (current.month === month && current.year === year) {
             period = current;
           } else {
-            throw new BadRequestException(
-              `Entry date must fall inside a valid period (${current.month}/${current.year})`,
-            );
+            period = await this.upsertPeriod(userId, {
+              month,
+              year,
+              openingBank: 0,
+              openingCash: 0,
+              openingCreditCard: 0,
+              openingDebt: 0,
+            });
           }
         }
         targetPeriod = period;

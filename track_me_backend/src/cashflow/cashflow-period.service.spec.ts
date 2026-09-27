@@ -221,18 +221,18 @@ describe('CashFlowPeriodService — month rollover & carry-forward', () => {
     expect(aug.openingBank).toBe(1500);
   });
 
-  it('rejects transactions dated outside the current period', async () => {
+  it('auto-opens period for transactions dated in past months and recalculates chain', async () => {
     const prisma = makePrismaMock();
     const svc = new CashFlowPeriodService(prisma as any, () => FIXED_AUG_2026);
 
-    await expect(
-      svc.createTransaction('u1', {
-        kind: 'OUTFLOW',
-        category: 'E',
-        amount: 100,
-        date: '2026-07-20',
-      } as any),
-    ).rejects.toThrow(BadRequestException);
+    const txn = await svc.createTransaction('u1', {
+      kind: 'OUTFLOW',
+      category: 'E',
+      amount: 100,
+      date: '2026-07-20',
+    } as any);
+    expect(txn.date).toBe('2026-07-20');
+    expect(prisma.periods.some((p: any) => p.month === 7 && p.year === 2026)).toBe(true);
   });
 
   it('accepts a transaction dated inside the current period', async () => {
