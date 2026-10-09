@@ -17,6 +17,8 @@
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
         android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
@@ -101,11 +103,18 @@
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="com.trackme.track_me.ACTION_TOGGLE_HABIT" />
+                <action android:name="com.trackme.track_me.ACTION_LIST_CLICK" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/urday_habits_widget_info" />
         </receiver>
+
+        <!-- UrDay Habits RemoteViewsService for scrollable ListView inside widget -->
+        <service
+            android:name=".UrDayHabitsWidgetService"
+            android:permission="android.permission.BIND_REMOTEVIEWS"
+            android:exported="false" />
 
         <!-- UrDay Hero Focus Goal Widget Provider (2x2) -->
         <receiver

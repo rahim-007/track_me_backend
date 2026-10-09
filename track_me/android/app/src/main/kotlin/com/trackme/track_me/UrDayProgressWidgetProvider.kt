@@ -104,7 +104,7 @@ class UrDayProgressWidgetProvider : HomeWidgetProvider() {
             }
 
             val views = RemoteViews(context.packageName, R.layout.widget_daily_progress).apply {
-                val percent = prefs.getInt("progress_percent", 0)
+                val percent = prefs.getInt("progress_percent", 0).coerceIn(0, 100)
                 val ratio = prefs.getString("progress_ratio", "0/0") ?: "0/0"
                 val streak = prefs.getInt("streak_count", 0)
                 val quote = prefs.getString(

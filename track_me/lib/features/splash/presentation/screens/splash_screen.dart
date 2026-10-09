@@ -9,6 +9,9 @@ import '../../../../core/router/app_router.dart';
 import '../../../../core/services/firebase_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../auth/providers/auth_provider.dart';
+import '../../../cashflow/providers/cashflow_provider.dart';
+import '../../../goals/providers/goals_provider.dart';
+import '../../../habits/providers/habits_provider.dart';
 import '../../../onboarding/data/models/onboarding_pref_model.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
@@ -46,40 +49,68 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     await Future.delayed(const Duration(milliseconds: 2200));
     if (!mounted) return;
 
-    bool onboardingDone = false;
-    if (!IsarService.isAvailable) {
-      // Isar initializes in the background (non-blocking startup)
-      try {
-        await IsarService.initialize().timeout(const Duration(seconds: 2));
-      } catch (_) {
-        // Local DB unavailable — fall through with onboardingDone = false.
+    try {
+      bool onboardingDone = false;
+      if (!IsarService.isAvailable) {
+        // Isar initializes in the background (non-blocking startup)
+        try {
+          await IsarService.initialize().timeout(const Duration(seconds: 2));
+        } catch (_) {
+          // Local DB unavailable — fall through with onboardingDone = false.
+        }
       }
-    }
-    if (!mounted) return;
-    if (IsarService.isAvailable) {
-      final isar = IsarService.instance;
-      final pref = await isar.onboardingPrefModels.get(1);
-      onboardingDone = pref?.isCompleted ?? false;
-    }
+      if (!mounted) return;
 
-    if (!mounted) return;
-    if (!onboardingDone) {
-      context.go(AppRoutes.onboarding);
-      return;
-    }
+      if (IsarService.isAvailable) {
+        try {
+          final isar = IsarService.instance;
+          final pref = await isar.onboardingPrefModels
+              .get(1)
+              .timeout(const Duration(milliseconds: 1500));
+          onboardingDone = pref?.isCompleted ?? false;
+        } catch (e) {
+          debugPrint('[SplashScreen] Error reading onboarding status: $e');
+        }
+      }
 
-    // Check if authenticated
-    final authenticated = await ref.read(isAuthenticatedProvider.future);
-    if (!mounted) return;
+      if (!mounted) return;
+      if (!onboardingDone) {
+        context.go(AppRoutes.onboarding);
+        return;
+      }
 
-    if (authenticated) {
-      // Best-effort: keep the backend's FCM token + timezone fresh on every
-      // launch while logged in (tokens rotate, the device timezone can change,
-      // and the previous device may be long gone).
-      unawaited(FirebaseService.registerDeviceWithBackend());
-      context.go(AppRoutes.dashboard);
-    } else {
-      context.go(AppRoutes.login);
+      // Check if authenticated with a bounded timeout
+      bool authenticated = false;
+      try {
+        authenticated = await ref
+            .read(isAuthenticatedProvider.future)
+            .timeout(const Duration(milliseconds: 2500));
+      } catch (e) {
+        debugPrint('[SplashScreen] Error checking authentication: $e');
+        authenticated = false;
+      }
+
+      if (!mounted) return;
+
+      if (authenticated) {
+        // Best-effort: keep the backend's FCM token + timezone fresh on every
+        // launch while logged in (tokens rotate, the device timezone can change,
+        // and the previous device may be long gone).
+        unawaited(FirebaseService.registerDeviceWithBackend());
+        // Eagerly fetch latest remote data so user never encounters blank/0 states
+        unawaited(ref.read(cashFlowProvider.notifier).load());
+        unawaited(ref.read(habitsProvider.notifier).loadHabits());
+        unawaited(ref.read(goalsProvider.notifier).loadGoals());
+        context.go(AppRoutes.dashboard);
+      } else {
+        context.go(AppRoutes.login);
+      }
+    } catch (criticalErr) {
+      debugPrint('[SplashScreen] Critical unhandled navigation error: $criticalErr');
+      if (mounted) {
+        // Ultimate fallback: guarantee the app never freezes on the splash screen
+        context.go(AppRoutes.login);
+      }
     }
   }
 

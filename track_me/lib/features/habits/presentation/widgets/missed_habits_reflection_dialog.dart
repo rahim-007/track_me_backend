@@ -88,7 +88,9 @@ class _MissedHabitsReflectionDialogState
     setState(() => _isSubmitting = true);
 
     // Get userId from secure storage
-    const storage = FlutterSecureStorage();
+    const storage = FlutterSecureStorage(
+      aOptions: AndroidOptions(resetOnError: true),
+    );
     final userId = await storage.read(key: AppConstants.userIdKey) ?? '';
 
     final success = await ref.read(missedReasonsNotifierProvider.notifier).saveReasons(

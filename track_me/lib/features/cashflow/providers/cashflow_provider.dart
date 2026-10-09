@@ -1,11 +1,16 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../../../core/constants/app_constants.dart';
 import '../../../core/local/json_file_cache.dart';
 import '../../../core/local/user_local_cache.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/sync/sync_manager.dart';
 import '../../../core/sync/sync_queue.dart';
 import '../../../core/widgets/home_widget_service.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../data/models/cashflow_models.dart';
 
 /// Aggregated UI state for the Cash Flow tab.
@@ -87,7 +92,7 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
     // Show cached data instantly (offline-first), then reconcile.
     final cached = await JsonFileCache.read<Map<String, dynamic>>(
       _cacheName,
-      (json) => json as Map<String, dynamic>,
+      (json) => Map<String, dynamic>.from(json as Map),
     );
     if (cached != null && !_dirtySinceLoad) {
       state = _stateFromCacheJson(cached);
@@ -97,6 +102,8 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
           HomeWidgetService.instance.syncCashFlowData(period: currentPeriod);
         } catch (_) {}
       }
+    } else if (state.current is! AsyncData) {
+      state = state.copyWith(current: const AsyncValue.loading());
     }
 
     final now = DateTime.now();
@@ -104,47 +111,108 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
     final currentYear = now.year;
     final currentKey = currentYear * 100 + currentMonth;
 
+    // Check token: fast in-memory first, then secure storage fallback
+    String? token = DioClient().cachedAccessToken;
+    if (token == null || token.isEmpty) {
+      try {
+        const storage = FlutterSecureStorage(
+          aOptions: AndroidOptions(resetOnError: true),
+        );
+        token = await storage
+            .read(key: AppConstants.accessTokenKey)
+            .timeout(const Duration(seconds: 4));
+        if (token != null && token.isNotEmpty) {
+          DioClient().setCachedAccessToken(token);
+        }
+      } catch (_) {}
+    }
+
+    if (token == null || token.isEmpty) {
+      if (cached == null && state.current.valueOrNull == null) {
+        final defaultPeriod = CashFlowPeriodModel(
+          id: 'local_${currentMonth}_$currentYear',
+          month: currentMonth,
+          year: currentYear,
+          openingBank: 0,
+          openingCash: 0,
+          openingCreditCard: 0,
+          openingDebt: 0,
+          closingBank: 0,
+          closingCash: 0,
+          closingCreditCard: 0,
+          isCurrent: true,
+        );
+        state = CashFlowState(
+          current: AsyncValue.data(defaultPeriod),
+          history: [defaultPeriod],
+        );
+      }
+      return;
+    }
+
     final profile = await UserLocalCache.instance.getProfile();
     final profileCreatedAt = profile?.createdAt;
 
     final dio = DioClient().dio;
     final List<CashFlowPeriodModel> remotePeriods = [];
     CashFlowPeriodModel? remoteCurrent;
+    bool hadNetworkFailure = false;
 
     // 1. Fetch current period from backend
     try {
       final res = await dio.get('/cashflow/periods/current');
-      final data = (res.data['data'] ?? res.data) as Map<String, dynamic>;
-      final p = CashFlowPeriodModel.fromJson(data, isCurrent: true);
-      if (p.month == currentMonth && p.year == currentYear) {
-        remoteCurrent = p;
-      } else {
-        remotePeriods.add(p.copyWith(isCurrent: false));
+      if (res.data != null) {
+        final rawData = res.data['data'] ?? res.data;
+        if (rawData is Map) {
+          final map = Map<String, dynamic>.from(rawData);
+          final p = CashFlowPeriodModel.fromJson(map, isCurrent: true);
+          if (p.month == currentMonth && p.year == currentYear) {
+            remoteCurrent = p;
+          } else {
+            remotePeriods.add(p.copyWith(isCurrent: false));
+          }
+        }
       }
-    } catch (_) {}
+    } catch (e) {
+      hadNetworkFailure = true;
+      debugPrint('[CashFlowNotifier] Failed to fetch current period: $e');
+    }
 
     // 2. Fetch history periods from backend
     try {
       final res = await dio.get('/cashflow/periods');
-      final list = ((res.data['data'] ?? res.data) as List);
-      final fetched = list
-          .map((e) => CashFlowPeriodModel.fromJson(
-                e as Map<String, dynamic>,
+      if (res.data != null) {
+        final rawData = res.data['data'] ?? res.data;
+        if (rawData is List) {
+          for (final item in rawData) {
+            if (item is Map) {
+              final map = Map<String, dynamic>.from(item);
+              final p = CashFlowPeriodModel.fromJson(
+                map,
                 isCurrent:
-                    e['month'] == currentMonth && e['year'] == currentYear,
-              ))
-          .toList();
-      remotePeriods.addAll(fetched);
-    } catch (_) {}
+                    map['month'] == currentMonth && map['year'] == currentYear,
+              );
+              remotePeriods.add(p);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      hadNetworkFailure = true;
+      debugPrint('[CashFlowNotifier] Failed to fetch periods: $e');
+    }
 
     // 3. Fetch debts
     List<DebtEntryModel> debts = state.debts;
     try {
       final res = await dio.get('/cashflow/debts');
-      final list = ((res.data['data'] ?? res.data) as List);
-      debts = list
-          .map((e) => DebtEntryModel.fromJson(e as Map<String, dynamic>))
-          .toList();
+      final rawList = res.data['data'] ?? res.data;
+      if (rawList is List) {
+        debts = rawList
+            .whereType<Map>()
+            .map((e) => DebtEntryModel.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
+      }
     } catch (_) {}
 
     // 4. Fetch debt summary
@@ -152,24 +220,53 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
     double yetToGive = state.yetToGive;
     try {
       final res = await dio.get('/cashflow/debts/summary');
-      final summary = (res.data['data'] ?? res.data) as Map<String, dynamic>;
-      yetToReceive =
-          (summary['yetToReceive'] as num?)?.toDouble() ?? yetToReceive;
-      yetToGive = (summary['yetToGive'] as num?)?.toDouble() ?? yetToGive;
+      final rawSummary = res.data['data'] ?? res.data;
+      if (rawSummary is Map) {
+        final summary = Map<String, dynamic>.from(rawSummary);
+        yetToReceive =
+            (summary['yetToReceive'] as num?)?.toDouble() ?? yetToReceive;
+        yetToGive = (summary['yetToGive'] as num?)?.toDouble() ?? yetToGive;
+      }
     } catch (_) {}
 
     if (_dirtySinceLoad) return;
 
-    // 5. Determine start date: when the user actually started using this
+    // Fresh install protection: If this device has no local cache and the backend
+    // could not be reached, build healthy local current period so the user can interact
+    // with the UI immediately rather than being stuck on an unclosable "Retry" screen.
+    // Avoid writing zero-filled placeholder data to disk until the server is reached
+    // or the user explicitly adds data.
+    final shouldSkipPersist = cached == null &&
+        remoteCurrent == null &&
+        remotePeriods.isEmpty &&
+        hadNetworkFailure &&
+        _allTransactions.isEmpty;
+
+    // 5. Pre-load transactions across all authentic periods from backend (deduplicated)
+    final authenticPeriodsToFetch = <String, CashFlowPeriodModel>{
+      if (remoteCurrent != null) remoteCurrent.id: remoteCurrent,
+      for (final p in remotePeriods) p.id: p,
+    }.values.where((p) => !p.isSynthetic && p.id.isNotEmpty).toList();
+
+    if (authenticPeriodsToFetch.isNotEmpty) {
+      await Future.wait(
+        authenticPeriodsToFetch.map((p) => _fetchPeriodTransactions(p.id)),
+      );
+    }
+
+    if (_dirtySinceLoad) return;
+
+    // 6. Determine start date: when the user actually started using this
     final startKey = _determineStartKey(
       currentKey: currentKey,
       remotePeriods: remotePeriods,
+      remoteCurrent: remoteCurrent,
       profileCreatedAt: profileCreatedAt,
     );
     _startedYear = startKey ~/ 100;
     _startedMonth = startKey % 100;
 
-    // 6. Build periods: from when the user started using this up to current month
+    // 7. Build periods: from when the user started using this up to current month
     final periodMap = _buildPeriodMap(
       sourcePeriods: [...state.history, ...remotePeriods],
       currentPeriod: remoteCurrent ?? state.current.valueOrNull,
@@ -202,15 +299,35 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
       yetToReceive: yetToReceive,
       yetToGive: yetToGive,
     );
-    await _persist();
+    if (!shouldSkipPersist) {
+      await _persist();
+    }
     if (currentPeriod.id.isNotEmpty && !currentPeriod.id.startsWith('local_')) {
       await _loadTransactions(currentPeriod.id, currentPeriod);
     }
   }
 
+  Future<void> _fetchPeriodTransactions(String periodId) async {
+    try {
+      final response = await DioClient().dio.get(
+        '/cashflow/transactions',
+        queryParameters: {'periodId': periodId},
+      );
+      final rawList = response.data['data'] ?? response.data;
+      if (rawList is List) {
+        final txns = rawList
+            .whereType<Map>()
+            .map((e) => TransactionModel.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
+        _mergeTransactions(txns);
+      }
+    } catch (_) {}
+  }
+
   int _determineStartKey({
     required int currentKey,
     required List<CashFlowPeriodModel> remotePeriods,
+    CashFlowPeriodModel? remoteCurrent,
     DateTime? profileCreatedAt,
   }) {
     final now = DateTime.now();
@@ -218,8 +335,7 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
     final prevYear = now.month == 1 ? now.year - 1 : now.year;
     final prevKey = prevYear * 100 + prevMonth;
 
-    // Start with the previous month (August) as the guaranteed starting point
-    final List<int> candidates = [prevKey];
+    final List<int> candidates = [];
 
     // 1. Real backend periods
     for (final p in remotePeriods) {
@@ -228,7 +344,13 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
       }
     }
 
-    // 2. Existing history periods that are authentic
+    // 2. Current remote period if authentic
+    if (remoteCurrent != null &&
+        remoteCurrent.isAuthentic(currentKey: currentKey)) {
+      candidates.add(remoteCurrent.year * 100 + remoteCurrent.month);
+    }
+
+    // 3. Existing history periods that are authentic
     for (final p in state.history) {
       if (p.isAuthentic(
           transactions: _allTransactions, currentKey: currentKey)) {
@@ -236,7 +358,7 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
       }
     }
 
-    // 3. Current period if authentic
+    // 4. Current period if authentic
     final c = state.current.valueOrNull;
     if (c != null &&
         c.isAuthentic(
@@ -244,7 +366,7 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
       candidates.add(c.year * 100 + c.month);
     }
 
-    // 4. Authentic transactions recorded by user
+    // 5. Authentic transactions recorded by user
     for (final t in _allTransactions) {
       final parts = t.date.split('-');
       if (parts.length >= 2) {
@@ -256,22 +378,24 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
       }
     }
 
-    // 5. Account creation date if earlier
+    // 6. Account creation date if earlier
     if (profileCreatedAt != null) {
       final profileStartKey =
           profileCreatedAt.year * 100 + profileCreatedAt.month;
       candidates.add(profileStartKey);
     }
 
-    // 6. Explicitly set started period (e.g. from setupFirstPeriod)
+    // 7. Explicitly set started period (e.g. from setupFirstPeriod)
     if (_startedYear != null && _startedMonth != null) {
       final explicitKey = _startedYear! * 100 + _startedMonth!;
       candidates.add(explicitKey);
     }
 
-    int earliest = candidates.isNotEmpty
-        ? candidates.reduce((a, b) => a < b ? a : b)
-        : prevKey;
+    if (candidates.isEmpty) {
+      candidates.add(prevKey);
+    }
+
+    int earliest = candidates.reduce((a, b) => a < b ? a : b);
 
     // Never in the future
     if (earliest > currentKey) {
@@ -403,7 +527,21 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
         }
       }
       final txns = _transactionsForPeriod(p);
-      final recomputed = _recomputePeriodWithTxns(p, txns);
+      final CashFlowPeriodModel recomputed;
+      if (txns.isEmpty && !p.isSynthetic) {
+        // Authentic backend period with figures from server:
+        // preserve server totals rather than zeroing them out.
+        recomputed = p.copyWith(
+          closingBank: (p.closingBank != 0 || p.totalIncome != 0 || p.totalOutflow != 0)
+              ? p.closingBank
+              : p.openingBank,
+          closingCash: (p.closingCash != 0 || p.totalIncome != 0 || p.totalOutflow != 0)
+              ? p.closingCash
+              : p.openingCash,
+        );
+      } else {
+        recomputed = _recomputePeriodWithTxns(p, txns);
+      }
       periodMap[k] = recomputed;
       carryBank = recomputed.closingBank;
       carryCash = recomputed.closingCash;
@@ -420,15 +558,46 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
     try {
       final response = await DioClient().dio.get('/cashflow/transactions',
           queryParameters: {'periodId': periodId});
-      final txns = ((response.data['data'] ?? response.data) as List)
-          .map((e) => TransactionModel.fromJson(e as Map<String, dynamic>))
+      final rawList = response.data['data'] ?? response.data;
+      if (rawList is! List) return;
+      final txns = rawList
+          .whereType<Map>()
+          .map((e) => TransactionModel.fromJson(Map<String, dynamic>.from(e)))
           .toList();
       if (!_dirtySinceLoad) {
         _mergeTransactions(txns);
-        final periodToUse = targetPeriod ?? state.current.valueOrNull;
+        final currentPeriod = state.current.valueOrNull;
+        final periodToUse = targetPeriod ?? currentPeriod;
         final periodTxns =
             periodToUse != null ? _transactionsForPeriod(periodToUse) : txns;
-        state = state.copyWith(transactions: periodTxns);
+
+        final CashFlowPeriodModel? recomputed = periodToUse != null
+            ? _recomputePeriodWithTxns(periodToUse, periodTxns)
+            : null;
+
+        final isTargetCurrent = currentPeriod != null &&
+            recomputed != null &&
+            (currentPeriod.id == recomputed.id ||
+                (currentPeriod.month == recomputed.month &&
+                    currentPeriod.year == recomputed.year));
+
+        final updatedHistory = state.history.map((p) {
+          if (recomputed != null &&
+              (p.id == recomputed.id ||
+                  (p.month == recomputed.month && p.year == recomputed.year))) {
+            return recomputed;
+          }
+          final pTxns = _transactionsForPeriod(p);
+          return pTxns.isNotEmpty ? _recomputePeriodWithTxns(p, pTxns) : p;
+        }).toList();
+
+        state = state.copyWith(
+          current: isTargetCurrent
+              ? AsyncValue.data(recomputed)
+              : state.current,
+          history: updatedHistory,
+          transactions: periodTxns,
+        );
         await _persist();
       }
     } catch (_) {}
@@ -437,7 +606,9 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
   /// View a past month's data and transactions (read-only history).
   Future<void> selectPeriod(CashFlowPeriodModel period) async {
     final periodTxns = _transactionsForPeriod(period);
-    final recomputed = _recomputePeriodWithTxns(period, periodTxns);
+    final periodToDisplay = (periodTxns.isEmpty && !period.isSynthetic)
+        ? period
+        : _recomputePeriodWithTxns(period, periodTxns);
     final exists = state.history.any((p) =>
         p.id == period.id ||
         (p.month == period.month && p.year == period.year));
@@ -445,10 +616,10 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
         ? state.history
             .map((p) => (p.id == period.id ||
                     (p.month == period.month && p.year == period.year))
-                ? recomputed
+                ? periodToDisplay
                 : p)
             .toList()
-        : [...state.history, recomputed];
+        : [...state.history, periodToDisplay];
     state = state.copyWith(
       transactions: periodTxns,
       history: updatedHistory,
@@ -465,9 +636,11 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
     final current = state.current.valueOrNull;
     if (current != null) {
       final currentTxns = _transactionsForPeriod(current);
-      final recomputed = _recomputePeriodWithTxns(current, currentTxns);
+      final periodToDisplay = (currentTxns.isEmpty && !current.isSynthetic)
+          ? current
+          : _recomputePeriodWithTxns(current, currentTxns);
       state = state.copyWith(
-        current: AsyncValue.data(recomputed),
+        current: AsyncValue.data(periodToDisplay),
         transactions: currentTxns,
       );
       if (current.id.isNotEmpty && !current.id.startsWith('local_')) {
@@ -506,15 +679,17 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
     state = state.copyWith(current: AsyncValue.data(optimisticPeriod));
     await _persist();
 
+    final payload = {
+      'month': month,
+      'year': year,
+      'openingBank': bank,
+      'openingCash': cash,
+      'openingCreditCard': creditCard,
+      'openingDebt': debt,
+    };
+
     try {
-      final response = await DioClient().dio.post('/cashflow/periods', data: {
-        'month': month,
-        'year': year,
-        'openingBank': bank,
-        'openingCash': cash,
-        'openingCreditCard': creditCard,
-        'openingDebt': debt,
-      });
+      final response = await DioClient().dio.post('/cashflow/periods', data: payload);
       final periodData =
           (response.data['data'] ?? response.data) as Map<String, dynamic>;
       final period = CashFlowPeriodModel.fromJson(
@@ -523,7 +698,20 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
       );
       state = state.copyWith(current: AsyncValue.data(period));
       await _persist();
-    } catch (_) {}
+      // Re-load periods so backend recalculated future rollover balances and history are synchronized.
+      await load();
+    } catch (e) {
+      debugPrint('[CashFlowNotifier] setupFirstPeriod remote error: $e. Enqueuing sync.');
+      await SyncManager.instance.enqueue(
+        SyncAction(
+          type: SyncActionType.genericRequest,
+          endpoint: '/cashflow/periods',
+          method: 'POST',
+          payload: payload,
+        ),
+      );
+      unawaited(SyncManager.instance.sync());
+    }
   }
 
   Future<void> updateOpeningBalances({
@@ -531,10 +719,26 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
     required Map<String, double> balances,
   }) async {
     _dirtySinceLoad = true;
+    final isBackendId = periodId.isNotEmpty &&
+        !periodId.startsWith('local_') &&
+        !periodId.startsWith('period_');
     try {
-      await DioClient()
-          .dio
-          .patch('/cashflow/periods/$periodId/balances', data: balances);
+      if (isBackendId) {
+        await DioClient()
+            .dio
+            .patch('/cashflow/periods/$periodId/balances', data: balances);
+      }
+    } catch (_) {
+      if (isBackendId) {
+        await SyncManager.instance.enqueue(
+          SyncAction(
+            type: SyncActionType.genericRequest,
+            endpoint: '/cashflow/periods/$periodId/balances',
+            method: 'PATCH',
+            payload: balances,
+          ),
+        );
+      }
     } finally {
       await load();
     }
@@ -651,9 +855,10 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
     await _persist();
 
     // Check if it is a backend ID
-    final isBackendId = txn.id.length == 24 &&
+    final isBackendId = txn.id.isNotEmpty &&
         !txn.id.startsWith('local_') &&
-        !txn.id.startsWith('temp_');
+        !txn.id.startsWith('temp_') &&
+        !txn.id.startsWith('txn_');
 
     try {
       if (isBackendId) {
@@ -727,8 +932,10 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
     await _persist();
 
     // 2. If it's a local/temporary ID, it doesn't exist on backend
-    final isBackendId =
-        id.length == 24 && !id.startsWith('local_') && !id.startsWith('temp_');
+    final isBackendId = id.isNotEmpty &&
+        !id.startsWith('local_') &&
+        !id.startsWith('temp_') &&
+        !id.startsWith('txn_');
 
     try {
       if (isBackendId) {
@@ -827,6 +1034,15 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
       await _refreshDebtSummary();
       await _persist();
     } catch (_) {
+      await SyncManager.instance.enqueue(
+        SyncAction(
+          type: SyncActionType.genericRequest,
+          endpoint: '/cashflow/debts',
+          method: 'POST',
+          payload: entry.toCreateJson(),
+          tempId: entry.id,
+        ),
+      );
       await _persist();
     }
   }
@@ -846,19 +1062,35 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
       debts:
           state.debts.map((d) => d.id == entry.id ? updatedLocal : d).toList(),
     );
+    final isBackendId = entry.id.isNotEmpty &&
+        !entry.id.startsWith('local_') &&
+        !entry.id.startsWith('temp_') &&
+        !entry.id.startsWith('debt_');
     try {
-      final response = await DioClient()
-          .dio
-          .patch('/cashflow/debts/${entry.id}', data: {'settled': settled});
-      final savedData =
-          (response.data['data'] ?? response.data) as Map<String, dynamic>;
-      final updated = DebtEntryModel.fromJson(savedData);
-      state = state.copyWith(
-        debts: state.debts.map((d) => d.id == entry.id ? updated : d).toList(),
-      );
+      if (isBackendId) {
+        final response = await DioClient()
+            .dio
+            .patch('/cashflow/debts/${entry.id}', data: {'settled': settled});
+        final savedData =
+            (response.data['data'] ?? response.data) as Map<String, dynamic>;
+        final updated = DebtEntryModel.fromJson(savedData);
+        state = state.copyWith(
+          debts: state.debts.map((d) => d.id == entry.id ? updated : d).toList(),
+        );
+      }
       await _refreshDebtSummary();
       await _persist();
     } catch (_) {
+      if (isBackendId) {
+        await SyncManager.instance.enqueue(
+          SyncAction(
+            type: SyncActionType.genericRequest,
+            endpoint: '/cashflow/debts/${entry.id}',
+            method: 'PATCH',
+            payload: {'settled': settled},
+          ),
+        );
+      }
       await _persist();
     }
   }
@@ -868,14 +1100,25 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
     final before = state.debts;
     state = state.copyWith(debts: before.where((d) => d.id != id).toList());
     await _persist();
-    final isBackendId =
-        id.length == 24 && !id.startsWith('local_') && !id.startsWith('temp_');
+    final isBackendId = id.isNotEmpty &&
+        !id.startsWith('local_') &&
+        !id.startsWith('temp_') &&
+        !id.startsWith('debt_');
     try {
       if (isBackendId) {
         await DioClient().dio.delete('/cashflow/debts/$id');
       }
       await _refreshDebtSummary();
     } catch (_) {
+      if (isBackendId) {
+        await SyncManager.instance.enqueue(
+          SyncAction(
+            type: SyncActionType.genericRequest,
+            endpoint: '/cashflow/debts/$id',
+            method: 'DELETE',
+          ),
+        );
+      }
       await _refreshDebtSummary();
     }
   }
@@ -964,7 +1207,8 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
     _allTransactions = ((json['allTransactions'] as List?) ??
             (json['transactions'] as List?) ??
             const [])
-        .map((e) => TransactionModel.fromJson(e as Map<String, dynamic>))
+        .whereType<Map>()
+        .map((e) => TransactionModel.fromJson(Map<String, dynamic>.from(e)))
         .toList();
 
     final now = DateTime.now();
@@ -976,8 +1220,11 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
     // Discard any dummy synthetic periods that have no authentic user activity
     // (preserving current and previous month)
     final cleanHistory = ((json['history'] as List?) ?? const [])
-        .map((e) => CashFlowPeriodModel.fromJson(e as Map<String, dynamic>,
-            isCurrent: false))
+        .whereType<Map>()
+        .map((e) => CashFlowPeriodModel.fromJson(
+              Map<String, dynamic>.from(e),
+              isCurrent: false,
+            ))
         .where((p) {
           final k = p.year * 100 + p.month;
           if (k == currentKey || k == prevKey) return true;
@@ -991,16 +1238,18 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
           ? const AsyncValue.loading()
           : AsyncValue.data(
               CashFlowPeriodModel.fromJson(
-                (json['current'] as Map<String, dynamic>)..['isCurrent'] = null,
+                Map<String, dynamic>.from(json['current'] as Map)..['isCurrent'] = null,
                 isCurrent: true,
               ),
             ),
       history: cleanHistory,
       transactions: ((json['transactions'] as List?) ?? const [])
-          .map((e) => TransactionModel.fromJson(e as Map<String, dynamic>))
+          .whereType<Map>()
+          .map((e) => TransactionModel.fromJson(Map<String, dynamic>.from(e)))
           .toList(),
       debts: ((json['debts'] as List?) ?? const [])
-          .map((e) => DebtEntryModel.fromJson(e as Map<String, dynamic>))
+          .whereType<Map>()
+          .map((e) => DebtEntryModel.fromJson(Map<String, dynamic>.from(e)))
           .toList(),
       yetToReceive: (json['yetToReceive'] as num?)?.toDouble() ?? 0,
       yetToGive: (json['yetToGive'] as num?)?.toDouble() ?? 0,
@@ -1027,6 +1276,14 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
     });
   }
 
+  void clear() {
+    _allTransactions = [];
+    _startedYear = null;
+    _startedMonth = null;
+    _dirtySinceLoad = false;
+    state = const CashFlowState();
+  }
+
   static Map<String, dynamic> toDebtJson(DebtEntryModel d) => {
         'id': d.id,
         'direction': d.theyOweMe ? 'RECEIVE' : 'GIVE',
@@ -1040,5 +1297,13 @@ class CashFlowNotifier extends StateNotifier<CashFlowState> {
 
 final cashFlowProvider =
     StateNotifierProvider<CashFlowNotifier, CashFlowState>((ref) {
-  return CashFlowNotifier();
+  final notifier = CashFlowNotifier();
+  ref.listen<AuthState>(authNotifierProvider, (previous, next) {
+    if (next is AuthSuccess) {
+      notifier.load();
+    } else if (next is AuthInitial || next is AuthAccountDeleted) {
+      notifier.clear();
+    }
+  });
+  return notifier;
 });

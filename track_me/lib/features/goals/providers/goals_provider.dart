@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../../../core/constants/app_constants.dart';
 import '../../../core/local/json_file_cache.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/sync/sync_manager.dart';
@@ -30,6 +32,25 @@ class GoalsNotifier extends StateNotifier<GoalsState> {
     }
 
     _dirtySinceLoad = false;
+
+    // Do not fire unauthenticated network requests that trigger 401 errors
+    try {
+      const storage = FlutterSecureStorage(
+        aOptions: AndroidOptions(resetOnError: true),
+      );
+      final token = await storage
+          .read(key: AppConstants.accessTokenKey)
+          .timeout(const Duration(seconds: 2));
+      if (token == null || token.isEmpty) {
+        if (cached != null && cached.isNotEmpty) {
+          state = AsyncValue.data(cached);
+        } else {
+          state = const AsyncValue.data([]);
+        }
+        return;
+      }
+    } catch (_) {}
+
     try {
       final client = DioClient();
       final response = await client.dio.get('/goals');

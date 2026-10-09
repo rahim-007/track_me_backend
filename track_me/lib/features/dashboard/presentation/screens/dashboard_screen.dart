@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -36,14 +37,7 @@ String _formatGreetingName(String? raw) {
 
 @visibleForTesting
 List<HabitModel> habitsScheduledOn(List<HabitModel> habits, DateTime date) {
-  final weekdayIndex = date.weekday - 1; // 0 = Monday
-  return habits.where((h) {
-    final hasRepeatDay = h.repeatDays.any((d) => d);
-    if (!hasRepeatDay) return true;
-    return weekdayIndex >= 0 &&
-        weekdayIndex < h.repeatDays.length &&
-        h.repeatDays[weekdayIndex];
-  }).toList();
+  return habits.where((h) => h.isScheduledOn(date)).toList();
 }
 
 class DashboardScreen extends ConsumerStatefulWidget {
@@ -515,140 +509,159 @@ class _ProgressBannerCard extends StatelessWidget {
     final progressFactor = (displayPercent / 100.0).clamp(0.0, 1.0);
     final gradientColors = [const Color(0xFF5848D6), const Color(0xFF4930D8)];
 
-    return Container(
-      height: 180,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: gradientColors.first,
-        gradient: LinearGradient(
-          colors: gradientColors,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: gradientColors.first.withOpacity(0.35),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cardWidth = constraints.maxWidth;
+        final isCompact = cardWidth < 360;
+        final mountainWidth = (cardWidth * 0.50).clamp(150.0, 260.0);
+        final mountainHeight = mountainWidth * (195.0 / 260.0);
+        final progressWidth = (cardWidth * 0.40).clamp(120.0, 175.0);
+        final textAvailableWidth = cardWidth - (mountainWidth * 0.72);
+
+        return Container(
+          height: 180,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: gradientColors.first,
+            gradient: LinearGradient(
+              colors: gradientColors,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: gradientColors.first.withOpacity(0.35),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: Stack(
-          children: [
-            // Exact Mountain Illustration Asset with Flag, Clouds and Winding Road
-            Positioned(
-              right: -10,
-              bottom: -18,
-              width: 260,
-              height: 195,
-              child: Image.asset(
-                'assets/images/mountain_illustration.png',
-                fit: BoxFit.contain,
-                alignment: Alignment.bottomRight,
-                errorBuilder: (context, error, stackTrace) {
-                  return CustomPaint(painter: _MountainPainter());
-                },
-              ),
-            ),
-            // Left Accent Vertical Line (Matching Goal & Habit banners)
-            Positioned(
-              left: 0,
-              top: 0,
-              bottom: 0,
-              child: Container(
-                width: 4,
-                color: const Color(0xFF8B6EF5),
-              ),
-            ),
-            // Card Content
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            'Weekly Progress',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white.withOpacity(0.92),
-                              letterSpacing: 0.2,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: Stack(
+              children: [
+                // Exact Mountain Illustration Asset with Flag, Clouds and Winding Road (responsive)
+                Positioned(
+                  right: -8,
+                  bottom: -15,
+                  width: mountainWidth,
+                  height: mountainHeight,
+                  child: Image.asset(
+                    'assets/images/mountain_illustration.png',
+                    fit: BoxFit.contain,
+                    alignment: Alignment.bottomRight,
+                    errorBuilder: (context, error, stackTrace) {
+                      return CustomPaint(painter: _MountainPainter());
+                    },
+                  ),
+                ),
+                // Left Accent Vertical Line (Matching Goal & Habit banners)
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  child: Container(
+                    width: 4,
+                    color: const Color(0xFF8B6EF5),
+                  ),
+                ),
+                // Card Content (width-constrained to prevent overlapping mountain illustration)
+                Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isCompact ? 16 : 22,
+                    vertical: isCompact ? 16 : 20,
+                  ),
+                  child: SizedBox(
+                    width: textAvailableWidth,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  'Weekly Progress',
+                                  style: TextStyle(
+                                    fontSize: isCompact ? 13 : 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white.withOpacity(0.92),
+                                    letterSpacing: 0.2,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.18),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Text(
+                                    'This Week',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.18),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Text(
-                              'This Week',
+                            const SizedBox(height: 4),
+                            Text(
+                              '$displayPercent%',
                               style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
+                                fontSize: isCompact ? 36 : 42,
+                                fontWeight: FontWeight.w800,
                                 color: Colors.white,
+                                letterSpacing: -1.5,
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '$displayPercent%',
-                        style: const TextStyle(
-                          fontSize: 42,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                          letterSpacing: -1.5,
+                          ],
                         ),
-                      ),
-                    ],
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // White Progress Line Bar
+                            SizedBox(
+                              width: progressWidth,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: LinearProgressIndicator(
+                                  value: progressFactor.clamp(0.0, 1.0),
+                                  backgroundColor: Colors.white.withOpacity(0.25),
+                                  color: Colors.white,
+                                  minHeight: 6,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              stats.scheduledCount > 0
+                                  ? '${stats.completedCount} of ${stats.scheduledCount} completed this week'
+                                  : (habits.isEmpty ? "Keep going! You're doing great." : 'No habits scheduled yet'),
+                              style: TextStyle(
+                                fontSize: isCompact ? 11.5 : 12.5,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white.withOpacity(0.95),
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // White Progress Line Bar
-                      SizedBox(
-                        width: 170,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: LinearProgressIndicator(
-                            value: progressFactor.clamp(0.0, 1.0),
-                            backgroundColor: Colors.white.withOpacity(0.25),
-                            color: Colors.white,
-                            minHeight: 6,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        stats.scheduledCount > 0
-                            ? '${stats.completedCount} of ${stats.scheduledCount} completed this week'
-                            : (habits.isEmpty ? "Keep going! You're doing great." : 'No habits scheduled yet'),
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white.withOpacity(0.95),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -818,14 +831,22 @@ class _StatCard extends StatelessWidget {
 
 // ─── 4. Today's Habits Section Widget ─────────────────────────────────────────
 
-class _TodaysHabitsSection extends ConsumerWidget {
+class _TodaysHabitsSection extends ConsumerStatefulWidget {
   final List<HabitModel> habits;
 
   const _TodaysHabitsSection({required this.habits});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final scheduledHabits = habitsScheduledOn(habits, DateTime.now());
+  ConsumerState<_TodaysHabitsSection> createState() =>
+      _TodaysHabitsSectionState();
+}
+
+class _TodaysHabitsSectionState extends ConsumerState<_TodaysHabitsSection> {
+  bool _isReordering = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheduledHabits = habitsScheduledOn(widget.habits, DateTime.now());
     final completedCount = scheduledHabits.where((h) => h.isCompletedToday).length;
     final totalCount = scheduledHabits.length;
 
@@ -841,14 +862,14 @@ class _TodaysHabitsSection extends ConsumerWidget {
                 const Text('⚡', style: TextStyle(fontSize: 18)),
                 const SizedBox(width: 6),
                 Text(
-                  "Today's Habits",
+                  _isReordering ? "Arrange Habits" : "Today's Habits",
                   style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textPrimary,
                   ),
                 ),
-                if (totalCount > 0) ...[
+                if (!_isReordering && totalCount > 0) ...[
                   const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -865,20 +886,86 @@ class _TodaysHabitsSection extends ConsumerWidget {
                       ),
                     ),
                   ),
+                ] else if (_isReordering) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      'Drag items',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
                 ],
               ],
             ),
-            GestureDetector(
-              onTap: () => context.go(AppRoutes.habits),
-              child: Text(
-                'View All >',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primary,
+            if (_isReordering)
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  setState(() => _isReordering = false);
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: AppShadows.soft,
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.check_rounded, color: Colors.white, size: 14),
+                      SizedBox(width: 4),
+                      Text(
+                        'Done',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+              )
+            else
+              Row(
+                children: [
+                  if (totalCount > 1) ...[
+                    IconButton(
+                      icon: const Icon(Icons.swap_vert_rounded, size: 20),
+                      color: AppColors.primary,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      tooltip: 'Reorder habits',
+                      onPressed: () {
+                        HapticFeedback.mediumImpact();
+                        setState(() => _isReordering = true);
+                      },
+                    ),
+                    const SizedBox(width: 14),
+                  ],
+                  GestureDetector(
+                    onTap: () => context.go(AppRoutes.habits),
+                    child: Text(
+                      'View All >',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
           ],
         ),
         const SizedBox(height: 14),
@@ -929,6 +1016,147 @@ class _TodaysHabitsSection extends ConsumerWidget {
               ],
             ),
           )
+        else if (_isReordering)
+          ReorderableListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            buildDefaultDragHandles: false,
+            itemCount: scheduledHabits.length,
+            onReorder: (oldIndex, newIndex) {
+              if (oldIndex < newIndex) newIndex -= 1;
+              final list = List<HabitModel>.from(scheduledHabits);
+              final item = list.removeAt(oldIndex);
+              list.insert(newIndex, item);
+              ref.read(habitsProvider.notifier).reorderVisibleHabits(list);
+            },
+            itemBuilder: (context, index) {
+              final habit = scheduledHabits[index];
+              final isDone = habit.isCompletedToday;
+              return Padding(
+                key: ValueKey(habit.id),
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: AppColors.primary.withOpacity(0.35),
+                      width: 1.5,
+                    ),
+                    boxShadow: AppShadows.soft,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    child: Row(
+                      children: [
+                        // Category Icon Badge
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: isDone
+                                ? (AppColors.isDarkMode
+                                    ? const Color(0x2810B981)
+                                    : const Color(0xFFECFDF5))
+                                : AppColors.primaryContainer,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Center(
+                            child: Text(
+                              (habit.emoji != null && habit.emoji!.trim().isNotEmpty)
+                                  ? habit.emoji!
+                                  : _getCategoryEmoji(habit.category),
+                              style: const TextStyle(fontSize: 22),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        // Habit Name & Category Tag
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      habit.name,
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.textPrimary,
+                                        decoration: isDone
+                                            ? TextDecoration.lineThrough
+                                            : null,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primaryContainer,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      habit.category,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.primary,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  const Text('🔥', style: TextStyle(fontSize: 11)),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${calculateHabitStreak(habit)} day streak',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w500,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Drag Handle
+                        ReorderableDragStartListener(
+                          index: index,
+                          child: Container(
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryContainer,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.drag_handle_rounded,
+                              color: AppColors.primary,
+                              size: 22,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          )
         else
           ListView.separated(
             shrinkWrap: true,
@@ -938,138 +1166,146 @@ class _TodaysHabitsSection extends ConsumerWidget {
             itemBuilder: (context, index) {
               final habit = scheduledHabits[index];
               final isDone = habit.isCompletedToday;
-              return Container(
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: isDone
-                        ? const Color(0xFF10B981).withOpacity(0.3)
-                        : AppColors.borderLine,
+              return GestureDetector(
+                onLongPress: totalCount > 1
+                    ? () {
+                        HapticFeedback.mediumImpact();
+                        setState(() => _isReordering = true);
+                      }
+                    : null,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: isDone
+                          ? const Color(0xFF10B981).withOpacity(0.3)
+                          : AppColors.borderLine,
+                    ),
+                    boxShadow: AppShadows.soft,
                   ),
-                  boxShadow: AppShadows.soft,
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  child: Row(
-                    children: [
-                      // Category Icon Badge
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: isDone
-                              ? (AppColors.isDarkMode
-                                  ? const Color(0x2810B981)
-                                  : const Color(0xFFECFDF5))
-                              : AppColors.primaryContainer,
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Center(
-                          child: Text(
-                            (habit.emoji != null && habit.emoji!.trim().isNotEmpty)
-                                ? habit.emoji!
-                                : _getCategoryEmoji(habit.category),
-                            style: const TextStyle(fontSize: 22),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      // Habit Name & Category Tag
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Flexible(
-                                  child: Text(
-                                    habit.name,
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.textPrimary,
-                                      decoration: isDone
-                                          ? TextDecoration.lineThrough
-                                          : null,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primaryContainer,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    habit.category,
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.primary,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                const Text('🔥', style: TextStyle(fontSize: 11)),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '${calculateHabitStreak(habit)} day streak',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w500,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      // Interactive Checkbox Toggle Button
-                      GestureDetector(
-                        onTap: () {
-                          ref
-                              .read(habitsProvider.notifier)
-                              .toggleCompletion(habit, DateTime.now(), debounce: true);
-                        },
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          width: 38,
-                          height: 38,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    child: Row(
+                      children: [
+                        // Category Icon Badge
+                        Container(
+                          width: 44,
+                          height: 44,
                           decoration: BoxDecoration(
                             color: isDone
-                                ? const Color(0xFF10B981)
-                                : Colors.transparent,
-                            shape: BoxShape.circle,
-                            border: isDone
-                                ? null
-                                : Border.all(
-                                    color: AppColors.primary,
-                                    width: 2,
-                                  ),
+                                ? (AppColors.isDarkMode
+                                    ? const Color(0x2810B981)
+                                    : const Color(0xFFECFDF5))
+                                : AppColors.primaryContainer,
+                            borderRadius: BorderRadius.circular(14),
                           ),
-                          child: isDone
-                              ? const Icon(
-                                  Icons.check_rounded,
-                                  color: Colors.white,
-                                  size: 22,
-                                )
-                              : null,
+                          child: Center(
+                            child: Text(
+                              (habit.emoji != null && habit.emoji!.trim().isNotEmpty)
+                                  ? habit.emoji!
+                                  : _getCategoryEmoji(habit.category),
+                              style: const TextStyle(fontSize: 22),
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 12),
+                        // Habit Name & Category Tag
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      habit.name,
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.textPrimary,
+                                        decoration: isDone
+                                            ? TextDecoration.lineThrough
+                                            : null,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primaryContainer,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      habit.category,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.primary,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  const Text('🔥', style: TextStyle(fontSize: 11)),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${calculateHabitStreak(habit)} day streak',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w500,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Interactive Checkbox Toggle Button
+                        GestureDetector(
+                          onTap: () {
+                            ref
+                                .read(habitsProvider.notifier)
+                                .toggleCompletion(habit, DateTime.now(), debounce: true);
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              color: isDone
+                                  ? const Color(0xFF10B981)
+                                  : Colors.transparent,
+                              shape: BoxShape.circle,
+                              border: isDone
+                                  ? null
+                                  : Border.all(
+                                      color: AppColors.primary,
+                                      width: 2,
+                                    ),
+                            ),
+                            child: isDone
+                                ? const Icon(
+                                    Icons.check_rounded,
+                                    color: Colors.white,
+                                    size: 22,
+                                  )
+                                : null,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               );

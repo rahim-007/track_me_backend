@@ -54,7 +54,8 @@ struct UrDayTimelineProvider: TimelineProvider {
 
     private func fetchCurrentEntry() -> UrDayEntry {
         let userDefaults = UserDefaults(suiteName: appGroupId)
-        let percent = userDefaults?.integer(forKey: "progress_percent") ?? 0
+        let rawPercent = userDefaults?.integer(forKey: "progress_percent") ?? 0
+        let percent = min(max(rawPercent, 0), 100)
         let ratio = userDefaults?.string(forKey: "progress_ratio") ?? "0/0"
         let streak = userDefaults?.integer(forKey: "streak_count") ?? 0
         let quote = userDefaults?.string(forKey: "daily_quote") ?? "Small healthy choices become a strong life."
@@ -212,6 +213,7 @@ struct UrDayProgressWidgetView: View {
 struct UrDayHabitsWidgetView: View {
     var entry: UrDayTimelineProvider.Entry
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.widgetFamily) var family
 
     var body: some View {
         let isDark = colorScheme == .dark
@@ -265,7 +267,8 @@ struct UrDayHabitsWidgetView: View {
                     .frame(maxWidth: .infinity, alignment: .center)
                 Spacer()
             } else {
-                ForEach(entry.habits.prefix(4)) { habit in
+                let maxHabits = family == .systemLarge ? 9 : 4
+                ForEach(entry.habits.prefix(maxHabits)) { habit in
                     Link(destination: URL(string: "urday://habits?toggle=\(habit.id)")!) {
                         HStack(spacing: 8) {
                             ZStack {
@@ -405,7 +408,7 @@ struct UrDayCashFlowWidgetView: View {
             HStack(spacing: 4) {
                 Text("✨")
                     .font(.system(size: 10))
-                Text("NET CASH FLOW")
+                Text("UrDay • Cash Flow")
                     .font(.system(size: 10, weight: .heavy))
                     .foregroundColor(Color(hex: "E8E4FF"))
                     .tracking(0.8)
@@ -531,7 +534,7 @@ struct UrDayHabitsWidget: Widget {
         }
         .configurationDisplayName("UrDay Habits")
         .description("View and toggle today's habits directly from the home screen.")
-        .supportedFamilies([.systemMedium])
+        .supportedFamilies([.systemMedium, .systemLarge])
     }
 }
 

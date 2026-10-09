@@ -42,8 +42,12 @@ class UserLocalCache {
     // 2. Fallback to Isar UserLocalModel if available
     if (IsarService.isAvailable) {
       try {
-        const storage = FlutterSecureStorage();
-        final userId = await storage.read(key: AppConstants.userIdKey);
+        const storage = FlutterSecureStorage(
+          aOptions: AndroidOptions(resetOnError: true),
+        );
+        final userId = await storage
+            .read(key: AppConstants.userIdKey)
+            .timeout(const Duration(seconds: 2));
         if (userId != null && userId.isNotEmpty) {
           final isar = IsarService.instance;
           final isarUser = await isar.userLocalModels.getByUserId(userId);

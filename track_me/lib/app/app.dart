@@ -8,6 +8,7 @@ import '../core/router/app_router.dart';
 import '../core/theme/app_theme.dart';
 import '../core/theme/theme_provider.dart';
 import '../core/widgets/home_widget_service.dart';
+import '../features/auth/providers/auth_provider.dart';
 import '../features/cashflow/presentation/widgets/add_entry_sheet.dart';
 import '../features/goals/data/models/goal_model.dart';
 import '../features/goals/presentation/widgets/add_goal_dialog.dart';
@@ -47,6 +48,9 @@ class _TrackMeAppState extends ConsumerState<TrackMeApp>
   }
 
   Future<void> _handleAppResumed() async {
+    final isAuth =
+        await ref.read(authNotifierProvider.notifier).isAuthenticated();
+    if (!isAuth) return;
     await HomeWidgetService.instance.processPendingToggles(ref);
     await ref.read(habitsProvider.notifier).loadHabits();
   }
@@ -58,10 +62,21 @@ class _TrackMeAppState extends ConsumerState<TrackMeApp>
     await HomeWidgetService.instance.processPendingToggles(ref);
   }
 
-  void _handleWidgetUri(Uri uri) {
+  Future<void> _handleWidgetUri(Uri uri) async {
     if (uri.scheme != 'urday') return;
 
     final context = rootNavigatorKey.currentContext;
+
+    // Guard: Deep links and widget taps must never bypass authentication
+    final isAuth =
+        await ref.read(authNotifierProvider.notifier).isAuthenticated();
+    if (!isAuth) {
+      if (context != null) {
+        GoRouter.of(context).go(AppRoutes.login);
+      }
+      return;
+    }
+
     final host = uri.host.toLowerCase();
     final path = uri.path.toLowerCase();
 

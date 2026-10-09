@@ -1,9 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:go_router/go_router.dart';
 
 import '../config/app_env.dart';
 import '../constants/app_constants.dart';
+import '../router/app_router.dart';
 import 'dio_cache_interceptor.dart';
 
 class DioClient {
@@ -13,7 +15,19 @@ class DioClient {
   factory DioClient() => _instance;
 
   late final Dio dio;
-  final _secureStorage = const FlutterSecureStorage();
+  final _secureStorage = const FlutterSecureStorage(
+    aOptions: AndroidOptions(resetOnError: true),
+  );
+
+  /// In-memory cache of the access token to avoid platform channel latency
+  /// and withstand Keystore timeouts on Android release builds.
+  String? _cachedAccessToken;
+
+  String? get cachedAccessToken => _cachedAccessToken;
+
+  void setCachedAccessToken(String? token) {
+    _cachedAccessToken = token;
+  }
 
   void init() {
     debugPrint('[DioClient] ▶ BASE_URL = ${AppEnv.baseUrl}');
@@ -43,19 +57,38 @@ class DioClient {
   /// previously invalidated the token and logged the user out).
   Future<bool>? _refreshing;
 
+  /// Callback invoked when a 401 is received and session refresh definitively fails.
+  static void Function()? onSessionExpired;
+
   InterceptorsWrapper _authInterceptor() {
     return InterceptorsWrapper(
       onRequest: (options, handler) async {
-        final token = await _secureStorage.read(
-          key: AppConstants.accessTokenKey,
-        );
-        if (token != null) {
+        String? token = _cachedAccessToken;
+        try {
+          final readToken = await _secureStorage
+              .read(key: AppConstants.accessTokenKey)
+              .timeout(const Duration(seconds: 6));
+          if (readToken != null && readToken.isNotEmpty) {
+            token = readToken;
+            _cachedAccessToken = readToken;
+          }
+        } catch (_) {
+          // Fall back to memory cache if Keystore read times out or fails
+        }
+        if (token != null && token.isNotEmpty) {
           options.headers['Authorization'] = 'Bearer $token';
         }
         handler.next(options);
       },
       onError: (error, handler) async {
-        if (error.response?.statusCode == 401) {
+        final path = error.requestOptions.path;
+        final isAuthEndpoint = path.contains('/auth/login') ||
+            path.contains('/auth/register') ||
+            path.contains('/auth/refresh') ||
+            path.contains('/auth/google') ||
+            path.contains('/auth/forgot-password');
+
+        if (error.response?.statusCode == 401 && !isAuthEndpoint) {
           final refreshed = await _refreshToken();
           if (refreshed) {
             final token = await _secureStorage.read(
@@ -64,14 +97,28 @@ class DioClient {
             error.requestOptions.headers['Authorization'] = 'Bearer $token';
             final response = await dio.fetch(error.requestOptions);
             return handler.resolve(response);
+          } else {
+            // Definitively unauthenticated or session expired — notify app to navigate to login
+            await _clearTokens();
+            _notifySessionExpired();
           }
-          // On definitive refresh failure the tokens were already cleared inside
-          // _refreshToken; on transient network failures we intentionally keep
-          // the session so the next app launch doesn't demand a login.
         }
         handler.next(error);
       },
     );
+  }
+
+  void _notifySessionExpired() {
+    debugPrint('[DioClient] ⚠️ Session expired or invalid. Navigating to login.');
+    onSessionExpired?.call();
+    try {
+      final context = rootNavigatorKey.currentContext;
+      if (context != null) {
+        GoRouter.of(context).go(AppRoutes.login);
+      }
+    } catch (e) {
+      debugPrint('[DioClient] Navigation to login on session expiry failed: $e');
+    }
   }
 
   InterceptorsWrapper _loggingInterceptor() {
@@ -154,6 +201,9 @@ class DioClient {
     );
   }
 
+  /// Public method to trigger token refresh externally (e.g. from auth checks).
+  Future<bool> refreshToken() => _refreshToken();
+
   Future<bool> _refreshToken() {
     final inFlight = _refreshing;
     if (inFlight != null) return inFlight;
@@ -193,6 +243,7 @@ class DioClient {
       final newRefreshToken = responseData['refresh_token'] as String?;
 
       if (newAccessToken != null) {
+        _cachedAccessToken = newAccessToken;
         await _secureStorage.write(
           key: AppConstants.accessTokenKey,
           value: newAccessToken,
@@ -222,6 +273,7 @@ class DioClient {
   }
 
   Future<void> _clearTokens() async {
+    _cachedAccessToken = null;
     await _secureStorage.delete(key: AppConstants.accessTokenKey);
     await _secureStorage.delete(key: AppConstants.refreshTokenKey);
     await _secureStorage.delete(key: AppConstants.userIdKey);

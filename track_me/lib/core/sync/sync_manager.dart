@@ -49,7 +49,9 @@ class SyncManager {
   SyncManager._();
   static final SyncManager instance = SyncManager._();
 
-  final _secureStorage = const FlutterSecureStorage();
+  final _secureStorage = const FlutterSecureStorage(
+    aOptions: AndroidOptions(resetOnError: true),
+  );
   Timer? _periodicTimer;
   bool _isSyncing = false;
   Future<void>? _inFlightSync;
@@ -111,8 +113,15 @@ class SyncManager {
   Future<void> _doSync() async {
     if (_isSyncing) return;
 
-    // Verify authentication
-    final token = await _secureStorage.read(key: AppConstants.accessTokenKey);
+    // Verify authentication safely
+    String? token;
+    try {
+      token = await _secureStorage
+          .read(key: AppConstants.accessTokenKey)
+          .timeout(const Duration(seconds: 2));
+    } catch (_) {
+      token = null;
+    }
     if (token == null || token.isEmpty) {
       return;
     }

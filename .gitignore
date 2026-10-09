@@ -48,3 +48,6 @@ Thumbs.db
 !track_me/android/app/src/main/res/**
 !track_me/ios/Runner/Assets.xcassets/**
 !track_me/web/**
+
+# ─── Graphify Knowledge Graph Cache ──────────────────────────────────────────
+graphify-out/

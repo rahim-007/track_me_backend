@@ -32,7 +32,7 @@ class _CashFlowQuoteCardState extends State<CashFlowQuoteCard> {
     });
   }
 
-  Widget _buildHighlightedQuote(String text) {
+  Widget _buildHighlightedQuote(String text, {double fontSize = 15.0}) {
     final highlightWords = [
       'money', 'wealth', 'save', 'saving', 'savings', 'spend', 'spending',
       'budget', 'budgeting', 'goals', 'goal', 'freedom', 'interest',
@@ -65,8 +65,8 @@ class _CashFlowQuoteCardState extends State<CashFlowQuoteCard> {
       maxLines: 4,
       overflow: TextOverflow.ellipsis,
       text: TextSpan(
-        style: const TextStyle(
-          fontSize: 15.0,
+        style: TextStyle(
+          fontSize: fontSize,
           fontWeight: FontWeight.w600,
           height: 1.35,
           color: Colors.white,
@@ -85,41 +85,67 @@ class _CashFlowQuoteCardState extends State<CashFlowQuoteCard> {
 
     return GestureDetector(
       onTap: _nextQuote,
-      child: Container(
-        height: 168,
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: const Color(0xFF5F4DE1),
-          gradient: const LinearGradient(
-            colors: [Color(0xFF5F4DE1), Color(0xFF5143CA)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF5F4DE1).withOpacity(0.35),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final cardWidth = constraints.maxWidth;
+          final isCompact = cardWidth < 360;
+          final isMedium = cardWidth >= 360 && cardWidth < 420;
+          final cardHeight = (cardWidth < 345) ? 176.0 : 168.0;
+
+          // Scaled illustration on right:
+          final artWidth = (cardWidth * 0.39).clamp(118.0, 195.0);
+          final artHeight = artWidth * (440.0 / 568.0);
+
+          final quoteFontSize = isCompact ? 13.5 : (isMedium ? 14.2 : 15.0);
+          final quoteMarkSize = isCompact ? 26.0 : 30.0;
+          final authorFontSize = isCompact ? 11.5 : 12.5;
+
+          return Container(
+            height: cardHeight,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: const Color(0xFF5F4DE1),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF5F4DE1), Color(0xFF5143CA)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF5F4DE1).withOpacity(0.35),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return Stack(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: Stack(
                 children: [
-                  // Background Hero Banner Graphic (Artwork on Right)
-                  Positioned.fill(
-                    child: Image.asset(
-                      'assets/images/cashflow_hero_banner.png',
-                      fit: BoxFit.cover,
-                      alignment: Alignment.centerRight,
-                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                  // Background Hero Banner Graphic (Proportionally sized on the right)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: artWidth,
+                    child: ClipRect(
+                      child: OverflowBox(
+                        alignment: Alignment.centerRight,
+                        minWidth: 0,
+                        maxWidth: double.infinity,
+                        minHeight: 0,
+                        maxHeight: double.infinity,
+                        child: Image.asset(
+                          'assets/images/cashflow_hero_banner.png',
+                          height: artHeight,
+                          fit: BoxFit.fitHeight,
+                          alignment: Alignment.centerRight,
+                          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                        ),
+                      ),
                     ),
                   ),
-
                   // Left Accent Vertical Line
                   Positioned(
                     left: 0,
@@ -130,59 +156,62 @@ class _CashFlowQuoteCardState extends State<CashFlowQuoteCard> {
                       color: const Color(0xFF8B6EF5),
                     ),
                   ),
-
-                  // Left Quote Text Content (strictly left side)
+                  // Left Quote Text Content (strictly non-overlapping)
                   Positioned(
                     left: 18,
-                    top: 14,
-                    bottom: 14,
-                    right: constraints.maxWidth * 0.44,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              '“',
-                              style: TextStyle(
-                                fontSize: 32,
-                                height: 0.85,
-                                fontWeight: FontWeight.w900,
-                                color: Color(0xFFC4B5FD),
+                    top: 12,
+                    bottom: 12,
+                    right: artWidth + 12,
+                    child: MediaQuery.withClampedTextScaling(
+                      maxScaleFactor: 1.25,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '“',
+                                style: TextStyle(
+                                  fontSize: quoteMarkSize,
+                                  height: 0.85,
+                                  fontWeight: FontWeight.w900,
+                                  color: const Color(0xFFC4B5FD),
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: _buildHighlightedQuote(
-                                currentQuote.quote,
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: _buildHighlightedQuote(
+                                  currentQuote.quote,
+                                  fontSize: quoteFontSize,
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Padding(
-                          padding: const EdgeInsets.only(left: 20),
-                          child: Text(
-                            '– $cleanAuthor',
-                            style: const TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFFC4B5FD),
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                            ],
                           ),
-                        ),
-                      ],
+                          SizedBox(height: isCompact ? 5 : 8),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 18),
+                            child: Text(
+                              '– $cleanAuthor',
+                              style: TextStyle(
+                                fontSize: authorFontSize,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFFC4B5FD),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
-              );
-            },
-          ),
-        ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }

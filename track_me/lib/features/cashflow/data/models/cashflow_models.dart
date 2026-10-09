@@ -109,10 +109,11 @@ class CashFlowPeriodModel {
     Map<String, dynamic> json, {
     required bool isCurrent,
   }) {
+    final now = DateTime.now();
     return CashFlowPeriodModel(
-      id: json['id'] as String,
-      month: json['month'] as int,
-      year: json['year'] as int,
+      id: json['id']?.toString() ?? '',
+      month: (json['month'] as num?)?.toInt() ?? now.month,
+      year: (json['year'] as num?)?.toInt() ?? now.year,
       openingBank: (json['openingBank'] as num?)?.toDouble() ?? 0,
       openingCash: (json['openingCash'] as num?)?.toDouble() ?? 0,
       openingCreditCard: (json['openingCreditCard'] as num?)?.toDouble() ?? 0,
@@ -123,22 +124,35 @@ class CashFlowPeriodModel {
       closingBank: (json['closingBank'] as num?)?.toDouble() ??
           (json['openingBank'] as num?)?.toDouble() ??
           0,
-      // closingCash is now returned from the backend.
-      // Fall back to openingCash for cached/legacy data that predates this field.
       closingCash: (json['closingCash'] as num?)?.toDouble() ??
           (json['openingCash'] as num?)?.toDouble() ??
           0,
       closingCreditCard: (json['closingCreditCard'] as num?)?.toDouble() ??
           (json['openingCreditCard'] as num?)?.toDouble() ??
           0,
-      incomeByCategory:
-          ((json['incomeByCategory'] as Map<String, dynamic>?) ?? const {})
-              .map((k, v) => MapEntry(k, (v as num).toDouble())),
-      outflowByCategory:
-          ((json['outflowByCategory'] as Map<String, dynamic>?) ?? const {})
-              .map((k, v) => MapEntry(k, (v as num).toDouble())),
+      incomeByCategory: _parseCategoryMap(json['incomeByCategory'] ??
+          (json['categories'] is Map ? json['categories']['income'] : null)),
+      outflowByCategory: _parseCategoryMap(json['outflowByCategory'] ??
+          (json['categories'] is Map ? json['categories']['outflow'] : null)),
       isCurrent: isCurrent,
     );
+  }
+
+  static Map<String, double> _parseCategoryMap(dynamic raw) {
+    if (raw is Map) {
+      final result = <String, double>{};
+      for (final entry in raw.entries) {
+        final val = entry.value;
+        if (val is num) {
+          result[entry.key.toString()] = val.toDouble();
+        } else if (val != null) {
+          final parsed = double.tryParse(val.toString());
+          if (parsed != null) result[entry.key.toString()] = parsed;
+        }
+      }
+      return result;
+    }
+    return const {};
   }
 
   Map<String, dynamic> toJson() => {
@@ -277,13 +291,15 @@ class TransactionModel {
 
   factory TransactionModel.fromJson(Map<String, dynamic> json) {
     return TransactionModel(
-      id: json['id'] as String,
-      kind: json['kind'] == 'INCOME' ? TxnKind.income : TxnKind.outflow,
-      category: json['category'] as String,
-      amount: (json['amount'] as num).toDouble(),
+      id: json['id']?.toString() ?? '',
+      kind: json['kind']?.toString() == 'INCOME' ? TxnKind.income : TxnKind.outflow,
+      category: json['category']?.toString() ?? '',
+      amount: (json['amount'] as num?)?.toDouble() ??
+          double.tryParse(json['amount']?.toString() ?? '') ??
+          0.0,
       note: (json['note'] as String?) ?? '',
       date: (json['date'] as String?)?.split('T').first ?? '',
-      account: CashFlowAccount.fromApi(json['account'] as String?),
+      account: CashFlowAccount.fromApi(json['account']?.toString()),
     );
   }
 
@@ -351,14 +367,16 @@ class DebtEntryModel {
 
   factory DebtEntryModel.fromJson(Map<String, dynamic> json) {
     return DebtEntryModel(
-      id: json['id'] as String,
-      theyOweMe: json['direction'] == 'RECEIVE',
-      person: json['person'] as String,
-      amount: (json['amount'] as num).toDouble(),
+      id: json['id']?.toString() ?? '',
+      theyOweMe: json['direction']?.toString() == 'RECEIVE',
+      person: json['person']?.toString() ?? '',
+      amount: (json['amount'] as num?)?.toDouble() ??
+          double.tryParse(json['amount']?.toString() ?? '') ??
+          0.0,
       note: (json['note'] as String?) ?? '',
       date: (json['date'] as String?)?.split('T').first ?? '',
-      settled: json['settled'] as bool? ?? false,
-      settledAt: json['settledAt'] as String?,
+      settled: json['settled'] == true,
+      settledAt: json['settledAt']?.toString(),
     );
   }
 

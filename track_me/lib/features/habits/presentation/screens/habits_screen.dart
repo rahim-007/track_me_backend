@@ -1,11 +1,15 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shadows.dart';
+import '../../../../core/widgets/shared_widgets.dart';
 import '../../data/models/habit_model.dart';
 import '../../data/quotes_data.dart';
 import '../../providers/habits_provider.dart';
@@ -25,6 +29,7 @@ class HabitsScreen extends ConsumerStatefulWidget {
 class _HabitsScreenState extends ConsumerState<HabitsScreen> {
   DateTime _selectedDate = DateTime.now();
   int _currentQuoteIndex = 0;
+  bool _isReordering = false;
 
   @override
   void initState() {
@@ -55,12 +60,14 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
   void _previousWeek() {
     setState(() {
       _selectedDate = _selectedDate.subtract(const Duration(days: 7));
+      _isReordering = false;
     });
   }
 
   void _nextWeek() {
     setState(() {
       _selectedDate = _selectedDate.add(const Duration(days: 7));
+      _isReordering = false;
     });
   }
 
@@ -289,17 +296,6 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
     );
   }
 
-  int _calculateMaxStreak(List<HabitModel> habits) {
-    int maxStreak = 0;
-    for (final habit in habits) {
-      final currentStreak = calculateHabitStreak(habit);
-      if (currentStreak > maxStreak) {
-        maxStreak = currentStreak;
-      }
-    }
-    return maxStreak;
-  }
-
   @override
   Widget build(BuildContext context) {
     final habitsAsync = ref.watch(habitsProvider);
@@ -402,45 +398,75 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
                     child: GestureDetector(
                       onTap: _nextQuote,
-                      child: Container(
-                        height: 168,
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF5F4DE1),
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF5F4DE1), Color(0xFF5143CA)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(24),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF5F4DE1).withOpacity(0.35),
-                              blurRadius: 20,
-                              offset: const Offset(0, 8),
-                            ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(24),
-                          child: LayoutBuilder(
-                            builder: (context, constraints) {
-                              final currentQuote =
-                                  kHabitQuotes[_currentQuoteIndex];
-                              final cleanAuthor = currentQuote.author
-                                  .replaceAll('Inspired by ', '')
-                                  .trim();
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final cardWidth = constraints.maxWidth;
+                          final isCompact = cardWidth < 360;
+                          final isMedium = cardWidth >= 360 && cardWidth < 420;
+                          final cardHeight = (cardWidth < 345) ? 176.0 : 168.0;
 
-                              return Stack(
+                          // Scaled illustration on right:
+                          // On wide screens (e.g. 468dp): ~185-195dp
+                          // On standard screens (360-400dp): ~145-160dp
+                          // On compact screens (<360dp): ~120-135dp
+                          final artWidth = (cardWidth * 0.39).clamp(118.0, 195.0);
+                          final artHeight = artWidth * (440.0 / 516.0);
+
+                          final quoteFontSize = isCompact ? 13.5 : (isMedium ? 14.2 : 15.0);
+                          final quoteMarkSize = isCompact ? 26.0 : 30.0;
+                          final authorFontSize = isCompact ? 11.5 : 12.5;
+
+                          final currentQuote =
+                              kHabitQuotes[_currentQuoteIndex];
+                          final cleanAuthor = currentQuote.author
+                              .replaceAll('Inspired by ', '')
+                              .trim();
+
+                          return Container(
+                            height: cardHeight,
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF5F4DE1),
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF5F4DE1), Color(0xFF5143CA)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(24),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF5F4DE1).withOpacity(0.35),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 8),
+                                ),
+                              ],
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(24),
+                              child: Stack(
                                 children: [
-                                  // Background Hero Banner Graphic (Clipboard Illustration on Right)
-                                  Positioned.fill(
-                                    child: Image.asset(
-                                      'assets/images/habit_hero_banner.png',
-                                      fit: BoxFit.cover,
-                                      alignment: Alignment.centerRight,
-                                      errorBuilder: (_, __, ___) =>
-                                          const SizedBox.shrink(),
+                                  // Background Hero Banner Graphic (Proportionally sized on the right)
+                                  Positioned(
+                                    right: 0,
+                                    top: 0,
+                                    bottom: 0,
+                                    width: artWidth,
+                                    child: ClipRect(
+                                      child: OverflowBox(
+                                        alignment: Alignment.centerRight,
+                                        minWidth: 0,
+                                        maxWidth: double.infinity,
+                                        minHeight: 0,
+                                        maxHeight: double.infinity,
+                                        child: Image.asset(
+                                          'assets/images/habit_hero_banner.png',
+                                          height: artHeight,
+                                          fit: BoxFit.fitHeight,
+                                          alignment: Alignment.centerRight,
+                                          errorBuilder: (_, __, ___) =>
+                                              const SizedBox.shrink(),
+                                        ),
+                                      ),
                                     ),
                                   ),
                                   // Left Accent Vertical Line
@@ -453,63 +479,67 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                                       color: const Color(0xFF8B6EF5),
                                     ),
                                   ),
-                                  // Left Quote Text Content (strictly left side)
+                                  // Left Quote Text Content (strictly non-overlapping)
                                   Positioned(
                                     left: 18,
-                                    top: 14,
-                                    bottom: 14,
-                                    right: constraints.maxWidth * 0.44,
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Row(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            const Text(
-                                              '“',
-                                              style: TextStyle(
-                                                fontSize: 32,
-                                                height: 0.85,
-                                                fontWeight: FontWeight.w900,
-                                                color: Color(0xFFC4B5FD),
+                                    top: 12,
+                                    bottom: 12,
+                                    right: artWidth + 12,
+                                    child: MediaQuery.withClampedTextScaling(
+                                      maxScaleFactor: 1.25,
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                '“',
+                                                style: TextStyle(
+                                                  fontSize: quoteMarkSize,
+                                                  height: 0.85,
+                                                  fontWeight: FontWeight.w900,
+                                                  color: const Color(0xFFC4B5FD),
+                                                ),
                                               ),
-                                            ),
-                                            const SizedBox(width: 6),
-                                            Expanded(
-                                              child: _buildHighlightedQuote(
-                                                currentQuote.quote,
-                                                isDark,
+                                              const SizedBox(width: 6),
+                                              Expanded(
+                                                child: _buildHighlightedQuote(
+                                                  currentQuote.quote,
+                                                  isDark,
+                                                  fontSize: quoteFontSize,
+                                                ),
                                               ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Padding(
-                                          padding:
-                                              const EdgeInsets.only(left: 20),
-                                          child: Text(
-                                            '– $cleanAuthor',
-                                            style: const TextStyle(
-                                              fontSize: 12.5,
-                                              fontWeight: FontWeight.w700,
-                                              color: Color(0xFFC4B5FD),
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
+                                            ],
                                           ),
-                                        ),
-                                      ],
+                                          SizedBox(height: isCompact ? 5 : 8),
+                                          Padding(
+                                            padding:
+                                                const EdgeInsets.only(left: 18),
+                                            child: Text(
+                                              '– $cleanAuthor',
+                                              style: TextStyle(
+                                                fontSize: authorFontSize,
+                                                fontWeight: FontWeight.w700,
+                                                color: const Color(0xFFC4B5FD),
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ],
-                              );
-                            },
-                          ),
-                        ),
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ),
@@ -674,6 +704,7 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                               onTap: () {
                                 setState(() {
                                   _selectedDate = date;
+                                  _isReordering = false;
                                 });
                               },
                               child: Container(
@@ -803,19 +834,113 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                               "${DateFormat('MMM d').format(_selectedDate)} Habits";
                         }
 
+                        if (_isReordering) {
+                          return Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  const Text('⚡',
+                                      style: TextStyle(fontSize: 18)),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Arrange Habits',
+                                    style: TextStyle(
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          AppColors.primary.withOpacity(0.12),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      'Drag items',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.primary,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              GestureDetector(
+                                onTap: () {
+                                  HapticFeedback.lightImpact();
+                                  setState(() => _isReordering = false);
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary,
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: AppShadows.soft,
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.check_rounded,
+                                          color: Colors.white, size: 14),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'Done',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w800,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        }
+
                         return Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Flexible(
-                              child: Text(
-                                sectionTitle,
-                                style: TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.textPrimary,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      sectionTitle,
+                                      style: TextStyle(
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.w800,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  if (visibleHabits.length > 1) ...[
+                                    const SizedBox(width: 6),
+                                    IconButton(
+                                      icon: const Icon(Icons.swap_vert_rounded,
+                                          size: 20),
+                                      color: AppColors.primary,
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                      tooltip: 'Arrange habits',
+                                      onPressed: () {
+                                        HapticFeedback.mediumImpact();
+                                        setState(() => _isReordering = true);
+                                      },
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -1015,7 +1140,252 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                       )
                     : SliverPadding(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
-                        sliver: SliverList(
+                        sliver: _isReordering
+                            ? SliverReorderableList(
+                                itemCount: visibleHabits.length,
+                                onReorder: (oldIndex, newIndex) {
+                                  if (oldIndex < newIndex) newIndex -= 1;
+                                  final list =
+                                      List<HabitModel>.from(visibleHabits);
+                                  final item = list.removeAt(oldIndex);
+                                  list.insert(newIndex, item);
+                                  ref
+                                      .read(habitsProvider.notifier)
+                                      .reorderVisibleHabits(list);
+                                },
+                                itemBuilder: (context, index) {
+                                  final habit = visibleHabits[index];
+                                  final isDone = habit.completedDates
+                                      .contains(selectedDateStr);
+                                  final accentColor =
+                                      _getCategoryAccentColor(habit.category);
+
+                                  return Padding(
+                                    key: ValueKey(habit.id),
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: ReorderableDelayedDragStartListener(
+                                      index: index,
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: AppColors.surface,
+                                          borderRadius:
+                                              BorderRadius.circular(20),
+                                          border: Border.all(
+                                            color: AppColors.primary
+                                                .withOpacity(0.35),
+                                            width: 1.5,
+                                          ),
+                                          boxShadow: AppShadows.soft,
+                                        ),
+                                        child: ClipRRect(
+                                          borderRadius:
+                                              BorderRadius.circular(20),
+                                          child: IntrinsicHeight(
+                                            child: Row(
+                                              children: [
+                                                Container(
+                                                  width: 4.5,
+                                                  color: accentColor,
+                                                ),
+                                                Expanded(
+                                                  child: Padding(
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                      horizontal: 14,
+                                                      vertical: 14,
+                                                    ),
+                                                    child: Row(
+                                                      children: [
+                                                        Container(
+                                                          width: 48,
+                                                          height: 48,
+                                                          decoration:
+                                                              BoxDecoration(
+                                                            color: accentColor
+                                                                .withOpacity(
+                                                              isDark
+                                                                  ? 0.16
+                                                                  : 0.10,
+                                                            ),
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        16),
+                                                          ),
+                                                          child: Center(
+                                                            child: Text(
+                                                              (habit.emoji !=
+                                                                          null &&
+                                                                      habit.emoji!
+                                                                          .trim()
+                                                                          .isNotEmpty)
+                                                                  ? habit.emoji!
+                                                                  : _getCategoryEmoji(
+                                                                      habit
+                                                                          .category),
+                                                              style:
+                                                                  const TextStyle(
+                                                                      fontSize:
+                                                                          24),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                        const SizedBox(
+                                                            width: 14),
+                                                        Expanded(
+                                                          child: Column(
+                                                            crossAxisAlignment:
+                                                                CrossAxisAlignment
+                                                                    .start,
+                                                            mainAxisAlignment:
+                                                                MainAxisAlignment
+                                                                    .center,
+                                                            children: [
+                                                              Row(
+                                                                children: [
+                                                                  Flexible(
+                                                                    child: Text(
+                                                                      habit
+                                                                          .name,
+                                                                      style: TextStyle(
+                                                                        fontSize:
+                                                                            16,
+                                                                        fontWeight:
+                                                                            FontWeight.w800,
+                                                                        color: AppColors
+                                                                            .textPrimary,
+                                                                        decoration: isDone
+                                                                            ? TextDecoration
+                                                                                .lineThrough
+                                                                            : null,
+                                                                      ),
+                                                                      maxLines:
+                                                                          1,
+                                                                      overflow:
+                                                                          TextOverflow
+                                                                              .ellipsis,
+                                                                    ),
+                                                                  ),
+                                                                  const SizedBox(
+                                                                      width: 8),
+                                                                  Container(
+                                                                    padding:
+                                                                        const EdgeInsets.symmetric(
+                                                                      horizontal:
+                                                                          6,
+                                                                      vertical:
+                                                                          2,
+                                                                    ),
+                                                                    decoration:
+                                                                        BoxDecoration(
+                                                                      color: AppColors
+                                                                          .primaryContainer,
+                                                                      borderRadius:
+                                                                          BorderRadius.circular(8),
+                                                                    ),
+                                                                    child: Text(
+                                                                      habit
+                                                                          .category,
+                                                                      style:
+                                                                          TextStyle(
+                                                                        fontSize:
+                                                                            10,
+                                                                        fontWeight:
+                                                                            FontWeight.w700,
+                                                                        color: AppColors
+                                                                            .primary,
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                              const SizedBox(
+                                                                  height: 3),
+                                                              Text(
+                                                                _getHabitSubtitle(
+                                                                    habit),
+                                                                style:
+                                                                    TextStyle(
+                                                                  fontSize: 12,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w500,
+                                                                  color: AppColors
+                                                                      .textSecondary,
+                                                                ),
+                                                                maxLines: 1,
+                                                                overflow:
+                                                                    TextOverflow
+                                                                        .ellipsis,
+                                                              ),
+                                                              const SizedBox(
+                                                                  height: 4),
+                                                              Row(
+                                                                children: [
+                                                                  const Text(
+                                                                      '🔥',
+                                                                      style: TextStyle(
+                                                                          fontSize:
+                                                                              11)),
+                                                                  const SizedBox(
+                                                                      width: 4),
+                                                                  Text(
+                                                                    '${calculateHabitStreak(habit)} day streak',
+                                                                    style:
+                                                                        TextStyle(
+                                                                      fontSize:
+                                                                          11,
+                                                                      fontWeight:
+                                                                          FontWeight
+                                                                              .w600,
+                                                                      color: AppColors
+                                                                          .textSecondary,
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                        const SizedBox(
+                                                            width: 10),
+                                                        ReorderableDragStartListener(
+                                                          index: index,
+                                                          child: Container(
+                                                            width: 38,
+                                                            height: 38,
+                                                            decoration:
+                                                                BoxDecoration(
+                                                              color: AppColors
+                                                                  .primaryContainer,
+                                                              borderRadius:
+                                                                  BorderRadius
+                                                                      .circular(
+                                                                          10),
+                                                            ),
+                                                            child: const Icon(
+                                                              Icons
+                                                                  .drag_handle_rounded,
+                                                              color: AppColors
+                                                                  .primary,
+                                                              size: 22,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              )
+                            : SliverList(
                           delegate: SliverChildBuilderDelegate(
                             (context, index) {
                               final habit = visibleHabits[index];
@@ -1034,8 +1404,16 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                                   '[HabitsScreen] index=$index, habit="${habit.name}", habit.id="${habit.id}", missedReasons keys=${missedReasons.keys.toList()}, isMissed=$isMissed');
 
                               return Padding(
+                                key: ValueKey(habit.id),
                                 padding: const EdgeInsets.only(bottom: 12),
-                                child: Container(
+                                child: GestureDetector(
+                                  onLongPress: visibleHabits.length > 1
+                                      ? () {
+                                          HapticFeedback.mediumImpact();
+                                          setState(() => _isReordering = true);
+                                        }
+                                      : null,
+                                  child: Container(
                                   decoration: BoxDecoration(
                                     color: AppColors.surface,
                                     borderRadius: BorderRadius.circular(20),
@@ -1163,6 +1541,147 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                                                             ),
                                                           ],
                                                         ),
+                                                        if (habit.isInterval) ...[
+                                                          const SizedBox(height: 6),
+                                                          Row(
+                                                            children: [
+                                                              Container(
+                                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                                decoration: BoxDecoration(
+                                                                  color: const Color(0xFF5334EA).withOpacity(0.10),
+                                                                  borderRadius: BorderRadius.circular(6),
+                                                                ),
+                                                                child: Row(
+                                                                  mainAxisSize: MainAxisSize.min,
+                                                                  children: [
+                                                                    const Icon(Icons.repeat_rounded, size: 10, color: Color(0xFF5334EA)),
+                                                                    const SizedBox(width: 3),
+                                                                    Text(
+                                                                      (habit.intervalMinutes != null &&
+                                                                              habit.intervalMinutes! % 60 == 0)
+                                                                          ? 'Every ${habit.intervalMinutes! ~/ 60}h'
+                                                                          : (habit.intervalMinutes != null &&
+                                                                                  habit.intervalMinutes! > 60)
+                                                                              ? 'Every ${habit.intervalMinutes! ~/ 60}h ${habit.intervalMinutes! % 60}m'
+                                                                              : 'Every ${habit.intervalMinutes ?? 60}m',
+                                                                      style: const TextStyle(
+                                                                        fontSize: 10,
+                                                                        fontWeight: FontWeight.w700,
+                                                                        color: Color(0xFF5334EA),
+                                                                      ),
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                              ),
+                                                              if (habit.targetValue != null && habit.targetValue! > 0) ...[
+                                                                const SizedBox(width: 8),
+                                                                Text(
+                                                                  '${habit.currentValueToday.toStringAsFixed(0)}/${habit.targetValue!.toStringAsFixed(0)} ${habit.unit ?? ''}',
+                                                                  style: TextStyle(
+                                                                    fontSize: 10.5,
+                                                                    fontWeight: FontWeight.w800,
+                                                                    color: habit.isCompletedToday
+                                                                        ? const Color(0xFF10B981)
+                                                                        : const Color(0xFF5334EA),
+                                                                  ),
+                                                                ),
+                                                              ],
+                                                            ],
+                                                          ),
+                                                          if (habit.targetValue != null && habit.targetValue! > 0) ...[
+                                                            const SizedBox(height: 5),
+                                                            ClipRRect(
+                                                              borderRadius: BorderRadius.circular(4),
+                                                              child: LinearProgressIndicator(
+                                                                value: habit.progressPercentage,
+                                                                minHeight: 5,
+                                                                backgroundColor: const Color(0xFF5334EA).withOpacity(0.12),
+                                                                valueColor: AlwaysStoppedAnimation<Color>(
+                                                                  habit.isCompletedToday
+                                                                      ? const Color(0xFF10B981)
+                                                                      : const Color(0xFF5334EA),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                          if (!isDone) ...[
+                                                            const SizedBox(height: 6),
+                                                            Row(
+                                                              children: [
+                                                                if ((habit.unit ?? '').toLowerCase() == 'ml') ...[
+                                                                  InkWell(
+                                                                    onTap: () {
+                                                                      ref.read(habitsProvider.notifier).logProgress(
+                                                                        habit.id,
+                                                                        250,
+                                                                        DateFormat('yyyy-MM-dd').format(_selectedDate),
+                                                                      );
+                                                                    },
+                                                                    borderRadius: BorderRadius.circular(8),
+                                                                    child: Container(
+                                                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                                      decoration: BoxDecoration(
+                                                                        color: const Color(0xFF06B6D4).withOpacity(0.15),
+                                                                        borderRadius: BorderRadius.circular(8),
+                                                                        border: Border.all(color: const Color(0xFF06B6D4).withOpacity(0.4)),
+                                                                      ),
+                                                                      child: const Text(
+                                                                        '+250 ml',
+                                                                        style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFF0891B2)),
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                  const SizedBox(width: 6),
+                                                                  InkWell(
+                                                                    onTap: () {
+                                                                      ref.read(habitsProvider.notifier).logProgress(
+                                                                        habit.id,
+                                                                        500,
+                                                                        DateFormat('yyyy-MM-dd').format(_selectedDate),
+                                                                      );
+                                                                    },
+                                                                    borderRadius: BorderRadius.circular(8),
+                                                                    child: Container(
+                                                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                                      decoration: BoxDecoration(
+                                                                        color: const Color(0xFF06B6D4).withOpacity(0.15),
+                                                                        borderRadius: BorderRadius.circular(8),
+                                                                        border: Border.all(color: const Color(0xFF06B6D4).withOpacity(0.4)),
+                                                                      ),
+                                                                      child: const Text(
+                                                                        '+500 ml',
+                                                                        style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFF0891B2)),
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                ] else ...[
+                                                                  InkWell(
+                                                                    onTap: () {
+                                                                      ref.read(habitsProvider.notifier).logProgress(
+                                                                        habit.id,
+                                                                        1,
+                                                                        DateFormat('yyyy-MM-dd').format(_selectedDate),
+                                                                      );
+                                                                    },
+                                                                    borderRadius: BorderRadius.circular(8),
+                                                                    child: Container(
+                                                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                                      decoration: BoxDecoration(
+                                                                        color: const Color(0xFF5334EA).withOpacity(0.12),
+                                                                        borderRadius: BorderRadius.circular(8),
+                                                                        border: Border.all(color: const Color(0xFF5334EA).withOpacity(0.3)),
+                                                                      ),
+                                                                      child: Text(
+                                                                        '+1 ${habit.unit ?? 'Dose'}',
+                                                                        style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFF5334EA)),
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ],
+                                                            ),
+                                                          ],
+                                                        ],
                                                         if (isMissed &&
                                                             missedReason
                                                                 .isNotEmpty) ...[
@@ -1645,8 +2164,9 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                                     ),
                                   ),
                                 ),
-                              );
-                            },
+                              ),
+                            );
+                          },
                             childCount: visibleHabits.length,
                           ),
                         ),
@@ -1765,12 +2285,31 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (err, st) => Center(
-            child: Text(
-              'Error loading habits: $err',
-              style: TextStyle(color: AppColors.error),
-            ),
-          ),
+          error: (err, st) {
+            final is401 = err.toString().contains('401');
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 40),
+                child: EmptyStateWidget(
+                  icon: is401
+                      ? Icons.lock_outline_rounded
+                      : Icons.cloud_off_rounded,
+                  title: is401 ? 'Session Expired' : "Couldn't load habits",
+                  subtitle: is401
+                      ? 'Please sign in to view and track your habits.'
+                      : 'Check your connection and try again',
+                  actionLabel: is401 ? 'Sign In' : 'Try Again',
+                  onAction: () {
+                    if (is401) {
+                      context.go(AppRoutes.login);
+                    } else {
+                      ref.read(habitsProvider.notifier).loadHabits();
+                    }
+                  },
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -1824,7 +2363,7 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
     return '${habit.category} • Target 1x/day';
   }
 
-  Widget _buildHighlightedQuote(String text, bool isDark) {
+  Widget _buildHighlightedQuote(String text, bool isDark, {double fontSize = 15.0}) {
     final highlightWords = [
       'habit',
       'habits',
@@ -1880,8 +2419,8 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
       maxLines: 4,
       overflow: TextOverflow.ellipsis,
       text: TextSpan(
-        style: const TextStyle(
-          fontSize: 15.0,
+        style: TextStyle(
+          fontSize: fontSize,
           fontWeight: FontWeight.w600,
           height: 1.35,
           color: Colors.white,

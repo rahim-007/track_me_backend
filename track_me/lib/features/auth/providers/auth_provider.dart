@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
@@ -254,12 +255,65 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   // ─── Helpers ───────────────────────────────────────────────────────────────
 
+  static bool _isJwtExpired(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return true;
+      final payloadNormalized = base64Url.normalize(parts[1]);
+      final payloadString = utf8.decode(base64Url.decode(payloadNormalized));
+      final payload = jsonDecode(payloadString);
+      if (payload is Map && payload.containsKey('exp')) {
+        final exp = payload['exp'] as int?;
+        if (exp != null) {
+          final expiryDate = DateTime.fromMillisecondsSinceEpoch(exp * 1000);
+          // Consider expired if past or within 30 seconds of expiry
+          return DateTime.now().isAfter(expiryDate.subtract(const Duration(seconds: 30)));
+        }
+      }
+      return false;
+    } catch (_) {
+      return true;
+    }
+  }
+
   Future<bool> isAuthenticated() async {
-    final token = await _secureStorage.read(key: AppConstants.accessTokenKey);
-    return token != null && token.isNotEmpty;
+    try {
+      final token = await _secureStorage
+          .read(key: AppConstants.accessTokenKey)
+          .timeout(const Duration(milliseconds: 2500));
+      if (token == null || token.isEmpty) return false;
+
+      // Check if access token is still valid (not expired)
+      if (!_isJwtExpired(token)) {
+        DioClient().setCachedAccessToken(token);
+        final userId = await _secureStorage.read(key: AppConstants.userIdKey);
+        state = AuthSuccess(userId: userId ?? '');
+        return true;
+      }
+
+      // If access token is expired, attempt silent token refresh with the refresh token
+      debugPrint('[AUTH] Access token expired, attempting silent refresh...');
+      final refreshed = await DioClient().refreshToken();
+      if (refreshed) {
+        debugPrint('[AUTH] Silent refresh succeeded.');
+        final userId = await _secureStorage.read(key: AppConstants.userIdKey);
+        state = AuthSuccess(userId: userId ?? '');
+        return true;
+      }
+
+      debugPrint('[AUTH] Silent refresh failed. User must log in.');
+      return false;
+    } catch (e) {
+      debugPrint('[AUTH] Failed reading auth token from secure storage: $e');
+      return false;
+    }
   }
 
   Future<void> _saveTokens(Map<String, dynamic> data) async {
+    final accessToken = data['access_token'] as String?;
+    if (accessToken != null && accessToken.isNotEmpty) {
+      DioClient().setCachedAccessToken(accessToken);
+    }
     await _secureStorage.write(
       key: AppConstants.accessTokenKey,
       value: data['access_token'],
@@ -310,7 +364,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
 final authNotifierProvider = StateNotifierProvider<AuthNotifier, AuthState>(
   (ref) => AuthNotifier(
-    secureStorage: const FlutterSecureStorage(),
+    secureStorage: const FlutterSecureStorage(
+      aOptions: AndroidOptions(
+        resetOnError: true,
+      ),
+    ),
     googleSignIn: GoogleSignIn(
       scopes: ['email', 'profile'],
       // Web OAuth client ID from Firebase (client_type 3). On Android this
@@ -322,6 +380,11 @@ final authNotifierProvider = StateNotifierProvider<AuthNotifier, AuthState>(
 );
 
 final isAuthenticatedProvider = FutureProvider<bool>((ref) async {
-  final notifier = ref.read(authNotifierProvider.notifier);
-  return notifier.isAuthenticated();
+  try {
+    final notifier = ref.read(authNotifierProvider.notifier);
+    return await notifier.isAuthenticated();
+  } catch (e) {
+    debugPrint('[AUTH] isAuthenticatedProvider error: $e');
+    return false;
+  }
 });

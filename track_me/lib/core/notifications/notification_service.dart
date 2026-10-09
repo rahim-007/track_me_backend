@@ -63,11 +63,15 @@ class NotificationService {
   /// only the first "undecided" request shows a system dialog.
   static Future<void> requestPermissions() async {
     if (kIsWeb) return;
-    final androidImpl =
-        _plugin.resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
-    await androidImpl?.requestNotificationsPermission();
-    await androidImpl?.requestExactAlarmsPermission();
+    try {
+      final androidImpl =
+          _plugin.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+      await androidImpl?.requestNotificationsPermission();
+      await androidImpl?.requestExactAlarmsPermission();
+    } catch (_) {
+      // Platform channel unavailable in test or headless environments
+    }
   }
 
   static bool _localTzResolved = false;
@@ -136,35 +140,48 @@ class NotificationService {
         iOS: DarwinNotificationDetails(),
       );
 
-      final hasRepeatDay = repeatDays.any((d) => d);
-      if (!hasRepeatDay) {
-        // Daily habit — a single repeating notification.
-        await _plugin.zonedSchedule(
-          _notificationId(habitId, slot: 0),
-          '⏰ Time for your habit!',
-          'Don\'t forget: $habitName',
-          _nextInstanceOfTime(hour, minute, skipToday: skipToday),
-          details,
-          androidScheduleMode: scheduleMode,
-          uiLocalNotificationDateInterpretation:
-              UILocalNotificationDateInterpretation.absoluteTime,
-          matchDateTimeComponents: DateTimeComponents.time,
-        );
-        return;
-      }
+      final effectiveRepeatDays = repeatDays.any((d) => d)
+          ? repeatDays
+          : const [true, true, true, true, true, true, true];
+
+      final todayWeekdayIndex = tz.TZDateTime.now(tz.local).weekday - 1;
 
       // One repeating weekly notification per selected weekday.
-      for (var i = 0; i < repeatDays.length; i++) {
-        if (!repeatDays[i]) continue;
+      for (var i = 0; i < effectiveRepeatDays.length; i++) {
+        if (!effectiveRepeatDays[i]) continue;
+        final slotId = _notificationId(habitId, slot: i + 1);
+
+        if (skipToday && i == todayWeekdayIndex) {
+          // Habit is completed today: schedule next week's occurrence as one-shot
+          // (without matchDateTimeComponents so OS does not reschedule for today).
+          final nextOccurrence = _nextInstanceOfDay(
+            hour,
+            minute,
+            weekdayIndex: i,
+            skipToday: true,
+          );
+          await _plugin.zonedSchedule(
+            slotId,
+            '⏰ Time for your habit!',
+            'Don\'t forget: $habitName',
+            nextOccurrence,
+            details,
+            androidScheduleMode: scheduleMode,
+            uiLocalNotificationDateInterpretation:
+                UILocalNotificationDateInterpretation.absoluteTime,
+          );
+          continue;
+        }
+
         await _plugin.zonedSchedule(
-          _notificationId(habitId, slot: i + 1),
+          slotId,
           '⏰ Time for your habit!',
           'Don\'t forget: $habitName',
           _nextInstanceOfDay(
             hour,
             minute,
             weekdayIndex: i,
-            skipToday: skipToday,
+            skipToday: false,
           ),
           details,
           androidScheduleMode: scheduleMode,
@@ -178,12 +195,192 @@ class NotificationService {
     }
   }
 
-  /// Cancel every slot scheduled for [habitId] (daily + all weekdays).
+  /// Schedule interval-based reminders (e.g. Water every 1 hr, Medicine every 2 hrs)
+  static Future<void> scheduleIntervalHabitReminder({
+    required String habitId,
+    required String habitName,
+    required String windowStartTime,
+    required String windowEndTime,
+    required int intervalMinutes,
+    List<bool> repeatDays = const [true, true, true, true, true, true, true],
+    bool skipToday = false,
+    String? customBody,
+  }) async {
+    if (kIsWeb) return;
+    await _ensureLocalTimezone();
+    await cancelHabitReminder(habitId);
+
+    try {
+      final startParts = windowStartTime.split(':');
+      final endParts = windowEndTime.split(':');
+      if (startParts.length != 2 || endParts.length != 2) return;
+      final startHour = int.tryParse(startParts[0]) ?? 8;
+      final startMin = int.tryParse(startParts[1]) ?? 0;
+      final endHour = int.tryParse(endParts[0]) ?? 22;
+      final endMin = int.tryParse(endParts[1]) ?? 0;
+
+      final startTotalMins = startHour * 60 + startMin;
+      final endTotalMins = endHour * 60 + endMin;
+      if (endTotalMins <= startTotalMins || intervalMinutes <= 0) return;
+
+      final slots = <(int hour, int minute)>[];
+      for (var m = startTotalMins; m <= endTotalMins; m += intervalMinutes) {
+        slots.add((m ~/ 60, m % 60));
+      }
+
+      final androidImpl =
+          _plugin.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+      final canExact = await androidImpl?.canScheduleExactNotifications() ??
+          true;
+      final scheduleMode = canExact
+          ? AndroidScheduleMode.exactAllowWhileIdle
+          : AndroidScheduleMode.inexactAllowWhileIdle;
+
+      const details = NotificationDetails(
+        android: AndroidNotificationDetails(
+          habitChannelId,
+          'Habit Reminders',
+          channelDescription: 'Interval habit reminder notifications',
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
+        iOS: DarwinNotificationDetails(),
+      );
+
+      final body = customBody ?? 'Time for your habit: $habitName';
+
+      final effectiveRepeatDays = repeatDays.any((d) => d)
+          ? repeatDays
+          : const [true, true, true, true, true, true, true];
+
+      final now = tz.TZDateTime.now(tz.local);
+      final nextDay = _findNextScheduledDay(
+        repeatDays: effectiveRepeatDays,
+        from: now,
+      );
+
+      if (skipToday) {
+        // Habit is completed today: all remaining interval alarms for today were cancelled
+        // above via cancelHabitReminder. Schedule tomorrow's / next scheduled day's interval
+        // slots as one-shot alarms (without matchDateTimeComponents so the OS does not pull
+        // them back to today).
+        for (var slotIndex = 0; slotIndex < slots.length; slotIndex++) {
+          final slot = slots[slotIndex];
+          final scheduled = tz.TZDateTime(
+            tz.local,
+            nextDay.year,
+            nextDay.month,
+            nextDay.day,
+            slot.$1,
+            slot.$2,
+          );
+          await _plugin.zonedSchedule(
+            _notificationId(habitId, slot: slotIndex),
+            '⏰ Time for your habit!',
+            body,
+            scheduled,
+            details,
+            androidScheduleMode: scheduleMode,
+            uiLocalNotificationDateInterpretation:
+                UILocalNotificationDateInterpretation.absoluteTime,
+          );
+        }
+        return;
+      }
+
+      final todayWeekdayIndex = now.weekday - 1;
+      final isScheduledToday = effectiveRepeatDays[todayWeekdayIndex];
+
+      for (var slotIndex = 0; slotIndex < slots.length; slotIndex++) {
+        final slot = slots[slotIndex];
+        tz.TZDateTime scheduled;
+        if (isScheduledToday) {
+          scheduled = _nextInstanceOfTime(slot.$1, slot.$2, skipToday: false);
+        } else {
+          scheduled = tz.TZDateTime(
+            tz.local,
+            nextDay.year,
+            nextDay.month,
+            nextDay.day,
+            slot.$1,
+            slot.$2,
+          );
+        }
+        await _plugin.zonedSchedule(
+          _notificationId(habitId, slot: slotIndex),
+          '⏰ Time for your habit!',
+          body,
+          scheduled,
+          details,
+          androidScheduleMode: scheduleMode,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          matchDateTimeComponents: DateTimeComponents.time,
+        );
+      }
+    } catch (e) {
+      debugPrint('[NotificationService] Failed to schedule interval reminder: $e');
+    }
+  }
+
+  /// Schedules next rolling medicine reminder [gapMinutes] from now
+  static Future<void> scheduleRollingReminder({
+    required String habitId,
+    required String habitName,
+    required int gapMinutes,
+    DateTime? fromTime,
+  }) async {
+    if (kIsWeb) return;
+    await _ensureLocalTimezone();
+    await cancelHabitReminder(habitId);
+
+    try {
+      final base = fromTime ?? DateTime.now();
+      final target = base.add(Duration(minutes: gapMinutes));
+      final tzTarget = tz.TZDateTime.from(target, tz.local);
+
+      final androidImpl =
+          _plugin.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+      final canExact = await androidImpl?.canScheduleExactNotifications() ??
+          true;
+      final scheduleMode = canExact
+          ? AndroidScheduleMode.exactAllowWhileIdle
+          : AndroidScheduleMode.inexactAllowWhileIdle;
+
+      const details = NotificationDetails(
+        android: AndroidNotificationDetails(
+          habitChannelId,
+          'Habit Reminders',
+          channelDescription: 'Medication reminder notifications',
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
+        iOS: DarwinNotificationDetails(),
+      );
+
+      await _plugin.zonedSchedule(
+        _notificationId(habitId, slot: 0),
+        '💊 Medicine Reminder',
+        'Time for your next dose of $habitName!',
+        tzTarget,
+        details,
+        androidScheduleMode: scheduleMode,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+      );
+    } catch (e) {
+      debugPrint('[NotificationService] Failed to schedule rolling reminder: $e');
+    }
+  }
+
+  /// Cancel every slot scheduled for [habitId] (up to 40 interval/weekday slots).
   static Future<void> cancelHabitReminder(String habitId) async {
     if (kIsWeb) return;
     try {
       final base = _notificationBase(habitId);
-      for (var slot = 0; slot < 8; slot++) {
+      for (var slot = 0; slot < 40; slot++) {
         await _plugin.cancel(base + slot);
       }
     } catch (_) {
@@ -224,21 +421,14 @@ class NotificationService {
     await _plugin.cancelAll();
   }
 
-  /// Stable, bounded int id for a habit's reminder slot. Derived from the
-  /// habit id string so create/delete/cancel always agree on the same ids,
-  /// and capped well below Android's 32-bit notification id limit.
-  ///
-  /// Uses an explicit FNV-1a hash instead of [String.hashCode], which the Dart
-  /// VM re-seeds per process. An unstable id would leave the previous session's
-  /// repeating alarm alive after a restart, producing duplicate reminders.
   static int _notificationBase(String habitId) {
     var hash = 0x811c9dc5;
     for (final codeUnit in habitId.codeUnits) {
       hash ^= codeUnit;
       hash = (hash * 0x01000193) & 0x7fffffff;
     }
-    hash = hash % 100000000;
-    return AppConstants.habitNotificationBaseId + hash * 8;
+    hash = hash % 20000000;
+    return AppConstants.habitNotificationBaseId + hash * 40;
   }
 
   static int _notificationId(String habitId, {required int slot}) {
@@ -297,5 +487,24 @@ class NotificationService {
       scheduled = scheduled.add(const Duration(days: 1));
     }
     return scheduled;
+  }
+
+  static tz.TZDateTime _findNextScheduledDay({
+    required List<bool> repeatDays,
+    required tz.TZDateTime from,
+  }) {
+    final hasRepeatDay = repeatDays.any((d) => d);
+    var day = from;
+    for (var i = 0; i < 7; i++) {
+      day = day.add(const Duration(days: 1));
+      if (!hasRepeatDay) return day;
+      final weekdayIndex = day.weekday - 1; // 0 = Mon, 6 = Sun
+      if (weekdayIndex >= 0 &&
+          weekdayIndex < repeatDays.length &&
+          repeatDays[weekdayIndex]) {
+        return day;
+      }
+    }
+    return day;
   }
 }

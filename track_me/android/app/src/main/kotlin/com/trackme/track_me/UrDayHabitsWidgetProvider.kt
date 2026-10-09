@@ -23,7 +23,11 @@ class UrDayHabitsWidgetProvider : HomeWidgetProvider() {
 
     companion object {
         const val ACTION_TOGGLE_HABIT = "com.trackme.track_me.ACTION_TOGGLE_HABIT"
+        const val ACTION_LIST_CLICK = "com.trackme.track_me.ACTION_LIST_CLICK"
         const val EXTRA_HABIT_ID = "extra_habit_id"
+        const val EXTRA_ACTION_TYPE = "extra_action_type"
+        const val ACTION_TOGGLE = "toggle"
+        const val ACTION_OPEN_APP = "open_app"
     }
 
     override fun onUpdate(
@@ -36,17 +40,41 @@ class UrDayHabitsWidgetProvider : HomeWidgetProvider() {
         for (appWidgetId in appWidgetIds) {
             updateSingleWidget(context, appWidgetManager, appWidgetId, prefs)
         }
+        try {
+            appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetIds, R.id.lv_habits)
+        } catch (_: Throwable) {}
     }
 
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         val action = intent.action
-        if (action == ACTION_TOGGLE_HABIT) {
+        if (action == ACTION_LIST_CLICK || action == ACTION_TOGGLE_HABIT) {
+            val actionType = intent.getStringExtra(EXTRA_ACTION_TYPE) ?: ACTION_TOGGLE
             val habitId = intent.getStringExtra(EXTRA_HABIT_ID)
                 ?: intent.data?.getQueryParameter("toggle")
                 ?: intent.data?.getQueryParameter("id")
-            if (!habitId.isNullOrEmpty()) {
-                handleHabitToggle(context, habitId)
+                ?: ""
+
+            if (actionType == ACTION_OPEN_APP) {
+                val launchIntent = HomeWidgetLaunchIntent.getActivity(
+                    context,
+                    MainActivity::class.java,
+                    Uri.parse("urday://habits")
+                )
+                try {
+                    launchIntent.send()
+                } catch (_: Throwable) {
+                    val fallback = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
+                        this.action = Intent.ACTION_VIEW
+                        this.data = Uri.parse("urday://habits")
+                        this.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    }
+                    if (fallback != null) context.startActivity(fallback)
+                }
+            } else {
+                if (habitId.isNotEmpty()) {
+                    handleHabitToggle(context, habitId)
+                }
             }
         } else if (action == Intent.ACTION_CONFIGURATION_CHANGED || action == Intent.ACTION_LOCALE_CHANGED) {
             try {
@@ -57,6 +85,7 @@ class UrDayHabitsWidgetProvider : HomeWidgetProvider() {
                 for (id in allWidgetIds) {
                     updateSingleWidget(context, appWidgetManager, id, widgetData)
                 }
+                appWidgetManager.notifyAppWidgetViewDataChanged(allWidgetIds, R.id.lv_habits)
             } catch (e: Throwable) {
                 Log.e("UrDayHabitsWidget", "Error on configuration change update", e)
             }
@@ -71,8 +100,6 @@ class UrDayHabitsWidgetProvider : HomeWidgetProvider() {
 
             var toggled = false
             var newCompletedState = false
-            var completedCount = prefs.getInt("completed_count", 0)
-            val totalCount = prefs.getInt("total_count", items.length())
 
             for (i in 0 until items.length()) {
                 val item = items.getJSONObject(i)
@@ -83,12 +110,6 @@ class UrDayHabitsWidgetProvider : HomeWidgetProvider() {
 
                     val streak = item.optInt("streak", 0)
                     item.put("streak", if (newCompletedState) streak + 1 else maxOf(0, streak - 1))
-
-                    if (newCompletedState) {
-                        completedCount++
-                    } else {
-                        completedCount = maxOf(0, completedCount - 1)
-                    }
                     toggled = true
                     break
                 }
@@ -96,12 +117,21 @@ class UrDayHabitsWidgetProvider : HomeWidgetProvider() {
 
             if (!toggled) return
 
-            val percent = if (totalCount > 0) (completedCount * 100 / totalCount) else 0
-            val ratio = "$completedCount/$totalCount"
+            var completedCount = 0
+            for (i in 0 until items.length()) {
+                if (items.getJSONObject(i).optBoolean("is_completed", false)) {
+                    completedCount++
+                }
+            }
+
+            val totalCount = maxOf(items.length(), prefs.getInt("total_count", items.length()))
+            val safeCompletedCount = if (totalCount > 0) completedCount.coerceIn(0, totalCount) else 0
+            val percent = if (totalCount > 0) ((safeCompletedCount * 100 / totalCount)).coerceIn(0, 100) else 0
+            val ratio = "$safeCompletedCount/$totalCount"
 
             // Compute live overall streak: if all scheduled habits are completed, increment base streak by 1
             val baseStreak = prefs.getInt("base_streak_count", prefs.getInt("streak_count", 0))
-            val newStreak = if (totalCount > 0 && completedCount == totalCount) {
+            val newStreak = if (totalCount > 0 && safeCompletedCount == totalCount) {
                 baseStreak + 1
             } else {
                 baseStreak
@@ -119,7 +149,7 @@ class UrDayHabitsWidgetProvider : HomeWidgetProvider() {
 
             prefs.edit().apply {
                 putString("habits_json", items.toString())
-                putInt("completed_count", completedCount)
+                putInt("completed_count", safeCompletedCount)
                 putInt("progress_percent", percent)
                 putString("progress_ratio", ratio)
                 putInt("streak_count", newStreak)
@@ -133,6 +163,8 @@ class UrDayHabitsWidgetProvider : HomeWidgetProvider() {
             for (id in habitWidgetIds) {
                 updateSingleWidget(context, appWidgetManager, id, prefs)
             }
+            // Instantly notify ListView data changed so checkbox flips immediately
+            appWidgetManager.notifyAppWidgetViewDataChanged(habitWidgetIds, R.id.lv_habits)
 
             // 2. Immediately notify UrDayProgressWidgetProvider instances so the circular widget matches
             try {
@@ -172,6 +204,9 @@ class UrDayHabitsWidgetProvider : HomeWidgetProvider() {
         super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
         val widgetData = getWidgetData(context)
         updateSingleWidget(context, appWidgetManager, appWidgetId, widgetData)
+        try {
+            appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetId, R.id.lv_habits)
+        } catch (_: Throwable) {}
     }
 
     private fun getWidgetData(context: Context, fallback: SharedPreferences? = null): SharedPreferences {
@@ -195,20 +230,15 @@ class UrDayHabitsWidgetProvider : HomeWidgetProvider() {
             val prefs = getWidgetData(context, widgetData)
             val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
             val minWidth = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0) ?: 0
-            val minHeight = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0) ?: 0
-
-            // Show compact horizontal habit widget for 1-cell height (<= 105dp or uninitialized 0)
-            val isCompact = minHeight == 0 || minHeight <= 105
-            val isMedium = !isCompact && minWidth in 1..279
-            val isLarge = !isCompact && !isMedium
 
             val views = RemoteViews(context.packageName, R.layout.widget_today_habits).apply {
                 val ratio = prefs.getString("progress_ratio", "0/0") ?: "0/0"
-                val percent = prefs.getInt("progress_percent", 0)
+                val percent = prefs.getInt("progress_percent", 0).coerceIn(0, 100)
                 val habitsJson = prefs.getString("habits_json", "[]") ?: "[]"
 
-                // 1. Header: Dynamic title based on responsive mode
-                val headerTitle = if (isLarge) "UrDay · Today's Habits" else "UrDay"
+                // 1. Header: Dynamic title based on width
+                val isNarrow = minWidth in 1..219
+                val headerTitle = if (isNarrow) "UrDay" else "UrDay · Today's Habits"
                 setTextViewText(R.id.tv_habits_title, headerTitle)
                 setTextViewText(R.id.tv_habits_progress_badge, "$ratio ($percent%)")
 
@@ -234,240 +264,43 @@ class UrDayHabitsWidgetProvider : HomeWidgetProvider() {
                     JSONArray()
                 }
 
-                val rowIds = intArrayOf(
-                    R.id.row_habit_1,
-                    R.id.row_habit_2,
-                    R.id.row_habit_3,
-                    R.id.row_habit_4,
-                    R.id.row_habit_5
-                )
-                val dividerIds = intArrayOf(
-                    R.id.divider_1,
-                    R.id.divider_2,
-                    R.id.divider_3,
-                    R.id.divider_4
-                )
-                val titleIds = intArrayOf(
-                    R.id.tv_title_1,
-                    R.id.tv_title_2,
-                    R.id.tv_title_3,
-                    R.id.tv_title_4,
-                    R.id.tv_title_5
-                )
-                val emojiIds = intArrayOf(
-                    R.id.tv_emoji_1,
-                    R.id.tv_emoji_2,
-                    R.id.tv_emoji_3,
-                    R.id.tv_emoji_4,
-                    R.id.tv_emoji_5
-                )
-                val streakIds = intArrayOf(
-                    R.id.tv_streak_1,
-                    R.id.tv_streak_2,
-                    R.id.tv_streak_3,
-                    R.id.tv_streak_4,
-                    R.id.tv_streak_5
-                )
-                val checkIds = intArrayOf(
-                    R.id.iv_check_1,
-                    R.id.iv_check_2,
-                    R.id.iv_check_3,
-                    R.id.iv_check_4,
-                    R.id.iv_check_5
-                )
-                val btnCheckIds = intArrayOf(
-                    R.id.btn_check_1,
-                    R.id.btn_check_2,
-                    R.id.btn_check_3,
-                    R.id.btn_check_4,
-                    R.id.btn_check_5
-                )
+                // 4. Scrollable ListView (Swipes up & down for ALL habits across all widget sizes)
+                val serviceIntent = Intent(context, UrDayHabitsWidgetService::class.java).apply {
+                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+                    data = Uri.parse("urday://widget/habits_service/$appWidgetId")
+                }
+                setRemoteAdapter(R.id.lv_habits, serviceIntent)
+                setEmptyView(R.id.lv_habits, R.id.tv_empty_habits)
 
-                // Compact columns
-                val compactColIds = intArrayOf(
-                    R.id.col_compact_1,
-                    R.id.col_compact_2,
-                    R.id.col_compact_3,
-                    R.id.col_compact_4,
-                    R.id.col_compact_5
+                // Set PendingIntent template for item clicks (toggles checkbox & row launch)
+                val listClickIntent = Intent(context, UrDayHabitsWidgetProvider::class.java).apply {
+                    action = ACTION_LIST_CLICK
+                }
+                val flags = if (Build.VERSION.SDK_INT >= 31) {
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+                } else {
+                    PendingIntent.FLAG_UPDATE_CURRENT
+                }
+                val listClickPendingIntent = PendingIntent.getBroadcast(
+                    context,
+                    0,
+                    listClickIntent,
+                    flags
                 )
-                val compactFrameEmojiIds = intArrayOf(
-                    R.id.frame_compact_emoji_1,
-                    R.id.frame_compact_emoji_2,
-                    R.id.frame_compact_emoji_3,
-                    R.id.frame_compact_emoji_4,
-                    R.id.frame_compact_emoji_5
-                )
-                val compactEmojiIds = intArrayOf(
-                    R.id.tv_compact_emoji_1,
-                    R.id.tv_compact_emoji_2,
-                    R.id.tv_compact_emoji_3,
-                    R.id.tv_compact_emoji_4,
-                    R.id.tv_compact_emoji_5
-                )
-                val compactCheckIds = intArrayOf(
-                    R.id.iv_compact_check_1,
-                    R.id.iv_compact_check_2,
-                    R.id.iv_compact_check_3,
-                    R.id.iv_compact_check_4,
-                    R.id.iv_compact_check_5
-                )
-                val compactBtnCheckIds = intArrayOf(
-                    R.id.btn_compact_check_1,
-                    R.id.btn_compact_check_2,
-                    R.id.btn_compact_check_3,
-                    R.id.btn_compact_check_4,
-                    R.id.btn_compact_check_5
-                )
+                setPendingIntentTemplate(R.id.lv_habits, listClickPendingIntent)
 
                 if (items.length() > 0) {
+                    setViewVisibility(R.id.lv_habits, View.VISIBLE)
                     setViewVisibility(R.id.tv_empty_habits, View.GONE)
-
-                    if (isCompact) {
-                        // ─── Compact Mode (Horizontal Grid matching reference design) ──
-                        setViewVisibility(R.id.layout_habits_compact, View.VISIBLE)
-                        setViewVisibility(R.id.layout_habits_list, View.GONE)
-                        setViewVisibility(R.id.tv_more_habits, View.GONE)
-
-                        val count = minOf(5, items.length())
-                        for (i in 0 until 5) {
-                            if (i < count) {
-                                val item = items.getJSONObject(i)
-                                val id = item.optString("id", "")
-                                val rawEmoji = item.optString("emoji", "⚡")
-                                val emoji = if (rawEmoji.isNullOrBlank() || rawEmoji == "null") "⚡" else rawEmoji.trim()
-                                val isCompleted = item.optBoolean("is_completed", false)
-
-                                setViewVisibility(compactColIds[i], View.VISIBLE)
-                                setTextViewText(compactEmojiIds[i], emoji)
-                                setImageViewResource(
-                                    compactCheckIds[i],
-                                    if (isCompleted) R.drawable.ic_widget_check else R.drawable.ic_widget_uncheck
-                                )
-
-                                // In-place toggle broadcast: DO NOT open the app when tick is clicked
-                                val tickIntent = Intent(context, UrDayHabitsWidgetProvider::class.java).apply {
-                                    action = ACTION_TOGGLE_HABIT
-                                    putExtra(EXTRA_HABIT_ID, id)
-                                    data = Uri.parse("urday://toggle_habit?id=$id")
-                                }
-                                val flags = if (Build.VERSION.SDK_INT >= 23) {
-                                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                                } else {
-                                    PendingIntent.FLAG_UPDATE_CURRENT
-                                }
-                                val tickPendingIntent = PendingIntent.getBroadcast(
-                                    context,
-                                    id.hashCode(),
-                                    tickIntent,
-                                    flags
-                                )
-
-                                val rowLaunchIntent = HomeWidgetLaunchIntent.getActivity(
-                                    context,
-                                    MainActivity::class.java,
-                                    Uri.parse("urday://habits")
-                                )
-                                setOnClickPendingIntent(compactColIds[i], rowLaunchIntent)
-                                setOnClickPendingIntent(compactFrameEmojiIds[i], rowLaunchIntent)
-                                setOnClickPendingIntent(compactEmojiIds[i], rowLaunchIntent)
-                                setOnClickPendingIntent(compactBtnCheckIds[i], tickPendingIntent)
-                                setOnClickPendingIntent(compactCheckIds[i], tickPendingIntent)
-                            } else {
-                                setViewVisibility(compactColIds[i], View.GONE)
-                            }
-                        }
-                    } else {
-                        // ─── Medium & Large Mode (Vertical Rows with Dividers) ──
-                        setViewVisibility(R.id.layout_habits_list, View.VISIBLE)
-                        setViewVisibility(R.id.layout_habits_compact, View.GONE)
-
-                        val count = minOf(5, items.length())
-                        for (i in 0 until 5) {
-                            if (i < count) {
-                                val item = items.getJSONObject(i)
-                                val id = item.optString("id", "")
-                                val name = item.optString("name", "Habit")
-                                val rawEmoji = item.optString("emoji", "⚡")
-                                val emoji = if (rawEmoji.isNullOrBlank() || rawEmoji == "null") "⚡" else rawEmoji.trim()
-                                val streak = item.optInt("streak", 0)
-                                val isCompleted = item.optBoolean("is_completed", false)
-
-                                setViewVisibility(rowIds[i], View.VISIBLE)
-                                setTextViewText(titleIds[i], name)
-                                setTextViewText(emojiIds[i], emoji)
-                                setTextViewText(streakIds[i], "🔥 $streak")
-                                setImageViewResource(
-                                    checkIds[i],
-                                    if (isCompleted) R.drawable.ic_widget_check else R.drawable.ic_widget_uncheck
-                                )
-
-                                // In-place toggle broadcast: DO NOT open the app when tick is clicked
-                                val tickIntent = Intent(context, UrDayHabitsWidgetProvider::class.java).apply {
-                                    action = ACTION_TOGGLE_HABIT
-                                    putExtra(EXTRA_HABIT_ID, id)
-                                    data = Uri.parse("urday://toggle_habit?id=$id")
-                                }
-                                val flags = if (Build.VERSION.SDK_INT >= 23) {
-                                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                                } else {
-                                    PendingIntent.FLAG_UPDATE_CURRENT
-                                }
-                                val tickPendingIntent = PendingIntent.getBroadcast(
-                                    context,
-                                    id.hashCode(),
-                                    tickIntent,
-                                    flags
-                                )
-
-                                val rowLaunchIntent = HomeWidgetLaunchIntent.getActivity(
-                                    context,
-                                    MainActivity::class.java,
-                                    Uri.parse("urday://habits")
-                                )
-                                setOnClickPendingIntent(rowIds[i], rowLaunchIntent)
-                                setOnClickPendingIntent(btnCheckIds[i], tickPendingIntent)
-                                setOnClickPendingIntent(checkIds[i], tickPendingIntent)
-
-                                // Dividers between rows
-                                if (i < 4) {
-                                    setViewVisibility(dividerIds[i], if (i < count - 1) View.VISIBLE else View.GONE)
-                                }
-                            } else {
-                                setViewVisibility(rowIds[i], View.GONE)
-                                if (i < 4) {
-                                    setViewVisibility(dividerIds[i], View.GONE)
-                                }
-                            }
-                        }
-
-                        // Show "+X more habits in UrDay →" footer if there are more than 5
-                        if (items.length() > 5) {
-                            val extra = items.length() - 5
-                            setViewVisibility(R.id.tv_more_habits, View.VISIBLE)
-                            setTextViewText(R.id.tv_more_habits, "+$extra more habits in UrDay →")
-                            val moreIntent = HomeWidgetLaunchIntent.getActivity(
-                                context,
-                                MainActivity::class.java,
-                                Uri.parse("urday://habits")
-                            )
-                            setOnClickPendingIntent(R.id.tv_more_habits, moreIntent)
-                        } else {
-                            setViewVisibility(R.id.tv_more_habits, View.GONE)
-                        }
-                    }
                 } else {
-                    // Empty state
+                    setViewVisibility(R.id.lv_habits, View.GONE)
                     setViewVisibility(R.id.tv_empty_habits, View.VISIBLE)
-                    setViewVisibility(R.id.layout_habits_list, View.GONE)
-                    setViewVisibility(R.id.layout_habits_compact, View.GONE)
-                    setViewVisibility(R.id.tv_more_habits, View.GONE)
                 }
             }
 
             appWidgetManager.updateAppWidget(appWidgetId, views)
         } catch (e: Throwable) {
-            Log.e("UrDayHabitsWidget", "Error updating habits widget", e)
+            Log.e("UrDayHabitsWidget", "Error updating widget $appWidgetId", e)
         }
     }
 }

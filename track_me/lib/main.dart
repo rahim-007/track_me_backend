@@ -61,7 +61,9 @@ void main() async {
   //     secure storage is slow.
   var initialIsDark = false;
   try {
-    const storage = FlutterSecureStorage();
+    const storage = FlutterSecureStorage(
+      aOptions: AndroidOptions(resetOnError: true),
+    );
     final stored = await storage
         .read(key: 'is_dark_mode')
         .timeout(const Duration(seconds: 2));

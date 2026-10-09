@@ -4,9 +4,11 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/constants/app_constants.dart';
 import '../../../core/local/json_file_cache.dart';
 import '../../../core/network/dio_cache_interceptor.dart';
 import '../../../core/network/dio_client.dart';
@@ -43,7 +45,9 @@ class HabitsNotifier extends StateNotifier<HabitsState> {
 
   Future<void> loadHabits() async {
     final rawCached = await _readCachedHabits();
-    final cached = await _reconcilePendingWidgetToggles(rawCached ?? []);
+    final customOrder = await _loadCustomOrder();
+    final orderedCached = _applyCustomOrder(rawCached ?? [], customOrder);
+    final cached = await _reconcilePendingWidgetToggles(orderedCached);
     if (cached.isNotEmpty) {
       state = AsyncValue.data(cached);
       unawaited(_syncHomeWidgets(cached));
@@ -52,6 +56,25 @@ class HabitsNotifier extends StateNotifier<HabitsState> {
     }
 
     _dirtySinceLoad = false;
+
+    // Do not fire unauthenticated network requests that trigger 401 errors
+    try {
+      const storage = FlutterSecureStorage(
+        aOptions: AndroidOptions(resetOnError: true),
+      );
+      final token = await storage
+          .read(key: AppConstants.accessTokenKey)
+          .timeout(const Duration(seconds: 2));
+      if (token == null || token.isEmpty) {
+        if (cached.isNotEmpty) {
+          state = AsyncValue.data(cached);
+        } else {
+          state = const AsyncValue.data([]);
+        }
+        return;
+      }
+    } catch (_) {}
+
     try {
       final client = DioClient();
       final response = await client.dio.get(
@@ -64,7 +87,7 @@ class HabitsNotifier extends StateNotifier<HabitsState> {
 
       if (_dirtySinceLoad) return;
 
-      final currentList = state.valueOrNull ?? cached ?? [];
+      final currentList = state.valueOrNull ?? cached;
       final tempItems =
           currentList.where((h) => h.id.startsWith('temp_')).toList();
 
@@ -147,8 +170,11 @@ class HabitsNotifier extends StateNotifier<HabitsState> {
         }
       }
 
-      await _cacheHabits(mergedList);
-      state = AsyncValue.data(mergedList);
+      final customOrder = await _loadCustomOrder();
+      final orderedMergedList = _applyCustomOrder(mergedList, customOrder);
+
+      await _cacheHabits(orderedMergedList);
+      state = AsyncValue.data(orderedMergedList);
 
       // (Re)arm device-side reminders for every habit that has one —
       // idempotent (same ids overwrite) and heals habits created before local
@@ -160,7 +186,7 @@ class HabitsNotifier extends StateNotifier<HabitsState> {
       }
     } catch (e, st) {
       if (_dirtySinceLoad) return;
-      if (cached != null && cached.isNotEmpty) {
+      if (cached.isNotEmpty) {
         state = AsyncValue.data(cached);
         unawaited(_rescheduleAllReminders(cached));
       } else if (state.valueOrNull == null) {
@@ -179,10 +205,9 @@ class HabitsNotifier extends StateNotifier<HabitsState> {
 
       // Move any locally-scheduled reminder from the temp id to the real one.
       await NotificationService.cancelHabitReminder(tempHabit.id);
-      final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
       await _scheduleReminder(
         newHabit,
-        isCompletedToday: newHabit.completedDates.contains(todayStr),
+        isCompletedToday: newHabit.isCompletedToday,
       );
 
       final currentList = state.valueOrNull ?? [];
@@ -206,7 +231,6 @@ class HabitsNotifier extends StateNotifier<HabitsState> {
 
   Future<void> addHabit(HabitModel habit) async {
     _dirtySinceLoad = true;
-    final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
     try {
       final client = DioClient();
       final response =
@@ -218,7 +242,7 @@ class HabitsNotifier extends StateNotifier<HabitsState> {
       await _cacheHabits(updated);
       await _scheduleReminder(
         newHabit,
-        isCompletedToday: newHabit.completedDates.contains(todayStr),
+        isCompletedToday: newHabit.isCompletedToday,
       );
     } catch (_) {
       // Optimistic update with temp id — still persisted locally so the habit
@@ -231,7 +255,7 @@ class HabitsNotifier extends StateNotifier<HabitsState> {
       await _cacheHabits(updated);
       await _scheduleReminder(
         tempHabit,
-        isCompletedToday: tempHabit.completedDates.contains(todayStr),
+        isCompletedToday: tempHabit.isCompletedToday,
       );
 
       // Register with background sync engine
@@ -278,11 +302,10 @@ class HabitsNotifier extends StateNotifier<HabitsState> {
 
     // Re-arm: cancel the old reminder schedule, then schedule the new one
     // (no-op when the reminder time was removed).
-    final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
     await NotificationService.cancelHabitReminder(habit.id);
     await _scheduleReminder(
       habit,
-      isCompletedToday: habit.completedDates.contains(todayStr),
+      isCompletedToday: habit.isCompletedToday,
     );
   }
 
@@ -462,6 +485,19 @@ class HabitsNotifier extends StateNotifier<HabitsState> {
       _dirtySinceLoad = true;
       state = AsyncValue.data(updated);
       await _cacheHabits(updated);
+
+      for (final item in toggles) {
+        final habitId = item['id'] as String?;
+        final desiredCompleted = item['completed'] as bool?;
+        if (habitId == null || desiredCompleted == null) continue;
+        final matched = updated.where((h) => h.id == habitId);
+        if (matched.isNotEmpty) {
+          await _scheduleReminder(
+            matched.first,
+            isCompletedToday: desiredCompleted,
+          );
+        }
+      }
     }
   }
 
@@ -567,27 +603,53 @@ class HabitsNotifier extends StateNotifier<HabitsState> {
   /// If already completed today, schedules the next instance starting tomorrow
   /// so today's reminder is skipped while tomorrow's remains active.
   Future<void> _rescheduleAllReminders(List<HabitModel> habits) async {
-    final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
     for (final habit in habits) {
-      final isCompletedToday = habit.completedDates.contains(todayStr);
-      await _scheduleReminder(habit, isCompletedToday: isCompletedToday);
+      await _scheduleReminder(habit, isCompletedToday: habit.isCompletedToday);
     }
   }
 
-  /// Schedule the device-side reminder for [habit] (no-op without a time).
+  /// Schedule the device-side reminder for [habit] (no-op without a time/interval).
   Future<void> _scheduleReminder(
     HabitModel habit, {
     bool isCompletedToday = false,
   }) async {
+    await NotificationService.requestPermissions();
+
+    if (habit.isInterval &&
+        habit.windowStartTime != null &&
+        habit.windowEndTime != null &&
+        habit.intervalMinutes != null &&
+        habit.intervalMinutes! > 0) {
+      final customBody = habit.targetValue != null
+          ? 'Goal: ${habit.targetValue!.toStringAsFixed(0)} ${habit.unit ?? ''}. Keep your streak alive!'
+          : 'Time for your habit: ${habit.name}';
+
+      await NotificationService.scheduleIntervalHabitReminder(
+        habitId: habit.id,
+        habitName: habit.name,
+        windowStartTime: habit.windowStartTime!,
+        windowEndTime: habit.windowEndTime!,
+        intervalMinutes: habit.intervalMinutes!,
+        repeatDays: habit.repeatDays,
+        skipToday: isCompletedToday,
+        customBody: customBody,
+      );
+      return;
+    }
+
     final reminderTime = habit.reminderTime;
-    if (reminderTime == null || reminderTime.isEmpty) return;
+    if (reminderTime == null || reminderTime.isEmpty) {
+      if (isCompletedToday) {
+        await NotificationService.cancelHabitReminder(habit.id);
+      }
+      return;
+    }
     final parts = reminderTime.split(':');
     if (parts.length != 2) return;
     final hour = int.tryParse(parts[0]);
     final minute = int.tryParse(parts[1]);
     if (hour == null || minute == null) return;
 
-    await NotificationService.requestPermissions();
     await NotificationService.scheduleHabitReminder(
       habitId: habit.id,
       habitName: habit.name,
@@ -598,7 +660,177 @@ class HabitsNotifier extends StateNotifier<HabitsState> {
     );
   }
 
+  /// Incremental progress logging for interval habits (e.g. +250ml water, +1 dose medicine)
+  Future<void> logProgress(
+    String habitId,
+    double increment,
+    String dateStr,
+  ) async {
+    final currentHabits = state.valueOrNull ?? await _readCachedHabits() ?? [];
+    final habitIndex = currentHabits.indexWhere((h) => h.id == habitId);
+    if (habitIndex == -1) return;
+
+    final habit = currentHabits[habitIndex];
+    final oldVal = habit.currentValueToday;
+    final newVal = (oldVal + increment).clamp(0.0, 999999.0);
+    final target = habit.targetValue ?? 1.0;
+    final isTargetMet = newVal >= target;
+
+    final completedDates = List<String>.from(habit.completedDates);
+    final skippedDates = List<String>.from(habit.skippedDates);
+    skippedDates.remove(dateStr);
+
+    if (isTargetMet && !completedDates.contains(dateStr)) {
+      completedDates.add(dateStr);
+    } else if (!isTargetMet && completedDates.contains(dateStr)) {
+      completedDates.remove(dateStr);
+    }
+
+    final updatedHabit = habit.copyWith(
+      currentValueToday: newVal,
+      completedDates: completedDates,
+      skippedDates: skippedDates,
+    );
+
+    final updatedList = List<HabitModel>.from(currentHabits);
+    updatedList[habitIndex] = updatedHabit;
+    state = AsyncValue.data(updatedList);
+    await _cacheHabits(updatedList);
+
+    // If target met today -> auto-silence remaining alarms for today!
+    final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    if (dateStr == todayStr) {
+      if (isTargetMet) {
+        await _scheduleReminder(updatedHabit, isCompletedToday: true);
+      } else if (habit.rollingInterval && habit.intervalMinutes != null) {
+        await NotificationService.scheduleRollingReminder(
+          habitId: habit.id,
+          habitName: habit.name,
+          gapMinutes: habit.intervalMinutes!,
+        );
+      }
+    }
+
+    // Backend dispatch
+    if (!habit.id.startsWith('temp_')) {
+      try {
+        final client = DioClient();
+        await client.dio.post('/habit-logs/progress', data: {
+          'habitId': habitId,
+          'date': dateStr,
+          'increment': increment,
+        });
+      } catch (_) {
+        await SyncManager.instance.enqueue(
+          SyncAction(
+            type: SyncActionType.toggleHabit,
+            endpoint: '/habit-logs/progress',
+            method: 'POST',
+            payload: {
+              'habitId': habitId,
+              'date': dateStr,
+              'increment': increment,
+            },
+          ),
+        );
+      }
+    }
+  }
+
   // ─── Local cache (offline-first) ─────────────────────────────────────────────
+
+  static const String _orderCacheName = 'habits_custom_order';
+
+  static Future<void> _saveCustomOrder(List<String> orderIds) async {
+    try {
+      await JsonFileCache.write(_orderCacheName, orderIds);
+    } catch (_) {}
+  }
+
+  static Future<List<String>?> _loadCustomOrder() async {
+    try {
+      return await JsonFileCache.read(
+        _orderCacheName,
+        (json) => (json as List).map((e) => e.toString()).toList(),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static List<HabitModel> _applyCustomOrder(
+    List<HabitModel> habits,
+    List<String>? orderIds,
+  ) {
+    if (orderIds == null || orderIds.isEmpty) return habits;
+    final orderMap = <String, int>{};
+    for (var i = 0; i < orderIds.length; i++) {
+      orderMap[orderIds[i]] = i;
+    }
+
+    final sorted = List<HabitModel>.from(habits);
+    sorted.sort((a, b) {
+      final indexA = orderMap[a.id];
+      final indexB = orderMap[b.id];
+      if (indexA != null && indexB != null) {
+        return indexA.compareTo(indexB);
+      }
+      if (indexA != null) return -1;
+      if (indexB != null) return 1;
+      return a.createdAt.compareTo(b.createdAt);
+    });
+    return sorted;
+  }
+
+  /// Reorders all habits by oldIndex and newIndex, persisting the new order.
+  Future<void> reorderHabits(int oldIndex, int newIndex) async {
+    final currentList = state.valueOrNull ?? [];
+    if (currentList.isEmpty) return;
+
+    final updated = List<HabitModel>.from(currentList);
+    if (oldIndex < 0 || oldIndex >= updated.length) return;
+    if (newIndex < 0 || newIndex > updated.length) return;
+
+    if (oldIndex < newIndex) {
+      newIndex -= 1;
+    }
+    final item = updated.removeAt(oldIndex);
+    updated.insert(newIndex, item);
+
+    state = AsyncValue.data(updated);
+    await _cacheHabits(updated);
+    await _saveCustomOrder(updated.map((h) => h.id).toList());
+  }
+
+  /// Reorders a subset of visible habits while preserving the positions
+  /// of other unscheduled/hidden habits.
+  Future<void> reorderVisibleHabits(List<HabitModel> newVisibleOrder) async {
+    final currentList = state.valueOrNull ?? [];
+    if (currentList.isEmpty || newVisibleOrder.isEmpty) return;
+
+    final visibleIds = newVisibleOrder.map((h) => h.id).toSet();
+    final newMaster = <HabitModel>[];
+    int visibleIdx = 0;
+
+    for (final habit in currentList) {
+      if (visibleIds.contains(habit.id)) {
+        if (visibleIdx < newVisibleOrder.length) {
+          newMaster.add(newVisibleOrder[visibleIdx]);
+          visibleIdx++;
+        }
+      } else {
+        newMaster.add(habit);
+      }
+    }
+    while (visibleIdx < newVisibleOrder.length) {
+      newMaster.add(newVisibleOrder[visibleIdx]);
+      visibleIdx++;
+    }
+
+    state = AsyncValue.data(newMaster);
+    await _cacheHabits(newMaster);
+    await _saveCustomOrder(newMaster.map((h) => h.id).toList());
+  }
 
   static Future<void> _cacheHabits(List<HabitModel> habits) async {
     await JsonFileCache.write(

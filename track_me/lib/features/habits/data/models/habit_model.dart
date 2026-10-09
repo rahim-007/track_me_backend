@@ -6,6 +6,14 @@ class HabitModel {
   final String? color;
   final List<bool> repeatDays;
   final String? reminderTime;
+  final bool isInterval;
+  final int? intervalMinutes;
+  final String? windowStartTime;
+  final String? windowEndTime;
+  final double? targetValue;
+  final String? unit;
+  final bool rollingInterval;
+  final double currentValueToday;
   final String? notes;
   final DateTime createdAt;
   List<String> completedDates;
@@ -22,6 +30,14 @@ class HabitModel {
     this.color,
     required this.repeatDays,
     this.reminderTime,
+    this.isInterval = false,
+    this.intervalMinutes,
+    this.windowStartTime,
+    this.windowEndTime,
+    this.targetValue,
+    this.unit,
+    this.rollingInterval = false,
+    this.currentValueToday = 0,
     this.notes,
     required this.createdAt,
     required this.completedDates,
@@ -33,13 +49,39 @@ class HabitModel {
 
   bool get isCompletedToday {
     final today = _todayStr;
-    return completedDates.contains(today);
+    if (completedDates.contains(today)) return true;
+    if (isInterval && targetValue != null && targetValue! > 0) {
+      return currentValueToday >= targetValue!;
+    }
+    return false;
+  }
+
+  double get progressPercentage {
+    if (targetValue == null || targetValue! <= 0) {
+      return isCompletedToday ? 1.0 : 0.0;
+    }
+    return (currentValueToday / targetValue!).clamp(0.0, 1.0);
   }
 
   bool get isSkippedToday {
     final today = _todayStr;
     return skippedDates.contains(today);
   }
+
+  /// Checks if this habit is scheduled to be performed on [date].
+  /// Monday is 1, Sunday is 7 in Dart DateTime.
+  /// Index in repeatDays: 0 = Mon, 6 = Sun.
+  /// If no repeat days are selected, it defaults to daily.
+  bool isScheduledOn(DateTime date) {
+    final hasRepeatDay = repeatDays.any((d) => d);
+    if (!hasRepeatDay) return true;
+    final weekdayIndex = date.weekday - 1;
+    return weekdayIndex >= 0 &&
+        weekdayIndex < repeatDays.length &&
+        repeatDays[weekdayIndex];
+  }
+
+  bool get isScheduledToday => isScheduledOn(DateTime.now());
 
   String get _todayStr {
     final now = DateTime.now();
@@ -54,6 +96,14 @@ class HabitModel {
     String? color,
     List<bool>? repeatDays,
     String? reminderTime,
+    bool? isInterval,
+    int? intervalMinutes,
+    String? windowStartTime,
+    String? windowEndTime,
+    double? targetValue,
+    String? unit,
+    bool? rollingInterval,
+    double? currentValueToday,
     String? notes,
     DateTime? createdAt,
     List<String>? completedDates,
@@ -70,6 +120,14 @@ class HabitModel {
       color: color ?? this.color,
       repeatDays: repeatDays ?? this.repeatDays,
       reminderTime: reminderTime ?? this.reminderTime,
+      isInterval: isInterval ?? this.isInterval,
+      intervalMinutes: intervalMinutes ?? this.intervalMinutes,
+      windowStartTime: windowStartTime ?? this.windowStartTime,
+      windowEndTime: windowEndTime ?? this.windowEndTime,
+      targetValue: targetValue ?? this.targetValue,
+      unit: unit ?? this.unit,
+      rollingInterval: rollingInterval ?? this.rollingInterval,
+      currentValueToday: currentValueToday ?? this.currentValueToday,
       notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
       completedDates: completedDates ?? this.completedDates,
@@ -97,6 +155,15 @@ class HabitModel {
               .toList() ??
           List.filled(7, true),
       reminderTime: json['reminderTime'] as String?,
+      isInterval: json['isInterval'] as bool? ?? false,
+      intervalMinutes: json['intervalMinutes'] as int?,
+      windowStartTime: json['windowStartTime'] as String?,
+      windowEndTime: json['windowEndTime'] as String?,
+      targetValue: (json['targetValue'] as num?)?.toDouble(),
+      unit: json['unit'] as String?,
+      rollingInterval: json['rollingInterval'] as bool? ?? false,
+      currentValueToday:
+          (json['currentValueToday'] as num?)?.toDouble() ?? 0.0,
       notes: json['notes'] as String?,
       createdAt: DateTime.parse(json['createdAt'] as String),
       completedDates: (json['completedDates'] as List<dynamic>?)
@@ -122,6 +189,14 @@ class HabitModel {
       'color': color,
       'repeatDays': repeatDays,
       'reminderTime': reminderTime,
+      'isInterval': isInterval,
+      'intervalMinutes': intervalMinutes,
+      'windowStartTime': windowStartTime,
+      'windowEndTime': windowEndTime,
+      'targetValue': targetValue,
+      'unit': unit,
+      'rollingInterval': rollingInterval,
+      'currentValueToday': currentValueToday,
       'notes': notes,
       'createdAt': createdAt.toIso8601String(),
       'completedDates': completedDates,
@@ -132,9 +207,7 @@ class HabitModel {
     };
   }
 
-  /// Payload for the backend `POST /habits` endpoint — only fields the API
-  /// accepts (server-managed fields like id/createdAt/logs must be omitted or
-  /// the strict validation pipe rejects the request with 400).
+  /// Payload for the backend `POST /habits` endpoint
   Map<String, dynamic> toCreateJson() {
     return {
       'name': name,
@@ -143,13 +216,17 @@ class HabitModel {
       'color': color,
       'repeatDays': repeatDays,
       'reminderTime': reminderTime,
+      'isInterval': isInterval,
+      'intervalMinutes': intervalMinutes,
+      'windowStartTime': windowStartTime,
+      'windowEndTime': windowEndTime,
+      'targetValue': targetValue,
+      'unit': unit,
+      'rollingInterval': rollingInterval,
       'notes': notes,
     };
   }
 
-  // Categories are free-form text now (Health/Wealth/Peace/Others plus any
-  // custom name typed under "Others"). Legacy values (Fitness, Learning, …)
-  // must pass through unchanged so existing habits keep their category.
   String get _safeCategory {
     final catUpper = category.trim().toUpperCase();
     return catUpper.isEmpty ? 'OTHER' : catUpper;

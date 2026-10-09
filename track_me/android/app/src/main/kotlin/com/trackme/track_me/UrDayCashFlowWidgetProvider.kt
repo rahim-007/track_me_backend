@@ -77,6 +77,29 @@ class UrDayCashFlowWidgetProvider : HomeWidgetProvider() {
         return homeWidgetPrefs
     }
 
+    private fun getDoubleValue(prefs: SharedPreferences, key: String, defaultValue: Double = 0.0): Double {
+        return try {
+            val raw = prefs.all[key]
+            when (raw) {
+                is Long -> {
+                    if (prefs.getBoolean("home_widget.double.$key", false)) {
+                        java.lang.Double.longBitsToDouble(raw)
+                    } else {
+                        raw.toDouble()
+                    }
+                }
+                is Double -> raw
+                is Float -> raw.toDouble()
+                is Int -> raw.toDouble()
+                is Number -> raw.toDouble()
+                is String -> raw.toDoubleOrNull() ?: defaultValue
+                else -> defaultValue
+            }
+        } catch (e: Throwable) {
+            defaultValue
+        }
+    }
+
     private fun updateSingleWidget(
         context: Context,
         appWidgetManager: AppWidgetManager,
@@ -95,8 +118,8 @@ class UrDayCashFlowWidgetProvider : HomeWidgetProvider() {
             }
 
             val rawNet = prefs.getString("cashflow_net", "+₹0") ?: "+₹0"
-            val netVal = prefs.getFloat("cashflow_net_val", 0f).toDouble()
-            val isPositive = prefs.getBoolean("cashflow_is_positive", netVal >= 0)
+            val netVal = getDoubleValue(prefs, "cashflow_net_val", 0.0)
+            val isPositive = prefs.getBoolean("cashflow_is_positive", !rawNet.startsWith("-"))
             val income = prefs.getString("cashflow_income", "₹0") ?: "₹0"
             val outflow = prefs.getString("cashflow_outflow", "₹0") ?: "₹0"
             val bank = prefs.getString("cashflow_bank", "₹0") ?: "₹0"
@@ -111,20 +134,29 @@ class UrDayCashFlowWidgetProvider : HomeWidgetProvider() {
                 val waveBitmap = createWaveDecorationBitmap(waveWidthPx, waveHeightPx, isDark)
                 setImageViewBitmap(R.id.iv_cashflow_wave, waveBitmap)
 
-                // 2. Net Cash Flow Main Amount
+                // 2. Header Brand Title
+                val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
+                val minWidth = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0) ?: 0
+                val isNarrow = minWidth in 1..180
+                val headerTitle = if (isNarrow) "UrDay" else "UrDay · Cash Flow"
+                setTextViewText(R.id.tv_net_title, headerTitle)
+
+                // 3. Net Cash Flow Main Amount
                 setTextViewText(R.id.tv_net_amount, rawNet)
 
                 // 3. Dynamic Status Pill (Positive / Deficit / Neutral)
-                if (netVal > 0 || (netVal == 0.0 && isPositive)) {
-                    setTextViewText(R.id.tv_status_text, "↗ Positive")
-                    setTextColor(R.id.tv_status_text, Color.WHITE)
-                } else if (netVal < 0) {
-                    setTextViewText(R.id.tv_status_text, "↘ Deficit")
-                    setTextColor(R.id.tv_status_text, Color.WHITE)
-                } else {
-                    setTextViewText(R.id.tv_status_text, "• Neutral")
-                    setTextColor(R.id.tv_status_text, Color.WHITE)
-                }
+                val statusText = prefs.getString("cashflow_status_text", null)
+                    ?: if (netVal > 0 || (netVal == 0.0 && isPositive && rawNet != "₹0" && !rawNet.startsWith("-"))) {
+                        "↗ Positive"
+                    } else if (netVal < 0 || rawNet.startsWith("-")) {
+                        "↘ Deficit"
+                    } else if (isPositive) {
+                        "↗ Positive"
+                    } else {
+                        "• Neutral"
+                    }
+                setTextViewText(R.id.tv_status_text, statusText)
+                setTextColor(R.id.tv_status_text, Color.WHITE)
 
                 // 4. Income & Outflow Compact Chips
                 // Prefix with arrows matching the signature card (↙ for Income, ↗ for Outflow)

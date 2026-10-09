@@ -23,11 +23,24 @@ final _viewedPeriodIdProvider = StateProvider<String?>((_) => null);
 final _cashFlowSegmentProvider = StateProvider<int>((_) => 0);
 
 /// Cash Flow dashboard screen redesigned for 10/10 visual fidelity matching reference.
-class CashFlowScreen extends ConsumerWidget {
+class CashFlowScreen extends ConsumerStatefulWidget {
   const CashFlowScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CashFlowScreen> createState() => _CashFlowScreenState();
+}
+
+class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(cashFlowProvider.notifier).load();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     ref.watch(themeProvider);
     final isDark = AppColors.isDarkMode;
     final state = ref.watch(cashFlowProvider);

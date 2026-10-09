@@ -26,10 +26,10 @@ class AppConstants {
 
   // API Timeouts (milliseconds)
   // Connect timeout is generous enough to survive a Render free-tier cold
-  // start (which can take up to 30–60 s) while still failing fast on a truly
+  // start (which can take up to 50–60 s) while still failing cleanly on a truly
   // unreachable host. The retry interceptor handles 503s with backoff.
-  static const int connectTimeout = 30000;
-  static const int receiveTimeout = 30000;
+  static const int connectTimeout = 60000;
+  static const int receiveTimeout = 60000;
   static const int sendTimeout = 30000;
 
   // Pagination

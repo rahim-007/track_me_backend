@@ -5,7 +5,9 @@ import '../widgets/home_widget_service.dart';
 import 'app_colors.dart';
 
 class ThemeNotifier extends StateNotifier<bool> {
-  static const _storage = FlutterSecureStorage();
+  static const _storage = FlutterSecureStorage(
+    aOptions: AndroidOptions(resetOnError: true),
+  );
 
   ThemeNotifier(super.initialState) {
     AppColors.isDarkMode = state;

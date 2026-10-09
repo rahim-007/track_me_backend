@@ -128,20 +128,20 @@ class HomeWidgetService {
       }
 
       // Ensure cashflow widget is initialized or synchronized from cache
-      final existingCashFlow =
-          await HomeWidget.getWidgetData<String>('cashflow_net');
-      if (existingCashFlow == null) {
-        final cachedCashFlow = await JsonFileCache.read<Map<String, dynamic>>(
-          'cashflow_cache',
-          (json) => json as Map<String, dynamic>,
+      final cachedCashFlow = await JsonFileCache.read<Map<String, dynamic>>(
+        'cashflow_cache',
+        (json) => json as Map<String, dynamic>,
+      );
+      if (cachedCashFlow != null && cachedCashFlow['current'] != null) {
+        final period = CashFlowPeriodModel.fromJson(
+          Map<String, dynamic>.from(cachedCashFlow['current'] as Map),
+          isCurrent: true,
         );
-        if (cachedCashFlow != null && cachedCashFlow['current'] != null) {
-          final period = CashFlowPeriodModel.fromJson(
-            Map<String, dynamic>.from(cachedCashFlow['current'] as Map),
-            isCurrent: true,
-          );
-          await syncCashFlowData(period: period);
-        } else {
+        await syncCashFlowData(period: period);
+      } else {
+        final existingCashFlow =
+            await HomeWidget.getWidgetData<String>('cashflow_net');
+        if (existingCashFlow == null) {
           await HomeWidget.saveWidgetData<String>('cashflow_net', '+₹0');
           await HomeWidget.saveWidgetData<double>('cashflow_net_val', 0.0);
           await HomeWidget.saveWidgetData<bool>('cashflow_is_positive', true);
@@ -153,6 +153,8 @@ class HomeWidgetService {
           await HomeWidget.saveWidgetData<String>('cashflow_cash', '₹0');
           await HomeWidget.saveWidgetData<String>('cashflow_card', '₹0');
           await HomeWidget.saveWidgetData<bool>('cashflow_has_data', false);
+          await HomeWidget.saveWidgetData<String>(
+              'cashflow_status_text', '• Neutral');
           final now = DateTime.now();
           await HomeWidget.saveWidgetData<String>(
             'cashflow_period_name',
@@ -204,20 +206,19 @@ class HomeWidgetService {
     try {
       final now = DateTime.now();
       final todayStr = DateFormat('yyyy-MM-dd').format(now);
-      final weekdayIndex = now.weekday - 1; // 0 = Mon, 6 = Sun
 
       // Filter habits scheduled for today
-      final todayHabits = habits.where((h) {
-        final hasRepeatDays = h.repeatDays.any((d) => d);
-        if (!hasRepeatDays) return true; // Daily if no days selected
-        return weekdayIndex < h.repeatDays.length && h.repeatDays[weekdayIndex];
-      }).toList();
+      final todayHabits = habits.where((h) => h.isScheduledOn(now)).toList();
 
       final totalCount = todayHabits.length;
       final completedCount =
           todayHabits.where((h) => h.completedDates.contains(todayStr)).length;
-      final percent =
-          totalCount > 0 ? ((completedCount / totalCount) * 100).round() : 0;
+      final safeCompletedCount =
+          totalCount > 0 ? completedCount.clamp(0, totalCount) : 0;
+      final percent = totalCount > 0
+          ? ((safeCompletedCount / totalCount) * 100).round().clamp(0, 100)
+          : 0;
+      final ratio = '$safeCompletedCount/$totalCount';
 
       // Select daily rotating motivational quote
       final quoteIndex =
@@ -228,14 +229,9 @@ class HomeWidgetService {
       final quoteAuthor =
           kHabitQuotes.isNotEmpty ? kHabitQuotes[quoteIndex].author : "UrDay";
 
-      // Prepare habit items for the widget list (up to 10 items)
-      // Prioritize habits scheduled for today. If fewer than 5 are scheduled today,
-      // include the user's other active habits so all 5 compact widget slots can be populated.
-      final otherHabits =
-          habits.where((h) => !todayHabits.contains(h)).toList();
-      final allDisplayHabits = [...todayHabits, ...otherHabits];
-
-      final habitItems = allDisplayHabits.take(10).map((h) {
+      // Prepare habit items strictly for habits scheduled for today.
+      // Unscheduled habits for today must NEVER appear in the home widget.
+      final habitItems = todayHabits.map((h) {
         final isCompleted = h.completedDates.contains(todayStr);
         final rawEmoji = h.emoji?.trim();
         final safeEmoji =
@@ -260,9 +256,9 @@ class HomeWidgetService {
       await HomeWidget.saveWidgetData<int>('progress_percent', percent);
       await HomeWidget.saveWidgetData<String>(
         'progress_ratio',
-        '$completedCount/$totalCount',
+        ratio,
       );
-      await HomeWidget.saveWidgetData<int>('completed_count', completedCount);
+      await HomeWidget.saveWidgetData<int>('completed_count', safeCompletedCount);
       await HomeWidget.saveWidgetData<int>('total_count', totalCount);
       await HomeWidget.saveWidgetData<int>('streak_count', overallStreak);
       await HomeWidget.saveWidgetData<int>('base_streak_count', yesterdayStreak);
@@ -523,6 +519,8 @@ class HomeWidgetService {
       await HomeWidget.saveWidgetData<String>('cashflow_card', formattedCard);
       await HomeWidget.saveWidgetData<bool>('cashflow_has_data', hasData);
       await HomeWidget.saveWidgetData<String>('cashflow_period_name', period.label);
+      await HomeWidget.saveWidgetData<String>(
+          'cashflow_status_text', isPositive ? '↗ Positive' : '↘ Deficit');
       await HomeWidget.saveWidgetData<bool>(
           'app_is_dark_mode', AppColors.isDarkMode);
 

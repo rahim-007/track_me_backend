@@ -14,8 +14,12 @@ class JsonFileCache {
 
   static Future<String> _resolvedName(String name) async {
     try {
-      const storage = FlutterSecureStorage();
-      final userId = await storage.read(key: AppConstants.userIdKey);
+      const storage = FlutterSecureStorage(
+        aOptions: AndroidOptions(resetOnError: true),
+      );
+      final userId = await storage
+          .read(key: AppConstants.userIdKey)
+          .timeout(const Duration(seconds: 2));
       if (userId != null && userId.isNotEmpty) {
         return '${name}_$userId.json';
       }

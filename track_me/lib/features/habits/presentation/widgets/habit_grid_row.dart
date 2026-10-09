@@ -176,8 +176,54 @@ class HabitGridRow extends ConsumerWidget {
                               ),
                             ),
                           ),
-                          const SizedBox(height: 10),
-                          // Weekly progress bar row
+                          if (habit.isInterval) ...[
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary.withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.repeat_rounded, size: 10, color: AppColors.primary),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        (habit.intervalMinutes != null &&
+                                                habit.intervalMinutes! % 60 == 0)
+                                            ? 'Every ${habit.intervalMinutes! ~/ 60}h'
+                                            : (habit.intervalMinutes != null &&
+                                                    habit.intervalMinutes! > 60)
+                                                ? 'Every ${habit.intervalMinutes! ~/ 60}h ${habit.intervalMinutes! % 60}m'
+                                                : 'Every ${habit.intervalMinutes ?? 60}m',
+                                        style: const TextStyle(
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (habit.targetValue != null && habit.targetValue! > 0) ...[
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    '${habit.currentValueToday.toStringAsFixed(0)}/${habit.targetValue!.toStringAsFixed(0)} ${habit.unit ?? ''}',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      color: habit.isCompletedToday ? const Color(0xFF10B981) : AppColors.primary,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ],
+                          const SizedBox(height: 8),
+                          // Progress Bar Row (Daily for Interval, Weekly for normal)
                           Row(
                             children: [
                               Expanded(
@@ -186,13 +232,20 @@ class HabitGridRow extends ConsumerWidget {
                                   child: TweenAnimationBuilder<double>(
                                     duration: const Duration(milliseconds: 400),
                                     curve: Curves.easeOutCubic,
-                                    tween: Tween<double>(begin: 0, end: weeklyProgress),
+                                    tween: Tween<double>(
+                                      begin: 0,
+                                      end: habit.isInterval && habit.targetValue != null && habit.targetValue! > 0
+                                          ? habit.progressPercentage
+                                          : weeklyProgress,
+                                    ),
                                     builder: (context, animVal, _) {
                                       return LinearProgressIndicator(
                                         value: animVal,
                                         minHeight: 6,
                                         backgroundColor: AppColors.primaryContainer,
-                                        valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                          habit.isCompletedToday ? const Color(0xFF10B981) : AppColors.primary,
+                                        ),
                                       );
                                     },
                                   ),
@@ -200,11 +253,13 @@ class HabitGridRow extends ConsumerWidget {
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                '${(weeklyProgress * 100).round()}%',
-                                style: const TextStyle(
+                                habit.isInterval && habit.targetValue != null && habit.targetValue! > 0
+                                    ? '${(habit.progressPercentage * 100).round()}%'
+                                    : '${(weeklyProgress * 100).round()}%',
+                                style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w800,
-                                  color: AppColors.primary,
+                                  color: habit.isCompletedToday ? const Color(0xFF10B981) : AppColors.primary,
                                 ),
                               ),
                             ],
