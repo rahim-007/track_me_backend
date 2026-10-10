@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/local/isar_service.dart';
+import '../../../../core/local/user_local_cache.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/services/firebase_service.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -47,12 +48,34 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   Future<void> _navigate() async {
     // Show splash screen smoothly for ~2.2 seconds before navigating
     await Future.delayed(const Duration(milliseconds: 2200));
-    if (!mounted) return;
-
     try {
+      // 1. Check if authenticated first with a bounded timeout
+      bool authenticated = false;
+      try {
+        authenticated = await ref
+            .read(isAuthenticatedProvider.future)
+            .timeout(const Duration(milliseconds: 3500));
+      } catch (e) {
+        debugPrint('[SplashScreen] Error checking authentication: $e');
+        final cached = UserLocalCache.instance.inMemoryProfile;
+        authenticated = cached != null && cached.id.isNotEmpty;
+      }
+
+      if (!mounted) return;
+
+      if (authenticated) {
+        // User is logged in — go directly to dashboard without getting blocked by Isar/onboarding
+        unawaited(FirebaseService.registerDeviceWithBackend());
+        unawaited(ref.read(cashFlowProvider.notifier).load());
+        unawaited(ref.read(habitsProvider.notifier).loadHabits());
+        unawaited(ref.read(goalsProvider.notifier).loadGoals());
+        context.go(AppRoutes.dashboard);
+        return;
+      }
+
+      // 2. User is not logged in — check onboarding status
       bool onboardingDone = false;
       if (!IsarService.isAvailable) {
-        // Isar initializes in the background (non-blocking startup)
         try {
           await IsarService.initialize().timeout(const Duration(seconds: 2));
         } catch (_) {
@@ -76,39 +99,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       if (!mounted) return;
       if (!onboardingDone) {
         context.go(AppRoutes.onboarding);
-        return;
-      }
-
-      // Check if authenticated with a bounded timeout
-      bool authenticated = false;
-      try {
-        authenticated = await ref
-            .read(isAuthenticatedProvider.future)
-            .timeout(const Duration(milliseconds: 2500));
-      } catch (e) {
-        debugPrint('[SplashScreen] Error checking authentication: $e');
-        authenticated = false;
-      }
-
-      if (!mounted) return;
-
-      if (authenticated) {
-        // Best-effort: keep the backend's FCM token + timezone fresh on every
-        // launch while logged in (tokens rotate, the device timezone can change,
-        // and the previous device may be long gone).
-        unawaited(FirebaseService.registerDeviceWithBackend());
-        // Eagerly fetch latest remote data so user never encounters blank/0 states
-        unawaited(ref.read(cashFlowProvider.notifier).load());
-        unawaited(ref.read(habitsProvider.notifier).loadHabits());
-        unawaited(ref.read(goalsProvider.notifier).loadGoals());
-        context.go(AppRoutes.dashboard);
       } else {
         context.go(AppRoutes.login);
       }
     } catch (criticalErr) {
       debugPrint('[SplashScreen] Critical unhandled navigation error: $criticalErr');
       if (mounted) {
-        // Ultimate fallback: guarantee the app never freezes on the splash screen
         context.go(AppRoutes.login);
       }
     }

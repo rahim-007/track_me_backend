@@ -281,30 +281,57 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final token = await _secureStorage
           .read(key: AppConstants.accessTokenKey)
           .timeout(const Duration(milliseconds: 2500));
-      if (token == null || token.isEmpty) return false;
+      final refreshToken = await _secureStorage
+          .read(key: AppConstants.refreshTokenKey)
+          .timeout(const Duration(milliseconds: 2500));
+      final userId = await _secureStorage
+          .read(key: AppConstants.userIdKey)
+          .timeout(const Duration(milliseconds: 2500));
 
-      // Check if access token is still valid (not expired)
-      if (!_isJwtExpired(token)) {
+      final cachedProfile = await UserLocalCache.instance.getProfile();
+      final effectiveUserId = userId ?? cachedProfile?.id;
+
+      // If user has no tokens and no cached profile, they are definitively not logged in
+      if ((token == null || token.isEmpty) &&
+          (refreshToken == null || refreshToken.isEmpty) &&
+          (effectiveUserId == null || effectiveUserId.isEmpty)) {
+        return false;
+      }
+
+      // If access token is still fresh, set it immediately
+      if (token != null && token.isNotEmpty && !_isJwtExpired(token)) {
         DioClient().setCachedAccessToken(token);
-        final userId = await _secureStorage.read(key: AppConstants.userIdKey);
-        state = AuthSuccess(userId: userId ?? '');
+        state = AuthSuccess(userId: effectiveUserId ?? '');
         return true;
       }
 
-      // If access token is expired, attempt silent token refresh with the refresh token
-      debugPrint('[AUTH] Access token expired, attempting silent refresh...');
-      final refreshed = await DioClient().refreshToken();
-      if (refreshed) {
-        debugPrint('[AUTH] Silent refresh succeeded.');
-        final userId = await _secureStorage.read(key: AppConstants.userIdKey);
-        state = AuthSuccess(userId: userId ?? '');
+      // If access token is expired, but user has a valid local session (refreshToken or cached profile):
+      // The session is valid! Do not block the splash screen on network calls or force login.
+      if ((refreshToken != null && refreshToken.isNotEmpty) ||
+          (effectiveUserId != null && effectiveUserId.isNotEmpty)) {
+        if (token != null && token.isNotEmpty) {
+          DioClient().setCachedAccessToken(token);
+        }
+        state = AuthSuccess(userId: effectiveUserId ?? '');
+
+        // Kick off silent background token refresh without blocking app launch.
+        // If the refresh token is revoked or expired after 30 days, DioClient's 401
+        // interceptor will clear tokens and navigate to login automatically.
+        if (refreshToken != null && refreshToken.isNotEmpty) {
+          unawaited(DioClient().refreshToken());
+        }
+
         return true;
       }
 
-      debugPrint('[AUTH] Silent refresh failed. User must log in.');
       return false;
     } catch (e) {
       debugPrint('[AUTH] Failed reading auth token from secure storage: $e');
+      final cachedProfile = UserLocalCache.instance.inMemoryProfile;
+      if (cachedProfile != null && cachedProfile.id.isNotEmpty) {
+        state = AuthSuccess(userId: cachedProfile.id);
+        return true;
+      }
       return false;
     }
   }

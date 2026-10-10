@@ -22,6 +22,7 @@ class DioClient {
   /// In-memory cache of the access token to avoid platform channel latency
   /// and withstand Keystore timeouts on Android release builds.
   String? _cachedAccessToken;
+  bool _isSessionDefinitivelyExpired = false;
 
   String? get cachedAccessToken => _cachedAccessToken;
 
@@ -97,8 +98,8 @@ class DioClient {
             error.requestOptions.headers['Authorization'] = 'Bearer $token';
             final response = await dio.fetch(error.requestOptions);
             return handler.resolve(response);
-          } else {
-            // Definitively unauthenticated or session expired — notify app to navigate to login
+          } else if (_isSessionDefinitivelyExpired) {
+            // Definitively unauthenticated or session expired (rejected with 401/400)
             await _clearTokens();
             _notifySessionExpired();
           }
@@ -244,6 +245,7 @@ class DioClient {
 
       if (newAccessToken != null) {
         _cachedAccessToken = newAccessToken;
+        _isSessionDefinitivelyExpired = false;
         await _secureStorage.write(
           key: AppConstants.accessTokenKey,
           value: newAccessToken,
@@ -261,7 +263,8 @@ class DioClient {
       final status = e.response?.statusCode;
       if (status == 400 || status == 401) {
         // The refresh token was definitively rejected (expired/invalid) —
-        // only then is it safe to drop the session.
+        // only then is it safe to mark session expired and drop the session.
+        _isSessionDefinitivelyExpired = true;
         await _clearTokens();
       }
       // Network / timeout errors keep the stored tokens so a temporary outage

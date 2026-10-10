@@ -104,7 +104,7 @@ class _CashFlowScreenState extends ConsumerState<CashFlowScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Cash Flow',
+                          'Cash Flow 💰',
                           style: TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.w800,

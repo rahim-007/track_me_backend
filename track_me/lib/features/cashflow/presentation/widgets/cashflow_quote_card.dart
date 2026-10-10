@@ -92,9 +92,8 @@ class _CashFlowQuoteCardState extends State<CashFlowQuoteCard> {
           final isMedium = cardWidth >= 360 && cardWidth < 420;
           final cardHeight = (cardWidth < 345) ? 176.0 : 168.0;
 
-          // Scaled illustration on right:
+          // Scaled illustration area on right:
           final artWidth = (cardWidth * 0.39).clamp(118.0, 195.0);
-          final artHeight = artWidth * (440.0 / 568.0);
 
           final quoteFontSize = isCompact ? 13.5 : (isMedium ? 14.2 : 15.0);
           final quoteMarkSize = isCompact ? 26.0 : 30.0;
@@ -123,27 +122,13 @@ class _CashFlowQuoteCardState extends State<CashFlowQuoteCard> {
               borderRadius: BorderRadius.circular(24),
               child: Stack(
                 children: [
-                  // Background Hero Banner Graphic (Proportionally sized on the right)
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    bottom: 0,
-                    width: artWidth,
-                    child: ClipRect(
-                      child: OverflowBox(
-                        alignment: Alignment.centerRight,
-                        minWidth: 0,
-                        maxWidth: double.infinity,
-                        minHeight: 0,
-                        maxHeight: double.infinity,
-                        child: Image.asset(
-                          'assets/images/cashflow_hero_banner.png',
-                          height: artHeight,
-                          fit: BoxFit.fitHeight,
-                          alignment: Alignment.centerRight,
-                          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                        ),
-                      ),
+                  // Background Hero Banner Graphic (Seamless edge-to-edge cover)
+                  Positioned.fill(
+                    child: Image.asset(
+                      'assets/images/cashflow_hero_banner.png',
+                      fit: BoxFit.cover,
+                      alignment: Alignment.centerRight,
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                     ),
                   ),
                   // Left Accent Vertical Line

@@ -370,7 +370,7 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Habits',
+                          'Habits ⚡',
                           style: TextStyle(
                             fontSize: 30,
                             fontWeight: FontWeight.w800,
