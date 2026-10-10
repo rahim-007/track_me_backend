@@ -90,7 +90,7 @@ struct UrDayProgressWidgetView: View {
         let isDark = colorScheme == .dark
         let circleBg = isDark ? Color(hex: "0D0E18") : Color(hex: "F7F7FA")
         let circleBorder = isDark ? Color(hex: "28283E") : Color(hex: "E2E2EA")
-        let trackColor = isDark ? Color(hex: "1C1B30") : Color(hex: "ECECF2")
+        let trackColor = Color.white.opacity(0.22)
         let textPrimary = isDark ? Color(hex: "EDEDF4") : Color(hex: "171721")
         let textSecondary = isDark ? Color(hex: "9493A6") : Color(hex: "6B6B78")
         let purpleAccent = isDark ? Color(hex: "A78BFA") : Color(hex: "6E49E6")

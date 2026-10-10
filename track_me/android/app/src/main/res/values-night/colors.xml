@@ -18,7 +18,7 @@
     <!-- Circular Progress & Date Widget Design - DARK MODE -->
     <color name="widget_circle_bg">#0D0E18</color>
     <color name="widget_circle_border">#28283E</color>
-    <color name="widget_circle_track">#1C1B30</color>
+    <color name="widget_circle_track">#38FFFFFF</color>
     <color name="widget_purple_accent">#A78BFA</color>
     <color name="widget_purple_primary">#7C3AED</color>
     <color name="widget_purple_glow">#338B5CF6</color>

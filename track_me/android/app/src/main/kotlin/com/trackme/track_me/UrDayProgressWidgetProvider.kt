@@ -187,8 +187,8 @@ class UrDayProgressWidgetProvider : HomeWidgetProvider() {
         val padding = strokeWidth / 2f + 2f
         val rect = RectF(padding, padding, sizePx - padding, sizePx - padding)
 
-        // 1. Inactive background track ring
-        val trackColor = if (isDark) Color.parseColor("#1C1B30") else Color.parseColor("#ECECF2")
+        // 1. Inactive background track ring in translucent white transparency (glassmorphism)
+        val trackColor = Color.argb(56, 255, 255, 255) // 22% opacity translucent white
         val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
             this.strokeWidth = strokeWidth
