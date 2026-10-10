@@ -50,7 +50,11 @@ export class CashFlowPeriodService {
 
   /** All periods for the user, oldest first. */
   async listPeriods(userId: string) {
-    await this.ensureCurrentPeriod(userId);
+    try {
+      await this.ensureCurrentPeriod(userId);
+    } catch (err) {
+      console.warn('[CashFlowPeriodService] ensureCurrentPeriod non-fatal error in listPeriods:', err);
+    }
     const periods = await this.prisma.cashFlowPeriod.findMany({
       where: { userId },
       orderBy: [{ year: 'asc' }, { month: 'asc' }],
@@ -64,7 +68,11 @@ export class CashFlowPeriodService {
    */
   async getCurrentPeriod(userId: string) {
     const period = await this.ensureCurrentPeriod(userId);
-    await this.recalculateFuturePeriods(userId);
+    try {
+      await this.recalculateFuturePeriods(userId);
+    } catch (err) {
+      console.warn('[CashFlowPeriodService] recalculateFuturePeriods non-fatal error in getCurrentPeriod:', err);
+    }
     const fresh = await this.prisma.cashFlowPeriod.findFirst({
       where: { id: period.id },
     });
@@ -399,12 +407,16 @@ export class CashFlowPeriodService {
   private async ensureCurrentPeriod(userId: string): Promise<PeriodRow> {
     const now = monthYearOf(this.now());
     let latest = await this.latestPeriod(userId);
+    let guard = 0;
+    const maxIterations = 24;
 
     while (
-      !latest ||
-      latest.year < now.year ||
-      (latest.year === now.year && latest.month < now.month)
+      guard < maxIterations &&
+      (!latest ||
+        latest.year < now.year ||
+        (latest.year === now.year && latest.month < now.month))
     ) {
+      guard++;
       const next = !latest ? null : nextMonth(latest.month, latest.year);
       if (!latest) {
         // No period at all — auto-open an all-zero current month so reads and
@@ -434,11 +446,21 @@ export class CashFlowPeriodService {
         });
       } catch {
         // Lost a race against another request that already opened this month —
-        // re-read and continue from there.
-        latest = await this.latestPeriod(userId);
+        // re-read and continue from there if advanced.
+        const recheck = await this.latestPeriod(userId);
+        if (
+          recheck &&
+          (recheck.year > latest.year ||
+            (recheck.year === latest.year && recheck.month > latest.month))
+        ) {
+          latest = recheck;
+        } else {
+          // If latest cannot advance, break gracefully to prevent infinite loop.
+          break;
+        }
       }
     }
-    return latest;
+    return latest!;
   }
 
   private async latestPeriod(userId: string): Promise<PeriodRow | null> {

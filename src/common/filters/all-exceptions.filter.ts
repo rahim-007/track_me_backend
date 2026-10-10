@@ -81,6 +81,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     this.logger.error(
       `${request.method} ${request.url} → ${status}: ${message}`,
+      (exception as any)?.stack || String(exception),
     );
 
     response.status(status).json({
