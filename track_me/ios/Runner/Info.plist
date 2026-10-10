@@ -57,5 +57,14 @@
 			</array>
 		</dict>
 	</array>
+	<!-- Permissions for Profile Avatar Selection (image_picker) -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>UrDay requires photo library access to allow you to upload and customize your profile avatar.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>UrDay requires camera access to allow you to take a photo for your profile avatar.</string>
+
+	<!-- App Store Export Compliance -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

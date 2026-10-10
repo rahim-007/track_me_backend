@@ -6,7 +6,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shadows.dart';
@@ -103,6 +105,21 @@ final appVersionProvider = FutureProvider<String>((ref) async {
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
+
+  Future<void> _openUrl(BuildContext context, String urlString) async {
+    final uri = Uri.tryParse(urlString);
+    if (uri != null && await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not open $urlString'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
 
   void _showEditProfileDialog(BuildContext context, WidgetRef ref, UserProfile? user) {
     showDialog<void>(
@@ -240,6 +257,30 @@ class ProfileScreen extends ConsumerWidget {
                 height: 1.5,
               ),
             ),
+            const SizedBox(height: 12),
+            InkWell(
+              onTap: () => _openUrl(context, AppConstants.accountDeletionUrl),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Icon(Icons.open_in_new_rounded, size: 14, color: AppColors.primary),
+                    SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Online deletion portal: urday.app/delete-account',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
         actions: [
@@ -369,6 +410,79 @@ class ProfileScreen extends ConsumerWidget {
         actions: [
           ElevatedButton(
             onPressed: () => Navigator.pop(context),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+            child: const Text('Got it', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPrivacySecurityDialog(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.primaryContainer,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.shield_rounded, color: AppColors.primary, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Privacy & Security',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'UrDay uses Supabase Row Level Security (RLS). All habit entries, goals, and financial cashflow items are private and strictly accessible only to your authenticated user account.',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'We never sell your data or share personal tracking records with third parties.',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+                height: 1.4,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              _openUrl(context, AppConstants.privacyPolicyUrl);
+            },
+            child: const Text('View Privacy Policy'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
@@ -558,13 +672,7 @@ class ProfileScreen extends ConsumerWidget {
                     icon: Icons.shield_rounded,
                     title: 'Privacy & Security',
                     subtitle: 'RLS database security & data safety',
-                    onTap: () {
-                      _showInfoDialog(
-                        context,
-                        'Privacy & Data Security',
-                        'UrDay uses Supabase Row Level Security (RLS). All habit entries, goals, and financial cashflow items are private and strictly accessible only to your authenticated user account.',
-                      );
-                    },
+                    onTap: () => _showPrivacySecurityDialog(context),
                   ),
                   _SettingsNavTile(
                     icon: Icons.delete_forever_rounded,
@@ -620,6 +728,18 @@ class ProfileScreen extends ConsumerWidget {
                         'Need assistance with UrDay?\n\n• Habits: Check in daily or record skip reasons.\n• Goals: Set target dates and adjust progress percentage.\n• Cash Flow: Record income and outflow to track net liquidity.\n\nFor support inquiries, reach out to support@urday.app.',
                       );
                     },
+                  ),
+                  _SettingsNavTile(
+                    icon: Icons.policy_rounded,
+                    title: 'Privacy Policy',
+                    subtitle: 'Data usage, retention & privacy terms',
+                    onTap: () => _openUrl(context, AppConstants.privacyPolicyUrl),
+                  ),
+                  _SettingsNavTile(
+                    icon: Icons.description_rounded,
+                    title: 'Terms of Service',
+                    subtitle: 'User agreement and service conditions',
+                    onTap: () => _openUrl(context, AppConstants.termsOfServiceUrl),
                   ),
                   _SettingsNavTile(
                     icon: Icons.info_outline_rounded,

@@ -6,6 +6,11 @@ class AppConstants {
   static const String appVersion = '1.0.0';
   static const String bundleId = 'com.trackme.app';
 
+  // Legal & Policy URLs (Google Play & App Store Compliance)
+  static const String privacyPolicyUrl = 'https://urday.app/privacy-policy';
+  static const String termsOfServiceUrl = 'https://urday.app/terms-of-service';
+  static const String accountDeletionUrl = 'https://urday.app/delete-account';
+
   // Isar Box Names
   static const String onboardingBox = 'onboarding_box';
   static const String authBox = 'auth_box';
