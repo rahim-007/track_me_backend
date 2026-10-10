@@ -270,12 +270,16 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen> {
                               borderRadius: BorderRadius.circular(24),
                               child: Stack(
                                 children: [
-                                  // Background Hero Banner Graphic (Seamless edge-to-edge cover)
-                                  Positioned.fill(
+                                  // 3D Goal Climber Illustration Graphic (Transparent native blend)
+                                  Positioned(
+                                    right: -2,
+                                    top: 6,
+                                    bottom: 0,
+                                    width: artWidth,
                                     child: Image.asset(
-                                      'assets/images/goal_hero_banner.png',
-                                      fit: BoxFit.cover,
-                                      alignment: Alignment.centerRight,
+                                      'assets/images/goal_climber_illustration.png',
+                                      fit: BoxFit.contain,
+                                      alignment: Alignment.bottomRight,
                                       errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                                     ),
                                   ),
