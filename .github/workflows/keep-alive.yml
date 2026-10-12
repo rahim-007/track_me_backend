@@ -1,0 +1,23 @@
+name: Backend Keep-Alive Liveness Ping
+
+on:
+  schedule:
+    # Ping every 10 minutes to prevent Render free-tier instance from sleeping
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Ping API Health Endpoint
+        run: |
+          echo "Pinging https://track-me-backend-pe6j.onrender.com/api/health..."
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -m 45 "https://track-me-backend-pe6j.onrender.com/api/health")
+          echo "HTTP Response Status: $STATUS"
+          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 400 ]; then
+            echo "Render instance is warm and healthy."
+          else
+            echo "Instance was cold or waking up."
+          fi
