@@ -45,6 +45,7 @@ export class CashFlowDebtService {
   }
 
   async create(userId: string, dto: CreateCashFlowDebtDto) {
+    const isSettled = dto.settled ?? false;
     const debt = await this.prisma.cashFlowDebt.create({
       data: {
         userId,
@@ -53,6 +54,12 @@ export class CashFlowDebtService {
         amount: dto.amount,
         note: dto.note ?? null,
         date: new Date(dto.date),
+        settled: isSettled,
+        settledAt: isSettled
+          ? dto.settledAt
+            ? new Date(dto.settledAt)
+            : new Date()
+          : null,
       },
     });
     return this.serialize(debt);
@@ -74,8 +81,16 @@ export class CashFlowDebtService {
         ...(dto.date !== undefined && { date: new Date(dto.date) }),
         ...(dto.settled !== undefined && {
           settled: dto.settled,
-          settledAt: dto.settled ? new Date() : null,
+          settledAt: dto.settled
+            ? dto.settledAt
+              ? new Date(dto.settledAt)
+              : new Date()
+            : null,
         }),
+        ...(dto.settled === undefined &&
+          dto.settledAt !== undefined && {
+            settledAt: dto.settledAt ? new Date(dto.settledAt) : null,
+          }),
       },
     });
     return this.serialize(updated);

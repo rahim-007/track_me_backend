@@ -40,6 +40,19 @@ export class CreateCashFlowDebtDto {
   })
   @IsDateString()
   date: string;
+
+  @ApiPropertyOptional({ example: false })
+  @IsOptional()
+  @IsBoolean()
+  settled?: boolean;
+
+  @ApiPropertyOptional({
+    example: '2026-08-22T10:00:00.000Z',
+    description: 'Settled ISO date or date string',
+  })
+  @IsOptional()
+  @IsDateString()
+  settledAt?: string;
 }
 
 export class UpdateCashFlowDebtDto {
@@ -75,4 +88,12 @@ export class UpdateCashFlowDebtDto {
   @IsOptional()
   @IsBoolean()
   settled?: boolean;
+
+  @ApiPropertyOptional({
+    example: '2026-08-22T10:00:00.000Z',
+    description: 'Settled ISO date or date string',
+  })
+  @IsOptional()
+  @IsDateString()
+  settledAt?: string;
 }

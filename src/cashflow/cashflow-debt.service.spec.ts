@@ -111,9 +111,33 @@ describe('CashFlowDebtService', () => {
     expect(settled.settled).toBe(true);
     expect(settled.settledAt).toBeDefined();
 
+    const customDate = '2026-08-05T14:30:00.000Z';
+    const settledCustom = await svc.update('u1', d.id, {
+      settled: true,
+      settledAt: customDate,
+    });
+    expect(settledCustom.settled).toBe(true);
+    expect(settledCustom.settledAt).toBe(customDate);
+
     const reopened = await svc.update('u1', d.id, { settled: false });
     expect(reopened.settled).toBe(false);
     expect(reopened.settledAt).toBeNull();
+  });
+
+  it('creates an already settled debt with settledAt date option', async () => {
+    const prisma = makePrismaMock();
+    const svc = new CashFlowDebtService(prisma as any);
+    const customDate = '2026-08-02T10:00:00.000Z';
+    const d = await svc.create('u1', {
+      direction: 'RECEIVE',
+      person: 'Rohan',
+      amount: 1500,
+      date: '2026-08-01',
+      settled: true,
+      settledAt: customDate,
+    });
+    expect(d.settled).toBe(true);
+    expect(d.settledAt).toBe(customDate);
   });
 
   it('enforces ownership on update and delete', async () => {
