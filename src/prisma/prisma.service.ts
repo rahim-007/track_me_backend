@@ -17,6 +17,12 @@ export class PrismaService
 
   async onModuleInit() {
     await this.$connect();
+    // Production migrations are standardized in prisma/migrations/ and run via "npm run migrate:deploy".
+    // The statements below provide backward-compatible safety checks for dev and single-instance deployments.
+    if (process.env.SKIP_STARTUP_DDL === 'true') {
+      console.log('[PrismaService] SKIP_STARTUP_DDL=true: Skipping runtime DDL execution.');
+      return;
+    }
     const alterStatements = [
       // Habits auto-migration
       'ALTER TABLE "habits" ADD COLUMN IF NOT EXISTS "isInterval" BOOLEAN NOT NULL DEFAULT false',
